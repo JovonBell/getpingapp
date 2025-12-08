@@ -3,24 +3,38 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { LanguageProvider } from './contexts/LanguageContext';
 import WelcomeScreen from './screens/WelcomeScreen';
 import CreateAccountScreen from './screens/CreateAccountScreen';
 import ImportContactsScreen from './screens/ImportContactsScreen';
 import SelectContactsScreen from './screens/SelectContactsScreen';
+import VisualizeCircleScreen from './screens/VisualizeCircleScreen';
 import HomeScreen from './screens/HomeScreen';
 import AddContactScreen from './screens/AddContactScreen';
 import AlertsScreen from './screens/AlertsScreen';
 import ContactsListScreen from './screens/ContactsListScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import MessagesScreen from './screens/MessagesScreen';
+import ChatScreen from './screens/ChatScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import ProfileEditScreen from './screens/ProfileEditScreen';
+import ProfileSettingsScreen from './screens/ProfileSettingsScreen';
+import PrivacySettingsScreen from './screens/PrivacySettingsScreen';
+import NotificationsSettingsScreen from './screens/NotificationsSettingsScreen';
+import LanguageSettingsScreen from './screens/LanguageSettingsScreen';
+import ThemeSettingsScreen from './screens/ThemeSettingsScreen';
+import HelpCenterScreen from './screens/HelpCenterScreen';
+import ContactUsScreen from './screens/ContactUsScreen';
+import AboutScreen from './screens/AboutScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // Bottom Tab Navigator for main app screens
 function MainTabs() {
+  const { theme } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -33,7 +47,7 @@ function MainTabs() {
           paddingTop: 12,
           height: 90,
         },
-        tabBarActiveTintColor: '#00ff88',
+        tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: '#666',
         tabBarLabelStyle: {
           fontSize: 12,
@@ -96,21 +110,35 @@ function MainTabs() {
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
-        <Stack.Screen name="Welcome" component={WelcomeScreen} />
-        <Stack.Screen name="CreateAccount" component={CreateAccountScreen} />
-        <Stack.Screen name="ImportContacts" component={ImportContactsScreen} />
-        <Stack.Screen name="SelectContacts" component={SelectContactsScreen} />
-        <Stack.Screen name="Profile" component={ProfileScreen} />
-        <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
-        <Stack.Screen name="Messages" component={MessagesScreen} />
-        <Stack.Screen name="Home" component={MainTabs} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <ThemeProvider>
+      <LanguageProvider>
+        <NavigationContainer>
+          <Stack.Navigator
+            screenOptions={{
+              headerShown: false,
+            }}
+          >
+            <Stack.Screen name="Welcome" component={WelcomeScreen} />
+            <Stack.Screen name="CreateAccount" component={CreateAccountScreen} />
+            <Stack.Screen name="ImportContacts" component={ImportContactsScreen} />
+            <Stack.Screen name="SelectContacts" component={SelectContactsScreen} />
+            <Stack.Screen name="VisualizeCircle" component={VisualizeCircleScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
+            <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />
+            <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
+            <Stack.Screen name="NotificationsSettings" component={NotificationsSettingsScreen} />
+            <Stack.Screen name="LanguageSettings" component={LanguageSettingsScreen} />
+            <Stack.Screen name="ThemeSettings" component={ThemeSettingsScreen} />
+            <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+            <Stack.Screen name="ContactUs" component={ContactUsScreen} />
+            <Stack.Screen name="About" component={AboutScreen} />
+            <Stack.Screen name="Messages" component={MessagesScreen} />
+            <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen name="Home" component={MainTabs} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }

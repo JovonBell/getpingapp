@@ -168,7 +168,7 @@ export default function SelectContactsScreen({ navigation, route }) {
             style={styles.importButton}
             onPress={() => {
               const contacts = DUMMY_CONTACTS.filter(c => selectedContacts.includes(c.id));
-              navigation.navigate('Home', { contacts });
+              navigation.navigate('VisualizeCircle', { contacts });
             }}
           >
             <Text style={styles.importButtonText}>import selected</Text>
@@ -236,9 +236,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 20,
     borderWidth: 2,
-    borderColor: '#00ff88',
+    borderColor: '#4FFFB0',
     borderRadius: 12,
-    backgroundColor: 'rgba(0, 255, 136, 0.1)',
+    backgroundColor: 'rgba(79, 255, 176, 0.1)',
   },
   selectAllText: {
     color: '#ffffff',

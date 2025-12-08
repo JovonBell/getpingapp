@@ -6,14 +6,57 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function AddContactScreen({ navigation }) {
+export default function AddContactScreen({ navigation, route }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [showTierPicker, setShowTierPicker] = useState(false);
+
+  const handleAddToCircle = () => {
+    if (!name.trim() || !phone.trim()) {
+      alert('Please enter at least a name and phone number');
+      return;
+    }
+    setShowTierPicker(true);
+  };
+
+  const handleTierSelect = (tier) => {
+    // Get existing contacts from route params or use empty array
+    const existingContacts = route?.params?.contacts || [];
+
+    // Create initials from name
+    const nameParts = name.trim().split(' ');
+    const initials = nameParts.length > 1
+      ? nameParts[0][0] + nameParts[nameParts.length - 1][0]
+      : nameParts[0][0] + (nameParts[0][1] || '');
+
+    // Create new contact
+    const newContact = {
+      id: Date.now().toString(),
+      name: name.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      initials: initials.toUpperCase(),
+      tier: tier,
+    };
+
+    // Add to contacts array
+    const updatedContacts = [...existingContacts, newContact];
+
+    // Navigate to HomeTab with updated contacts
+    setShowTierPicker(false);
+    setName('');
+    setPhone('');
+    setEmail('');
+
+    // Navigate to home with the new contact
+    navigation.navigate('HomeTab', { contacts: updatedContacts });
+  };
 
   return (
     <View style={styles.container}>
@@ -80,10 +123,67 @@ export default function AddContactScreen({ navigation }) {
             />
           </View>
 
-          <TouchableOpacity style={styles.saveButton}>
+          <TouchableOpacity style={styles.saveButton} onPress={handleAddToCircle}>
             <Text style={styles.saveButtonText}>Add to Circle</Text>
           </TouchableOpacity>
         </ScrollView>
+
+        {/* Tier Selection Modal */}
+        <Modal
+          visible={showTierPicker}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowTierPicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.tierPickerBox}>
+              <Text style={styles.tierPickerTitle}>Select Circle Tier</Text>
+              <Text style={styles.tierPickerSubtitle}>Choose how close this contact is to you</Text>
+
+              <View style={styles.tierOptions}>
+                <TouchableOpacity
+                  style={styles.tierOption}
+                  onPress={() => handleTierSelect('close')}
+                >
+                  <View style={styles.tierCircleContainer}>
+                    <View style={[styles.tierCircle, styles.tierCircleClose]} />
+                  </View>
+                  <Text style={styles.tierLabel}>Close Circle</Text>
+                  <Text style={styles.tierDescription}>Inner ring</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.tierOption}
+                  onPress={() => handleTierSelect('medium')}
+                >
+                  <View style={styles.tierCircleContainer}>
+                    <View style={[styles.tierCircle, styles.tierCircleMedium]} />
+                  </View>
+                  <Text style={styles.tierLabel}>Medium</Text>
+                  <Text style={styles.tierDescription}>Middle ring</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.tierOption}
+                  onPress={() => handleTierSelect('distant')}
+                >
+                  <View style={styles.tierCircleContainer}>
+                    <View style={[styles.tierCircle, styles.tierCircleDistant]} />
+                  </View>
+                  <Text style={styles.tierLabel}>Distant</Text>
+                  <Text style={styles.tierDescription}>Outer ring</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowTierPicker(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </LinearGradient>
     </View>
   );
@@ -156,7 +256,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   addPhotoText: {
-    color: '#00ff88',
+    color: '#4FFFB0',
     fontSize: 16,
   },
   inputContainer: {
@@ -171,7 +271,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: '#2a3a2a',
     borderWidth: 1,
-    borderColor: '#00ff88',
+    borderColor: '#4FFFB0',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -179,16 +279,117 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   saveButton: {
-    backgroundColor: '#a8e6cf',
+    backgroundColor: '#4FFFB0',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 20,
     marginBottom: 40,
+    shadowColor: '#4FFFB0',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
   },
   saveButtonText: {
-    color: '#1a1a1a',
+    color: '#000000',
     fontSize: 18,
+    fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  tierPickerBox: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#0a1a0a',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#4FFFB0',
+    padding: 24,
+    shadowColor: '#4FFFB0',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  tierPickerTitle: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  tierPickerSubtitle: {
+    color: '#999',
+    fontSize: 14,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  tierOptions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    gap: 12,
+    marginBottom: 24,
+  },
+  tierOption: {
+    alignItems: 'center',
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(79, 255, 176, 0.05)',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(79, 255, 176, 0.2)',
+  },
+  tierCircleContainer: {
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  tierCircle: {
+    backgroundColor: '#4FFFB0',
+    borderRadius: 30,
+    shadowColor: '#4FFFB0',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 10,
+  },
+  tierCircleClose: {
+    width: 24,
+    height: 24,
+  },
+  tierCircleMedium: {
+    width: 38,
+    height: 38,
+  },
+  tierCircleDistant: {
+    width: 52,
+    height: 52,
+  },
+  tierLabel: {
+    color: '#ffffff',
+    fontSize: 13,
     fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  tierDescription: {
+    color: '#999',
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  cancelButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#999',
+    fontSize: 16,
   },
 });

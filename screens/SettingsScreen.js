@@ -62,9 +62,28 @@ export default function SettingsScreen({ navigation }) {
             <View key={index} style={styles.section}>
               <Text style={styles.sectionTitle}>{section.title}</Text>
               {section.items.map((item, itemIndex) => (
-                <TouchableOpacity key={itemIndex} style={styles.settingItem}>
+                <TouchableOpacity
+                  key={itemIndex}
+                  style={styles.settingItem}
+                  onPress={() => {
+                    const navigationMap = {
+                      'profile': 'ProfileSettings',
+                      'privacy': 'PrivacySettings',
+                      'notifications': 'NotificationsSettings',
+                      'language': 'LanguageSettings',
+                      'theme': 'ThemeSettings',
+                      'help': 'HelpCenter',
+                      'contact': 'ContactUs',
+                      'about': 'About',
+                    };
+                    const screen = navigationMap[item.action];
+                    if (screen) {
+                      navigation.navigate(screen);
+                    }
+                  }}
+                >
                   <View style={styles.settingLeft}>
-                    <Ionicons name={item.icon} size={24} color="#00ff88" />
+                    <Ionicons name={item.icon} size={24} color="#4FFFB0" />
                     <Text style={styles.settingLabel}>{item.label}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color="#666" />

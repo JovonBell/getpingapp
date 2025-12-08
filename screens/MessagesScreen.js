@@ -67,9 +67,22 @@ const DUMMY_MESSAGES = [
   },
 ];
 
-export default function MessagesScreen({ navigation }) {
+export default function MessagesScreen({ navigation, route }) {
+  // Get contact from route params if navigating from HomeScreen
+  const contactFromRoute = route?.params?.contact;
+
+  // If a contact was passed, navigate to chat immediately
+  React.useEffect(() => {
+    if (contactFromRoute) {
+      navigation.navigate('Chat', { contact: contactFromRoute });
+    }
+  }, [contactFromRoute, navigation]);
+
   const renderMessage = ({ item }) => (
-    <TouchableOpacity style={styles.messageItem}>
+    <TouchableOpacity
+      style={styles.messageItem}
+      onPress={() => navigation.navigate('Chat', { contact: item })}
+    >
       <View style={[styles.avatar, { backgroundColor: item.color }]}>
         <Text style={styles.avatarText}>{item.initials}</Text>
       </View>
@@ -249,7 +262,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#00ff88',
+    backgroundColor: '#4FFFB0',
     marginLeft: 8,
   },
 });
