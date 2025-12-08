@@ -5,21 +5,22 @@ import {
   View,
   TouchableOpacity,
   TextInput,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function CreateAccountScreen({ navigation }) {
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [phoneFocused, setPhoneFocused] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
       <LinearGradient
         colors={['#0a2e1a', '#05140a', '#000000']}
         style={styles.gradient}
@@ -38,7 +39,30 @@ export default function CreateAccountScreen({ navigation }) {
           <Text style={styles.subtitle}>visualize your circle.</Text>
         </View>
 
-        {/* Input Fields */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {/* Input Fields */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>phone number</Text>
+          <TextInput
+            style={[
+              styles.input,
+              phoneFocused && styles.inputFocused,
+            ]}
+            placeholder="phone number"
+            placeholderTextColor="#999"
+            value={phone}
+            onChangeText={setPhone}
+            onFocus={() => setPhoneFocused(true)}
+            onBlur={() => setPhoneFocused(false)}
+            keyboardType="phone-pad"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>email</Text>
           <TextInput
@@ -91,7 +115,10 @@ export default function CreateAccountScreen({ navigation }) {
         </View>
 
         {/* Continue Button */}
-        <TouchableOpacity style={styles.continueButton}>
+        <TouchableOpacity
+          style={styles.continueButton}
+          onPress={() => navigation.navigate('ImportContacts')}
+        >
           <Text style={styles.continueButtonText}>continue</Text>
         </TouchableOpacity>
 
@@ -103,14 +130,20 @@ export default function CreateAccountScreen({ navigation }) {
         </View>
 
         {/* Social Login Buttons */}
-        <TouchableOpacity style={styles.socialButton}>
+        <TouchableOpacity
+          style={styles.socialButton}
+          onPress={() => navigation.navigate('ImportContacts')}
+        >
           <View style={styles.googleLogo}>
             <Text style={styles.googleG}>G</Text>
           </View>
           <Text style={styles.socialButtonText}>continue with google</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.socialButton}>
+        <TouchableOpacity
+          style={styles.socialButton}
+          onPress={() => navigation.navigate('ImportContacts')}
+        >
           <Ionicons name="logo-apple" size={24} color="#000000" />
           <Text style={styles.socialButtonText}>continue with apple</Text>
         </TouchableOpacity>
@@ -128,6 +161,7 @@ export default function CreateAccountScreen({ navigation }) {
             </Text>
           </TouchableOpacity>
         </View>
+        </ScrollView>
       </LinearGradient>
     </View>
   );
@@ -152,17 +186,18 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 40,
   },
+  scrollContent: {
+    paddingBottom: 20,
+  },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 8,
-    fontFamily: 'System',
   },
   subtitle: {
     fontSize: 16,
     color: '#ffffff',
-    fontFamily: 'System',
   },
   inputContainer: {
     marginBottom: 20,
@@ -171,7 +206,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#cccccc',
     marginBottom: 8,
-    fontFamily: 'System',
   },
   input: {
     backgroundColor: '#ffffff',
@@ -182,7 +216,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: '#000000',
-    fontFamily: 'System',
   },
   inputFocused: {
     borderColor: '#00ff88',
@@ -211,7 +244,6 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     fontSize: 18,
     fontWeight: '600',
-    fontFamily: 'System',
   },
   separator: {
     flexDirection: 'row',
@@ -228,7 +260,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     paddingHorizontal: 16,
     fontSize: 14,
-    fontFamily: 'System',
   },
   socialButton: {
     backgroundColor: '#f5f5dc',
@@ -257,7 +288,6 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     fontSize: 16,
     fontWeight: '500',
-    fontFamily: 'System',
   },
   footer: {
     marginTop: 30,
@@ -268,7 +298,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginBottom: 20,
-    fontFamily: 'System',
   },
   footerLink: {
     textDecorationLine: 'underline',
@@ -279,11 +308,9 @@ const styles = StyleSheet.create({
   signInText: {
     color: '#ffffff',
     fontSize: 14,
-    fontFamily: 'System',
   },
   signInLinkText: {
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
 });
-

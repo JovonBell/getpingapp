@@ -1,13 +1,10 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
 
 export default function WelcomeScreen({ navigation }) {
-
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
       <LinearGradient
         colors={['#0a2e1a', '#05140a', '#000000']}
         style={styles.gradient}
@@ -117,13 +114,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 10,
-    fontFamily: 'System',
   },
   tagline: {
     fontSize: 16,
     color: '#ffffff',
     marginBottom: 50,
-    fontFamily: 'System',
   },
   getStartedButton: {
     backgroundColor: '#a8e6cf',
@@ -138,7 +133,6 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     fontSize: 18,
     fontWeight: '600',
-    fontFamily: 'System',
   },
   signInContainer: {
     marginTop: 10,
@@ -146,11 +140,9 @@ const styles = StyleSheet.create({
   signInText: {
     color: '#ffffff',
     fontSize: 14,
-    fontFamily: 'System',
   },
   signInLink: {
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
 });
-
