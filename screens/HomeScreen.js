@@ -119,7 +119,7 @@ export default function HomeScreen({ navigation, route }) {
   // Pinch to zoom and rotation gesture handlers
   const lastScale = useRef(1);
   const lastDistance = useRef(0);
-  const lastTouchAngle = useRef(0);
+  const lastTouchPos = useRef({ x: 0, y: 0 });
   const isDragging = useRef(false);
 
   // Center of the circle visualization
@@ -137,11 +137,10 @@ export default function HomeScreen({ navigation, route }) {
       );
       lastDistance.current = distance;
     } else if (event.nativeEvent.touches.length === 1) {
-      // Single finger drag for rotation
+      // Single finger drag
       isDragging.current = true;
       const touch = event.nativeEvent.touches[0];
-      // Store initial touch position (not angle)
-      lastTouchAngle.current = { x: touch.pageX, y: touch.pageY };
+      lastTouchPos.current = { x: touch.pageX, y: touch.pageY };
     }
   };
 
@@ -159,7 +158,6 @@ export default function HomeScreen({ navigation, route }) {
         const scale = distance / lastDistance.current;
         const newScale = lastScale.current * scale;
 
-        // Limit zoom between 0.5x and 3x
         if (newScale >= 0.5 && newScale <= 3) {
           zoomScale.setValue(newScale);
           lastScale.current = newScale;
@@ -168,33 +166,36 @@ export default function HomeScreen({ navigation, route }) {
 
       lastDistance.current = distance;
     } else if (event.nativeEvent.touches.length === 1 && isDragging.current) {
-      // NEW APPROACH: Use cross product for intuitive rotation
       const touch = event.nativeEvent.touches[0];
 
-      // Get touch position relative to circle center
-      const touchX = touch.pageX;
-      const touchY = touch.pageY;
+      // Current touch position
+      const currentX = touch.pageX;
+      const currentY = touch.pageY;
 
-      // Vector from center to current touch
-      const radiusX = touchX - circleCenterX;
-      const radiusY = touchY - circleCenterY;
+      // Movement since last frame
+      const deltaX = currentX - lastTouchPos.current.x;
+      const deltaY = currentY - lastTouchPos.current.y;
 
-      // Get movement delta
-      const deltaX = touch.pageX - (lastTouchAngle.current.x || touch.pageX);
-      const deltaY = touch.pageY - (lastTouchAngle.current.y || touch.pageY);
+      // Vector from center to touch point
+      const radiusX = currentX - circleCenterX;
+      const radiusY = currentY - circleCenterY;
 
-      // Cross product determines rotation direction (flipped for Y-down coordinates)
-      // Positive = clockwise, Negative = counterclockwise
-      const crossProduct = radiusY * deltaX - radiusX * deltaY;
+      // Cross product: positive = clockwise, negative = counterclockwise
+      const crossProduct = radiusX * deltaY - radiusY * deltaX;
 
-      // Calculate rotation magnitude based on distance from center
-      const distance = Math.sqrt(radiusX * radiusX + radiusY * radiusY);
-      const rotationDelta = (crossProduct / (distance * distance)) * 200; // Sensitivity multiplier
+      // Normalize by distance squared to make rotation speed consistent
+      const distanceSquared = radiusX * radiusX + radiusY * radiusY;
 
-      setRotation(prev => prev + rotationDelta);
+      if (distanceSquared > 0) {
+        // Sensitivity: higher = faster rotation
+        const rotationSpeed = 150;
+        const rotationDelta = (crossProduct / distanceSquared) * rotationSpeed;
 
-      // Store current position for next frame
-      lastTouchAngle.current = { x: touch.pageX, y: touch.pageY };
+        setRotation(prev => prev + rotationDelta);
+      }
+
+      // Update last position
+      lastTouchPos.current = { x: currentX, y: currentY };
     }
   };
 
