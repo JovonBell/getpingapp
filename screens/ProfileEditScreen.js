@@ -18,6 +18,9 @@ import { saveProfileToSupabase, uploadAvatar, getCurrentUser } from '../utils/su
 export default function ProfileEditScreen({ navigation, route }) {
   // Get current profile data from route params or use defaults
   const currentProfile = route?.params?.profile || {};
+  const fromFirstCircle = route?.params?.fromFirstCircle || false;
+  const contacts = route?.params?.contacts || [];
+  const circleName = route?.params?.circleName || '';
 
   const [name, setName] = useState(currentProfile.name || '');
   const [jobTitle, setJobTitle] = useState(currentProfile.jobTitle || '');
@@ -32,7 +35,9 @@ export default function ProfileEditScreen({ navigation, route }) {
   const [linkedin, setLinkedin] = useState(currentProfile.socialLinks?.linkedin || '');
   const [twitter, setTwitter] = useState(currentProfile.socialLinks?.twitter || '');
   const [instagram, setInstagram] = useState(currentProfile.socialLinks?.instagram || '');
+  const [tiktok, setTiktok] = useState(currentProfile.socialLinks?.tiktok || '');
   const [website, setWebsite] = useState(currentProfile.socialLinks?.website || '');
+  const [school, setSchool] = useState(currentProfile.school || '');
 
   const [nameFocused, setNameFocused] = useState(false);
   const [jobTitleFocused, setJobTitleFocused] = useState(false);
@@ -142,10 +147,12 @@ export default function ProfileEditScreen({ navigation, route }) {
         email: email.trim(),
         phone: phone.trim(),
         avatar: avatarUrl,
+        school: school.trim(),
         socialLinks: {
           linkedin: linkedin.trim(),
           twitter: twitter.trim(),
           instagram: instagram.trim(),
+          tiktok: tiktok.trim(),
           website: website.trim(),
         },
         updatedAt: new Date().toISOString(),
@@ -171,8 +178,16 @@ export default function ProfileEditScreen({ navigation, route }) {
           {
             text: 'OK',
             onPress: () => {
-              // Navigate back and pass updated profile
-              navigation.navigate('Profile', { updated: true });
+              if (fromFirstCircle) {
+                // Coming from first circle setup, go to Home with circle data
+                navigation.navigate('Home', {
+                  screen: 'HomeTab',
+                  params: { contacts, circleName },
+                });
+              } else {
+                // Regular profile edit, go back to Profile screen
+                navigation.navigate('Profile', { updated: true });
+              }
             },
           },
         ]
@@ -275,6 +290,21 @@ export default function ProfileEditScreen({ navigation, route }) {
                 onChangeText={setLocation}
                 onFocus={() => setLocationFocused(true)}
                 onBlur={() => setLocationFocused(false)}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <View style={styles.socialLabel}>
+                <Ionicons name="school-outline" size={20} color="#00ff88" />
+                <Text style={styles.label}>School or Program</Text>
+              </View>
+              <TextInput
+                style={[styles.input]}
+                placeholder="Add your school or program"
+                placeholderTextColor="#666"
+                value={school}
+                onChangeText={setSchool}
+                autoCapitalize="words"
               />
             </View>
 
@@ -386,8 +416,23 @@ export default function ProfileEditScreen({ navigation, route }) {
 
             <View style={styles.inputContainer}>
               <View style={styles.socialLabel}>
+                <Ionicons name="logo-tiktok" size={20} color="#00ff88" />
+                <Text style={styles.label}>TikTok</Text>
+              </View>
+              <TextInput
+                style={[styles.input]}
+                placeholder="@yourtiktok"
+                placeholderTextColor="#666"
+                value={tiktok}
+                onChangeText={setTiktok}
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <View style={styles.socialLabel}>
                 <Ionicons name="globe-outline" size={20} color="#00ff88" />
-                <Text style={styles.label}>Website</Text>
+                <Text style={styles.label}>Website (optional)</Text>
               </View>
               <TextInput
                 style={[styles.input, websiteFocused && styles.inputFocused]}

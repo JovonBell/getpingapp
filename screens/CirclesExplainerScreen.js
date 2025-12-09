@@ -7,6 +7,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -14,7 +15,12 @@ export default function CirclesExplainerScreen({ navigation }) {
   const ring1Opacity = useRef(new Animated.Value(0.2)).current;
   const ring2Opacity = useRef(new Animated.Value(0.15)).current;
   const ring3Opacity = useRef(new Animated.Value(0.1)).current;
+  const ring1Scale = useRef(new Animated.Value(1)).current;
+  const ring2Scale = useRef(new Animated.Value(1)).current;
+  const ring3Scale = useRef(new Animated.Value(1)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
   const starAnimations = useRef([...Array(30)].map(() => new Animated.Value(0))).current;
+  const ringPulseAnimations = useRef([]).current;
 
   // Fixed star positions
   const starPositions = useRef(
@@ -26,6 +32,13 @@ export default function CirclesExplainerScreen({ navigation }) {
   ).current;
 
   useEffect(() => {
+    // Fade in card on mount
+    Animated.timing(cardOpacity, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+
     // Animate stars twinkling
     const animations = starAnimations.map((anim, index) =>
       Animated.loop(
@@ -47,36 +60,120 @@ export default function CirclesExplainerScreen({ navigation }) {
 
     animations.forEach(anim => anim.start());
 
-    return () => animations.forEach(anim => anim.stop());
+    // Gentle continuous pulsing of the rings while the card is visible
+    const pulseAnimations = [
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(ring1Scale, {
+            toValue: 1.05,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(ring1Scale, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+        ])
+      ),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(ring2Scale, {
+            toValue: 1.06,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(ring2Scale, {
+            toValue: 1,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
+        ])
+      ),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(ring3Scale, {
+            toValue: 1.07,
+            duration: 2400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(ring3Scale, {
+            toValue: 1,
+            duration: 2400,
+            useNativeDriver: true,
+          }),
+        ])
+      ),
+    ];
+
+    pulseAnimations.forEach(anim => anim.start());
+    ringPulseAnimations.push(...pulseAnimations);
+
+    return () => {
+      animations.forEach(anim => anim.stop());
+      pulseAnimations.forEach(anim => anim.stop());
+    };
   }, []);
 
   const handleShowMe = () => {
-    // Animate rings to become even more apparent
+    // Stop the gentle loop before the stronger pulse
+    ringPulseAnimations.forEach(anim => anim.stop());
+
+    // Fade out card and pulse circles
     Animated.parallel([
+      // Fade out card
+      Animated.timing(cardOpacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      // Pulse and glow rings even more
       Animated.timing(ring1Opacity, {
-        toValue: 0.3,
+        toValue: 0.5,
         duration: 600,
         useNativeDriver: true,
       }),
       Animated.timing(ring2Opacity, {
-        toValue: 0.25,
+        toValue: 0.4,
         duration: 600,
         useNativeDriver: true,
       }),
       Animated.timing(ring3Opacity, {
-        toValue: 0.2,
+        toValue: 0.35,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      // Scale rings for pulse effect
+      Animated.timing(ring1Scale, {
+        toValue: 1.15,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(ring2Scale, {
+        toValue: 1.15,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(ring3Scale, {
+        toValue: 1.15,
         duration: 600,
         useNativeDriver: true,
       }),
     ]).start(() => {
-      navigation.navigate('BuildUniverse');
+      // Briefly show glowing circles alone before the next card appears
+      setTimeout(() => {
+        navigation.navigate('BuildUniverse');
+      }, 300);
     });
   };
 
   return (
     <View style={styles.container}>
-      {/* Background with stars */}
-      <View style={styles.background}>
+      {/* Background with stars and iridescent gradient */}
+      <LinearGradient
+        colors={['#000000', '#0a2e1a', '#000000']}
+        style={styles.background}
+      >
         {starPositions.map((star, index) => (
           <Animated.View
             key={index}
@@ -90,18 +187,18 @@ export default function CirclesExplainerScreen({ navigation }) {
             ]}
           />
         ))}
-      </View>
+      </LinearGradient>
 
       {/* Concentric circles */}
       <View style={styles.circlesContainer}>
-        <Animated.View style={[styles.ring, styles.ring1, { opacity: ring1Opacity }]} />
-        <Animated.View style={[styles.ring, styles.ring2, { opacity: ring2Opacity }]} />
-        <Animated.View style={[styles.ring, styles.ring3, { opacity: ring3Opacity }]} />
+        <Animated.View style={[styles.ring, styles.ring1, { opacity: ring1Opacity, transform: [{ scale: ring1Scale }] }]} />
+        <Animated.View style={[styles.ring, styles.ring2, { opacity: ring2Opacity, transform: [{ scale: ring2Scale }] }]} />
+        <Animated.View style={[styles.ring, styles.ring3, { opacity: ring3Opacity, transform: [{ scale: ring3Scale }] }]} />
         <View style={styles.centerGlow} />
       </View>
 
       {/* Content card */}
-      <View style={styles.contentCard}>
+      <Animated.View style={[styles.contentCard, { opacity: cardOpacity }]}>
         <Text style={styles.title}>Your relationships{'\n'}aren't lists.{'\n'}They're circles.</Text>
         <Text style={styles.description}>
           Ping organizes your contacts into dynamic circles that grow, shift, and evolve as your life evolves.
@@ -109,7 +206,7 @@ export default function CirclesExplainerScreen({ navigation }) {
         <TouchableOpacity style={styles.button} onPress={handleShowMe}>
           <Text style={styles.buttonText}>Show Me How →</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -125,7 +222,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
-    backgroundColor: '#0a0f1a',
+    backgroundColor: '#000000',
   },
   star: {
     position: 'absolute',

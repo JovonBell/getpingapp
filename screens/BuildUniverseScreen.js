@@ -7,6 +7,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -14,7 +15,12 @@ export default function BuildUniverseScreen({ navigation }) {
   const ring1Opacity = useRef(new Animated.Value(0.3)).current;
   const ring2Opacity = useRef(new Animated.Value(0.25)).current;
   const ring3Opacity = useRef(new Animated.Value(0.2)).current;
+  const ring1Scale = useRef(new Animated.Value(1)).current;
+  const ring2Scale = useRef(new Animated.Value(1)).current;
+  const ring3Scale = useRef(new Animated.Value(1)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
   const starAnimations = useRef([...Array(30)].map(() => new Animated.Value(0))).current;
+  const ringPulseAnimations = useRef([]).current;
 
   // Fixed star positions
   const starPositions = useRef(
@@ -26,6 +32,13 @@ export default function BuildUniverseScreen({ navigation }) {
   ).current;
 
   useEffect(() => {
+    // Fade in card on mount
+    Animated.timing(cardOpacity, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+
     // Animate stars twinkling
     const animations = starAnimations.map((anim, index) =>
       Animated.loop(
@@ -47,17 +60,117 @@ export default function BuildUniverseScreen({ navigation }) {
 
     animations.forEach(anim => anim.start());
 
-    return () => animations.forEach(anim => anim.stop());
+    // Gentle continuous pulsing of the rings while the card is visible
+    const pulseAnimations = [
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(ring1Scale, {
+            toValue: 1.05,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(ring1Scale, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+        ])
+      ),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(ring2Scale, {
+            toValue: 1.06,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(ring2Scale, {
+            toValue: 1,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
+        ])
+      ),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(ring3Scale, {
+            toValue: 1.07,
+            duration: 2400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(ring3Scale, {
+            toValue: 1,
+            duration: 2400,
+            useNativeDriver: true,
+          }),
+        ])
+      ),
+    ];
+
+    pulseAnimations.forEach(anim => anim.start());
+    ringPulseAnimations.push(...pulseAnimations);
+
+    return () => {
+      animations.forEach(anim => anim.stop());
+      pulseAnimations.forEach(anim => anim.stop());
+    };
   }, []);
 
   const handleGetStarted = () => {
-    navigation.navigate('ImportContacts');
+    // Stop the gentle loop so the final strong pulse is clean
+    ringPulseAnimations.forEach(anim => anim.stop());
+
+    // Fade out card and give one last strong pulse of the circles
+    Animated.parallel([
+      Animated.timing(cardOpacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(ring1Opacity, {
+        toValue: 0.6,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(ring2Opacity, {
+        toValue: 0.5,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(ring3Opacity, {
+        toValue: 0.45,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(ring1Scale, {
+        toValue: 1.2,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(ring2Scale, {
+        toValue: 1.2,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(ring3Scale, {
+        toValue: 1.2,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Briefly hold the glowing universe before moving into onboarding
+      setTimeout(() => {
+        navigation.navigate('ImportContacts');
+      }, 300);
+    });
   };
 
   return (
     <View style={styles.container}>
-      {/* Background with stars */}
-      <View style={styles.background}>
+      {/* Background with stars and iridescent gradient */}
+      <LinearGradient
+        colors={['#000000', '#0a2e1a', '#000000']}
+        style={styles.background}
+      >
         {starPositions.map((star, index) => (
           <Animated.View
             key={index}
@@ -71,18 +184,18 @@ export default function BuildUniverseScreen({ navigation }) {
             ]}
           />
         ))}
-      </View>
+      </LinearGradient>
 
       {/* Concentric circles - most visible */}
       <View style={styles.circlesContainer}>
-        <Animated.View style={[styles.ring, styles.ring1, { opacity: ring1Opacity }]} />
-        <Animated.View style={[styles.ring, styles.ring2, { opacity: ring2Opacity }]} />
-        <Animated.View style={[styles.ring, styles.ring3, { opacity: ring3Opacity }]} />
+        <Animated.View style={[styles.ring, styles.ring1, { opacity: ring1Opacity, transform: [{ scale: ring1Scale }] }]} />
+        <Animated.View style={[styles.ring, styles.ring2, { opacity: ring2Opacity, transform: [{ scale: ring2Scale }] }]} />
+        <Animated.View style={[styles.ring, styles.ring3, { opacity: ring3Opacity, transform: [{ scale: ring3Scale }] }]} />
         <View style={styles.centerGlow} />
       </View>
 
       {/* Content card */}
-      <View style={styles.contentCard}>
+      <Animated.View style={[styles.contentCard, { opacity: cardOpacity }]}>
         <Text style={styles.title}>Let's build your{'\n'}universe.</Text>
         <Text style={styles.description}>
           We'll import your contacts and help you visualize your entire network. A clearer, smarter way to stay connected starts now.
@@ -90,7 +203,7 @@ export default function BuildUniverseScreen({ navigation }) {
         <TouchableOpacity style={styles.button} onPress={handleGetStarted}>
           <Text style={styles.buttonText}>Let's Get Started</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -106,7 +219,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
-    backgroundColor: '#0a0f1a',
+    backgroundColor: '#000000',
   },
   star: {
     position: 'absolute',

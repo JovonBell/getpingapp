@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,21 +6,14 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
-  TextInput,
-  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-export default function VisualizeCircleScreen({ navigation, route }) {
-  const allContacts = route?.params?.contacts || [];
-  const [circleName, setCircleName] = useState('');
-  // Track which contacts are selected - start with all selected
-  const [selectedContactIds, setSelectedContactIds] = useState(
-    allContacts.map(c => c.id)
-  );
+export default function ImportConfirmationScreen({ navigation, route }) {
+  const importedContacts = route?.params?.contacts || [];
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -95,25 +88,11 @@ export default function VisualizeCircleScreen({ navigation, route }) {
     ).start();
   }, []);
 
-  const toggleContact = (contactId) => {
-    setSelectedContactIds(prev =>
-      prev.includes(contactId)
-        ? prev.filter(id => id !== contactId)
-        : [...prev, contactId]
-    );
-  };
-
   const handleVisualize = () => {
-    const finalName = circleName.trim() || 'My First Circle';
-    const selectedContacts = allContacts.filter(c => selectedContactIds.includes(c.id));
-    // Navigate to Home with first circle data and show celebration
-    navigation.navigate('Home', {
+    // Go to Home with imported contacts but no circle yet
+    navigation.navigate('Home', { 
       screen: 'HomeTab',
-      params: { 
-        contacts: selectedContacts, 
-        circleName: finalName,
-        isFirstCircle: true,
-      },
+      params: { importedContacts }
     });
   };
 
@@ -154,7 +133,7 @@ export default function VisualizeCircleScreen({ navigation, route }) {
 
         {/* Main content */}
         <View style={styles.content}>
-          {/* 3D Ring visualization */}
+          {/* 3D Ring visualization - BIGGER */}
           <Animated.View
             style={[
               styles.ringContainer,
@@ -187,24 +166,24 @@ export default function VisualizeCircleScreen({ navigation, route }) {
                       {/* Glow base for circles */}
                       <View style={styles.circleGlowBase} />
 
-                      <Svg height="160" width="160" viewBox="0 0 160 160">
+                      <Svg height="200" width="200" viewBox="0 0 200 200">
                         {/* Multiple glowing concentric circles */}
-                        <Circle cx="80" cy="80" r="15" stroke="#4FFFB0" strokeWidth="2" fill="none" opacity="1" />
-                        <Circle cx="80" cy="80" r="15" stroke="#4FFFB0" strokeWidth="4" fill="none" opacity="0.3" blur="4" />
+                        <Circle cx="100" cy="100" r="20" stroke="#4FFFB0" strokeWidth="2" fill="none" opacity="1" />
+                        <Circle cx="100" cy="100" r="20" stroke="#4FFFB0" strokeWidth="4" fill="none" opacity="0.3" blur="4" />
 
-                        <Circle cx="80" cy="80" r="30" stroke="#4FFFB0" strokeWidth="1.5" fill="none" opacity="0.8" />
-                        <Circle cx="80" cy="80" r="30" stroke="#4FFFB0" strokeWidth="3" fill="none" opacity="0.2" blur="3" />
+                        <Circle cx="100" cy="100" r="40" stroke="#4FFFB0" strokeWidth="2" fill="none" opacity="0.8" />
+                        <Circle cx="100" cy="100" r="40" stroke="#4FFFB0" strokeWidth="3" fill="none" opacity="0.2" blur="3" />
 
-                        <Circle cx="80" cy="80" r="45" stroke="#4FFFB0" strokeWidth="1" fill="none" opacity="0.6" />
-                        <Circle cx="80" cy="80" r="45" stroke="#4FFFB0" strokeWidth="2" fill="none" opacity="0.15" blur="2" />
+                        <Circle cx="100" cy="100" r="60" stroke="#4FFFB0" strokeWidth="1.5" fill="none" opacity="0.6" />
+                        <Circle cx="100" cy="100" r="60" stroke="#4FFFB0" strokeWidth="2" fill="none" opacity="0.15" blur="2" />
 
-                        <Circle cx="80" cy="80" r="60" stroke="#4FFFB0" strokeWidth="0.5" fill="none" opacity="0.4" />
-                        <Circle cx="80" cy="80" r="60" stroke="#4FFFB0" strokeWidth="1.5" fill="none" opacity="0.1" blur="1" />
+                        <Circle cx="100" cy="100" r="80" stroke="#4FFFB0" strokeWidth="1" fill="none" opacity="0.4" />
+                        <Circle cx="100" cy="100" r="80" stroke="#4FFFB0" strokeWidth="1.5" fill="none" opacity="0.1" blur="1" />
 
                         {/* Center point glow */}
-                        <Circle cx="80" cy="80" r="3" fill="#4FFFB0" opacity="1" />
-                        <Circle cx="80" cy="80" r="6" fill="#4FFFB0" opacity="0.5" />
-                        <Circle cx="80" cy="80" r="10" fill="#4FFFB0" opacity="0.2" />
+                        <Circle cx="100" cy="100" r="4" fill="#4FFFB0" opacity="1" />
+                        <Circle cx="100" cy="100" r="8" fill="#4FFFB0" opacity="0.5" />
+                        <Circle cx="100" cy="100" r="12" fill="#4FFFB0" opacity="0.2" />
                       </Svg>
                     </Animated.View>
                   </View>
@@ -216,50 +195,15 @@ export default function VisualizeCircleScreen({ navigation, route }) {
             </View>
           </Animated.View>
 
-          {/* Text content + naming */}
+          {/* Text content */}
           <Animated.View style={[styles.textContainer, { opacity: fadeAnim }]}>
-            <Text style={styles.titleText}>Name Your Circle</Text>
-            <Text style={styles.editNote}>(you can always edit it later)</Text>
-
-            {/* Circle name input */}
-            <View style={styles.nameInputWrapper}>
-              <TextInput
-                style={styles.nameInput}
-                placeholder="e.g., Close Friends / Work Team / Family"
-                placeholderTextColor="#4FFFB0"
-                value={circleName}
-                onChangeText={setCircleName}
-              />
-            </View>
-
-            {/* Selected contacts preview */}
-            <View style={styles.contactChipsContainer}>
-              <FlatList
-                data={allContacts}
-                keyExtractor={(item) => item.id}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                renderItem={({ item }) => {
-                  const isSelected = selectedContactIds.includes(item.id);
-                  return (
-                    <TouchableOpacity
-                      style={[
-                        styles.contactChip,
-                        isSelected && styles.contactChipSelected
-                      ]}
-                      onPress={() => toggleContact(item.id)}
-                    >
-                      <View style={styles.contactChipAvatar}>
-                        <Text style={styles.contactChipAvatarText}>{item.initials}</Text>
-                      </View>
-                      <Text style={styles.contactChipName}>
-                        {item.name.split(' ')[0]}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                }}
-              />
-            </View>
+            <Text style={styles.titleText}>Perfect.</Text>
+            <Text style={styles.subtitleText}>
+              Now it's time to visualize your network.
+            </Text>
+            <Text style={styles.captionText}>
+              Your connections are shaping your universe...
+            </Text>
           </Animated.View>
 
           {/* CTA Button */}
@@ -275,7 +219,7 @@ export default function VisualizeCircleScreen({ navigation, route }) {
               onPress={handleVisualize}
               activeOpacity={0.8}
             >
-              <Text style={styles.buttonText}>Create Circle →</Text>
+              <Text style={styles.buttonText}>visualize my circle</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -304,19 +248,18 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingVertical: 80,
+    justifyContent: 'center',
+    paddingVertical: 60,
   },
   ringContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 40,
-    marginBottom: 20,
+    marginBottom: 40,
   },
   smartRing: {
-    width: 280,
-    height: 280,
-    borderRadius: 140,
+    width: 340,
+    height: 340,
+    borderRadius: 170,
     alignItems: 'center',
     justifyContent: 'center',
     // Deep shadow for levitation effect
@@ -329,17 +272,17 @@ const styles = StyleSheet.create({
   ringOuterEdge: {
     position: 'absolute',
     top: 0,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
+    width: 340,
+    height: 340,
+    borderRadius: 170,
     borderWidth: 3,
     borderColor: '#2a2a2a',
     opacity: 0.6,
   },
   ringBand: {
-    width: 280,
-    height: 280,
-    borderRadius: 140,
+    width: 340,
+    height: 340,
+    borderRadius: 170,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -351,9 +294,9 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
   },
   ringOpening: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'visible',
@@ -361,9 +304,9 @@ const styles = StyleSheet.create({
   },
   ringInnerShadow: {
     position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
     borderWidth: 8,
     borderColor: '#000000',
     opacity: 0.5,
@@ -371,9 +314,9 @@ const styles = StyleSheet.create({
   ringInnerEdge: {
     position: 'absolute',
     bottom: 0,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
+    width: 340,
+    height: 340,
+    borderRadius: 170,
     borderWidth: 2,
     borderColor: '#000000',
     opacity: 0.8,
@@ -381,14 +324,14 @@ const styles = StyleSheet.create({
   concentricContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 160,
-    height: 160,
+    width: 200,
+    height: 200,
   },
   circleGlowBase: {
     position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
     backgroundColor: '#4FFFB0',
     opacity: 0.15,
     shadowColor: '#4FFFB0',
@@ -399,9 +342,10 @@ const styles = StyleSheet.create({
   textContainer: {
     alignItems: 'center',
     paddingHorizontal: 40,
+    marginBottom: 60,
   },
   titleText: {
-    fontSize: 36,
+    fontSize: 42,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 16,
@@ -415,12 +359,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 28,
   },
-  editNote: {
-    fontSize: 14,
-    color: '#cccccc',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
   captionText: {
     fontSize: 16,
     fontWeight: '300',
@@ -429,62 +367,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     textAlign: 'center',
     lineHeight: 24,
-  },
-  nameInputWrapper: {
-    width: '100%',
-    marginTop: 24,
-    marginBottom: 16,
-  },
-  nameInput: {
-    width: '100%',
-    borderRadius: 28,
-    borderWidth: 2,
-    borderColor: '#4FFFB0',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    color: '#ffffff',
-    fontSize: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-  },
-  contactChipsContainer: {
-    width: '100%',
-    marginTop: 16,
-    marginBottom: 32,
-    minHeight: 80,
-  },
-  contactChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginRight: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(10, 26, 10, 0.9)',
-    borderWidth: 1,
-    borderColor: '#2a3a2a',
-  },
-  contactChipSelected: {
-    borderWidth: 2,
-    borderColor: '#4FFFB0',
-    backgroundColor: 'rgba(79, 255, 176, 0.15)',
-  },
-  contactChipAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#2a4a3a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  contactChipAvatarText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  contactChipName: {
-    color: '#ffffff',
-    fontSize: 14,
   },
   buttonContainer: {
     alignItems: 'center',
@@ -526,3 +408,4 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 });
+

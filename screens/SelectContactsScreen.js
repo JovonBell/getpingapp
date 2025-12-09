@@ -26,6 +26,7 @@ const DUMMY_CONTACTS = [
 
 export default function SelectContactsScreen({ navigation, route }) {
   const selectAll = route?.params?.selectAll || false;
+  const isInitialImport = route?.params?.isInitialImport || false;
   const [selectedContacts, setSelectedContacts] = useState(
     selectAll ? DUMMY_CONTACTS.map(c => c.id) : []
   );
@@ -118,8 +119,14 @@ export default function SelectContactsScreen({ navigation, route }) {
 
         {/* Title */}
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>select contacts</Text>
-          <Text style={styles.subtitle}>choose who enters your universe.</Text>
+          <Text style={styles.title}>
+            {isInitialImport ? 'select contacts' : 'Create Your First Circle'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {isInitialImport 
+              ? 'choose who enters your universe.' 
+              : 'Select contacts to include in this circle.'}
+          </Text>
         </View>
 
         {/* Select All Button */}
@@ -168,10 +175,18 @@ export default function SelectContactsScreen({ navigation, route }) {
             style={styles.importButton}
             onPress={() => {
               const contacts = DUMMY_CONTACTS.filter(c => selectedContacts.includes(c.id));
-              navigation.navigate('VisualizeCircle', { contacts });
+              if (isInitialImport) {
+                // Initial import - go to confirmation screen
+                navigation.navigate('ImportConfirmation', { contacts });
+              } else {
+                // Creating a circle - go to name/visualize screen
+                navigation.navigate('VisualizeCircle', { contacts });
+              }
             }}
           >
-            <Text style={styles.importButtonText}>import selected</Text>
+            <Text style={styles.importButtonText}>
+              {isInitialImport ? 'import selected' : 'continue'}
+            </Text>
           </TouchableOpacity>
         </View>
       </LinearGradient>

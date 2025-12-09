@@ -17,18 +17,12 @@ import { Ionicons } from '@expo/vector-icons';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation, route }) {
-  // Get contacts from route params or use dummy data for testing
+  // Contacts passed in after first-circle setup
   const routeContacts = route?.params?.contacts || [];
-  const selectedContacts = routeContacts.length > 0 ? routeContacts : [
-    { id: '1', name: 'Alice Johnson', phone: '(555) 123-4567', initials: 'AJ' },
-    { id: '2', name: 'Bob Smith', phone: '(555) 234-5678', initials: 'BS' },
-    { id: '3', name: 'Carol White', phone: '(555) 345-6789', initials: 'CW' },
-    { id: '4', name: 'David Brown', phone: '(555) 456-7890', initials: 'DB' },
-    { id: '5', name: 'Emma Davis', phone: '(555) 567-8901', initials: 'ED' },
-    { id: '6', name: 'Frank Miller', phone: '(555) 678-9012', initials: 'FM' },
-    { id: '7', name: 'Grace Lee', phone: '(555) 789-0123', initials: 'GL' },
-    { id: '8', name: 'Henry Wilson', phone: '(555) 890-1234', initials: 'HW' },
-  ];
+  const circleName = route?.params?.circleName || 'Your first Circle';
+  const isFirstCircle = route?.params?.isFirstCircle || false;
+  const [selectedContacts] = useState(routeContacts);
+  const hasCircle = selectedContacts.length > 0;
   // Helper to get first name from full name
   const getFirstName = (fullName) => fullName.split(' ')[0];
 
@@ -39,6 +33,12 @@ export default function HomeScreen({ navigation, route }) {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [circleCenterY, setCircleCenterY] = useState(250);
+  
+  // First circle celebration states
+  const [showCongratsPopup, setShowCongratsPopup] = useState(isFirstCircle);
+  const [showProfilePrompt, setShowProfilePrompt] = useState(false);
+  const congratsAnim = useRef(new Animated.Value(0)).current;
+  const profilePromptAnim = useRef(new Animated.Value(0)).current;
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const zoomScale = useRef(new Animated.Value(1)).current;
@@ -63,41 +63,20 @@ export default function HomeScreen({ navigation, route }) {
   // Colors for contacts
   const colors = ['#4FFFB0', '#ffaa00', '#ff6b6b', '#4ecdc4'];
 
-  // Concentric circle radii - smaller to fit on screen
-  const RING_RADII = [70, 105, 140];
+  // Single-ring radius for first circle
+  const RING_RADIUS = 105;
 
-  // Calculate positions for contacts - evenly distributed on each ring
+  // Calculate positions for contacts - evenly distributed on one ring
   const getContactPosition = (index, total) => {
-    let ring, angleOffset;
-
-    // Evenly distribute contacts across rings
-    const contactsPerRing = Math.ceil(total / 3);
-
-    if (index < contactsPerRing) {
-      // First ring
-      ring = 0;
-      const countInRing = Math.min(contactsPerRing, total);
-      angleOffset = (index * (360 / countInRing)) * (Math.PI / 180);
-    } else if (index < contactsPerRing * 2) {
-      // Second ring
-      ring = 1;
-      const countInRing = Math.min(contactsPerRing, total - contactsPerRing);
-      angleOffset = ((index - contactsPerRing) * (360 / countInRing)) * (Math.PI / 180) + (Math.PI / 12);
-    } else {
-      // Third ring
-      ring = 2;
-      const countInRing = total - (contactsPerRing * 2);
-      angleOffset = ((index - contactsPerRing * 2) * (360 / countInRing)) * (Math.PI / 180) + (Math.PI / 6);
-    }
-
-    const radius = RING_RADII[ring];
+    const angleOffset = (index * (360 / total)) * (Math.PI / 180);
+    const radius = RING_RADIUS;
 
     return {
       x: 200 + radius * Math.cos(angleOffset + rotation * (Math.PI / 180)),
       y: 200 + radius * Math.sin(angleOffset + rotation * (Math.PI / 180)),
       radius: 8,
       color: colors[index % colors.length],
-      ring,
+      ring: 0,
     };
   };
 
@@ -117,6 +96,60 @@ export default function HomeScreen({ navigation, route }) {
 
     return () => animations.forEach(anim => anim.stop());
   }, []);
+
+  // Handle first circle congratulations popup
+  useEffect(() => {
+    if (showCongratsPopup) {
+      // Fade in the congratulations popup
+      Animated.timing(congratsAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+
+      // Auto-dismiss after 5 seconds
+      const timer = setTimeout(() => {
+        dismissCongrats();
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [showCongratsPopup]);
+
+  const dismissCongrats = () => {
+    Animated.timing(congratsAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowCongratsPopup(false);
+      setShowProfilePrompt(true);
+      // Fade in profile prompt
+      Animated.timing(profilePromptAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
+  const handleSetupProfile = () => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('ProfileEdit', {
+        fromFirstCircle: true,
+        contacts: selectedContacts,
+        circleName,
+      });
+    } else {
+      navigation.navigate('ProfileEdit', {
+        fromFirstCircle: true,
+        contacts: selectedContacts,
+        circleName,
+      });
+    }
+    setShowProfilePrompt(false);
+  };
 
   // Pinch to zoom and rotation gesture handlers
   const lastScale = useRef(1);
@@ -203,6 +236,29 @@ export default function HomeScreen({ navigation, route }) {
   const handleTouchEnd = () => {
     lastDistance.current = 0;
     isDragging.current = false;
+  };
+
+  const handleCenterPress = () => {
+    console.log('Center pressed!');
+    const parent = navigation.getParent();
+    
+    if (hasCircle) {
+      // If circle already exists, go to profile edit
+      console.log('Has circle, navigating to ProfileEdit...');
+      if (parent) {
+        parent.navigate('ProfileEdit');
+      } else {
+        navigation.navigate('ProfileEdit');
+      }
+    } else {
+      // No circle yet, start the "create your first circle" workflow
+      console.log('No circle, navigating to SelectContacts...');
+      if (parent) {
+        parent.navigate('SelectContacts', { selectAll: false });
+      } else {
+        navigation.navigate('SelectContacts', { selectAll: false });
+      }
+    }
   };
 
   const handleContactPress = (contact, index) => {
@@ -313,54 +369,63 @@ export default function HomeScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Search Bar */}
-        <View style={styles.searchWrapper}>
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#4FFFB0" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="search your circle"
-              placeholderTextColor="#666"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onFocus={handleSearchFocus}
-              onBlur={handleSearchBlur}
-            />
-          </View>
-
-          {/* Search Results Dropdown */}
-          {showSearchResults && searchQuery.length > 0 && (
-            <View style={styles.searchResults}>
-              {filteredContacts.length > 0 ? (
-                <FlatList
-                  data={filteredContacts}
-                  keyExtractor={(item) => item.id}
-                  renderItem={({ item, index }) => (
-                    <TouchableOpacity
-                      style={styles.searchResultItem}
-                      onPress={() => {
-                        handleContactPress(item, selectedContacts.indexOf(item));
-                        setSearchQuery('');
-                        setShowSearchResults(false);
-                      }}
-                    >
-                      <View style={[styles.resultAvatar, { backgroundColor: colors[index % colors.length] }]}>
-                        <Text style={styles.resultAvatarText}>{item.initials}</Text>
-                      </View>
-                      <View style={styles.resultInfo}>
-                        <Text style={styles.resultName}>{item.name}</Text>
-                        <Text style={styles.resultPhone}>{item.phone}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                  style={styles.searchResultsList}
+        {/* Search Bar & circle label only after first circle exists */}
+        {hasCircle && (
+          <>
+            <View style={styles.searchWrapper}>
+              <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color="#4FFFB0" style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="search your circle"
+                  placeholderTextColor="#666"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  onFocus={handleSearchFocus}
+                  onBlur={handleSearchBlur}
                 />
-              ) : (
-                <Text style={styles.noResults}>No contacts found</Text>
+              </View>
+
+              {/* Search Results Dropdown */}
+              {showSearchResults && searchQuery.length > 0 && (
+                <View style={styles.searchResults}>
+                  {filteredContacts.length > 0 ? (
+                    <FlatList
+                      data={filteredContacts}
+                      keyExtractor={(item) => item.id}
+                      renderItem={({ item, index }) => (
+                        <TouchableOpacity
+                          style={styles.searchResultItem}
+                          onPress={() => {
+                            handleContactPress(item, selectedContacts.indexOf(item));
+                            setSearchQuery('');
+                            setShowSearchResults(false);
+                          }}
+                        >
+                          <View style={[styles.resultAvatar, { backgroundColor: colors[index % colors.length] }]}>
+                            <Text style={styles.resultAvatarText}>{item.initials}</Text>
+                          </View>
+                          <View style={styles.resultInfo}>
+                            <Text style={styles.resultName}>{item.name}</Text>
+                            <Text style={styles.resultPhone}>{item.phone}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      )}
+                      style={styles.searchResultsList}
+                    />
+                  ) : (
+                    <Text style={styles.noResults}>No contacts found</Text>
+                  )}
+                </View>
               )}
             </View>
-          )}
-        </View>
+
+            <View style={styles.circleNameContainer}>
+              <Text style={styles.circleNameLabel}>current circle</Text>
+              <Text style={styles.circleNameValue}>{circleName}</Text>
+            </View>
+          </>
+        )}
 
         {/* Network Visualization */}
         <View style={styles.networkContainer}>
@@ -397,9 +462,17 @@ export default function HomeScreen({ navigation, route }) {
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
+            {/* Circle label */}
+            {hasCircle && (
+              <View style={styles.circleLabelContainer}>
+                <Ionicons name="people-outline" size={16} color="#4FFFB0" />
+                <Text style={styles.circleLabelText}>{circleName}</Text>
+              </View>
+            )}
+
             <Animated.View style={[styles.svgContainer, { transform: [{ scale: zoomScale }] }]}>
               <Svg height="400" width={SCREEN_WIDTH} viewBox="0 0 400 400">
-                  {/* Center glow */}
+                  {/* Center glow / nucleus */}
                   <Circle cx="200" cy="200" r="40" fill="#4FFFB0" opacity="0.3" />
                   <Circle cx="200" cy="200" r="25" fill="#4FFFB0" opacity="0.5" />
                   <Circle cx="200" cy="200" r="15" fill="#ffffff" />
@@ -488,9 +561,25 @@ export default function HomeScreen({ navigation, route }) {
                 </Svg>
               </Animated.View>
             </View>
+
+          {/* Large, invisible tap target over the nucleus - only when no circle exists */}
+          {/* Positioned outside networkView to avoid touch handler interference */}
+          {!hasCircle && (
+            <TouchableOpacity
+              style={styles.centerTapTarget}
+              activeOpacity={1}
+              onPress={handleCenterPress}
+            >
+              <View style={{ flex: 1 }} />
+            </TouchableOpacity>
+          )}
           </View>
 
-        <Text style={styles.tapInstruction}>drag to rotate • tap a connection • pinch to zoom</Text>
+        <Text style={styles.tapInstruction}>
+          {hasCircle
+            ? 'Tap a circle to open • Tap the center to edit your profile'
+            : 'tap the center to create your first Circle • drag to rotate • pinch to zoom'}
+        </Text>
 
         {/* Small Contact Popup Box */}
         {selectedContact !== null && !showMoreInfo && (
@@ -618,6 +707,45 @@ export default function HomeScreen({ navigation, route }) {
             </View>
           </View>
         </Modal>
+
+        {/* First Circle Congratulations Popup */}
+        {showCongratsPopup && (
+          <Animated.View style={[styles.congratsOverlay, { opacity: congratsAnim }]}>
+            <Animated.View style={[styles.congratsPopup, { 
+              opacity: congratsAnim,
+              transform: [{ scale: congratsAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.8, 1],
+              })}]
+            }]}>
+              <Text style={styles.congratsTitle}>Congratulations on creating{'\n'}your first circle!</Text>
+              <Text style={styles.congratsSubtext}>
+                This is the start to a much stronger, more visual look at your network.
+              </Text>
+              <TouchableOpacity
+                style={styles.congratsButton}
+                onPress={dismissCongrats}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.congratsButtonText}>Next →</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </Animated.View>
+        )}
+
+        {/* Profile Setup Prompt */}
+        {showProfilePrompt && (
+          <Animated.View style={[styles.profilePromptContainer, { opacity: profilePromptAnim }]}>
+            <TouchableOpacity
+              style={styles.profilePrompt}
+              onPress={handleSetupProfile}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.profilePromptTitle}>Set up your profile →</Text>
+              <Text style={styles.profilePromptSubtext}>Add your socials and{'\n'}complete your profile.</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
       </LinearGradient>
     </View>
   );
@@ -789,11 +917,41 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   tapInstruction: {
-    textAlign: 'center',
+    position: 'absolute',
+    bottom: 140,
+    left: 24,
+    right: 24,
+    textAlign: 'right',
     color: '#ffffff',
+    fontSize: 14,
+    lineHeight: 20,
+    opacity: 0.85,
+  },
+  centerTapTarget: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    left: (SCREEN_WIDTH - 100) / 2,
+    top: '45%',
+    zIndex: 1000,
+    // backgroundColor: 'rgba(255, 0, 0, 0.5)', // Debug: uncomment to see tap area
+  },
+  circleNameContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  circleNameLabel: {
+    color: '#4FFFB0',
     fontSize: 12,
-    marginBottom: 20,
-    opacity: 0.7,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  circleNameValue: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '600',
   },
   popupOverlay: {
     position: 'absolute',
@@ -944,5 +1102,112 @@ const styles = StyleSheet.create({
   detailLabel: {
     color: '#ffffff',
     fontSize: 15,
+  },
+  // Circle label on orbit
+  circleLabelContainer: {
+    position: 'absolute',
+    top: 30,
+    left: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    zIndex: 20,
+  },
+  circleLabelText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  // First Circle Congratulations Popup Styles
+  congratsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+  },
+  congratsPopup: {
+    backgroundColor: 'rgba(26, 42, 26, 0.98)',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#4FFFB0',
+    padding: 28,
+    marginHorizontal: 30,
+    alignItems: 'center',
+    shadowColor: '#4FFFB0',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  congratsTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 32,
+  },
+  congratsSubtext: {
+    fontSize: 16,
+    color: '#cccccc',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  congratsButton: {
+    backgroundColor: '#4FFFB0',
+    paddingVertical: 14,
+    paddingHorizontal: 48,
+    borderRadius: 25,
+    shadowColor: '#4FFFB0',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  congratsButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  // Profile Prompt Styles
+  profilePromptContainer: {
+    position: 'absolute',
+    top: '28%',
+    right: 20,
+    zIndex: 1000,
+  },
+  profilePrompt: {
+    backgroundColor: 'rgba(42, 74, 58, 0.95)',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#4FFFB0',
+    padding: 16,
+    shadowColor: '#4FFFB0',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 15,
+    elevation: 15,
+    maxWidth: 220,
+  },
+  profilePromptTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 6,
+  },
+  profilePromptSubtext: {
+    fontSize: 13,
+    color: '#cccccc',
+    lineHeight: 18,
   },
 });

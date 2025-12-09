@@ -14,6 +14,8 @@ import BuildUniverseScreen from './screens/BuildUniverseScreen';
 import ImportContactsScreen from './screens/ImportContactsScreen';
 import SelectContactsScreen from './screens/SelectContactsScreen';
 import VisualizeCircleScreen from './screens/VisualizeCircleScreen';
+import ImportConfirmationScreen from './screens/ImportConfirmationScreen';
+import FirstCircleCelebrationScreen from './screens/FirstCircleCelebrationScreen';
 import HomeScreen from './screens/HomeScreen';
 import AddContactScreen from './screens/AddContactScreen';
 import AlertsScreen from './screens/AlertsScreen';
@@ -118,12 +120,30 @@ export default function App() {
           >
             <Stack.Screen name="Welcome" component={WelcomeScreen} />
             <Stack.Screen name="CreateAccount" component={CreateAccountScreen} />
-            <Stack.Screen name="WelcomeIntro" component={WelcomeIntroScreen} />
-            <Stack.Screen name="CirclesExplainer" component={CirclesExplainerScreen} />
-            <Stack.Screen name="BuildUniverse" component={BuildUniverseScreen} />
-            <Stack.Screen name="ImportContacts" component={ImportContactsScreen} />
+            <Stack.Screen
+              name="WelcomeIntro"
+              component={WelcomeIntroScreen}
+              options={{ animation: 'fade' }}
+            />
+            <Stack.Screen
+              name="CirclesExplainer"
+              component={CirclesExplainerScreen}
+              options={{ animation: 'fade' }}
+            />
+            <Stack.Screen
+              name="BuildUniverse"
+              component={BuildUniverseScreen}
+              options={{ animation: 'fade' }}
+            />
+            <Stack.Screen
+              name="ImportContacts"
+              component={ImportContactsScreen}
+              options={{ animation: 'fade' }}
+            />
             <Stack.Screen name="SelectContacts" component={SelectContactsScreen} />
+            <Stack.Screen name="ImportConfirmation" component={ImportConfirmationScreen} />
             <Stack.Screen name="VisualizeCircle" component={VisualizeCircleScreen} />
+            <Stack.Screen name="FirstCircleCelebration" component={FirstCircleCelebrationScreen} />
             <Stack.Screen name="AddContact" component={AddContactScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />

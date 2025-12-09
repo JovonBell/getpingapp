@@ -96,14 +96,14 @@ export default function ImportContactsScreen({ navigation }) {
 
           <TouchableOpacity
             style={styles.importButton}
-            onPress={() => navigation.navigate('SelectContacts', { selectAll: true })}
+            onPress={() => navigation.navigate('SelectContacts', { selectAll: true, isInitialImport: true })}
           >
             <Text style={styles.importButtonText}>import all contacts</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.manualButton}
-            onPress={() => navigation.navigate('SelectContacts', { selectAll: false })}
+            onPress={() => navigation.navigate('SelectContacts', { selectAll: false, isInitialImport: true })}
           >
             <Text style={styles.manualButtonText}>or select manually</Text>
           </TouchableOpacity>
