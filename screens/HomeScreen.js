@@ -119,8 +119,12 @@ export default function HomeScreen({ navigation, route }) {
   // Pinch to zoom and rotation gesture handlers
   const lastScale = useRef(1);
   const lastDistance = useRef(0);
-  const lastTouchX = useRef(0);
+  const lastTouchAngle = useRef(0);
   const isDragging = useRef(false);
+
+  // Center of the circle visualization
+  const circleCenterX = SCREEN_WIDTH / 2;
+  const circleCenterY = 250; // Approximate center of network visualization
 
   const handleTouchStart = (event) => {
     if (event.nativeEvent.touches.length === 2) {
@@ -135,7 +139,12 @@ export default function HomeScreen({ navigation, route }) {
     } else if (event.nativeEvent.touches.length === 1) {
       // Single finger drag for rotation
       isDragging.current = true;
-      lastTouchX.current = event.nativeEvent.touches[0].pageX;
+      const touch = event.nativeEvent.touches[0];
+      // Calculate initial angle from center to touch point
+      lastTouchAngle.current = Math.atan2(
+        touch.pageY - circleCenterY,
+        touch.pageX - circleCenterX
+      ) * (180 / Math.PI);
     }
   };
 
@@ -162,13 +171,26 @@ export default function HomeScreen({ navigation, route }) {
 
       lastDistance.current = distance;
     } else if (event.nativeEvent.touches.length === 1 && isDragging.current) {
-      // Drag to rotate
-      const currentX = event.nativeEvent.touches[0].pageX;
-      const deltaX = currentX - lastTouchX.current;
+      // Drag to rotate - calculate angular movement
+      const touch = event.nativeEvent.touches[0];
 
-      // Update rotation based on drag
-      setRotation(prev => prev - deltaX * 0.5);
-      lastTouchX.current = currentX;
+      // Calculate current angle from center to touch point
+      const currentAngle = Math.atan2(
+        touch.pageY - circleCenterY,
+        touch.pageX - circleCenterX
+      ) * (180 / Math.PI);
+
+      // Calculate the angular difference
+      let deltaAngle = currentAngle - lastTouchAngle.current;
+
+      // Handle angle wrapping (e.g., from 179 to -179 degrees)
+      if (deltaAngle > 180) deltaAngle -= 360;
+      if (deltaAngle < -180) deltaAngle += 360;
+
+      // Update rotation - multiply by sensitivity factor
+      setRotation(prev => prev + deltaAngle * 0.8);
+
+      lastTouchAngle.current = currentAngle;
     }
   };
 
