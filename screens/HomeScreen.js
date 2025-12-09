@@ -183,9 +183,9 @@ export default function HomeScreen({ navigation, route }) {
       const deltaX = touch.pageX - (lastTouchAngle.current.x || touch.pageX);
       const deltaY = touch.pageY - (lastTouchAngle.current.y || touch.pageY);
 
-      // Cross product determines rotation direction
+      // Cross product determines rotation direction (flipped for Y-down coordinates)
       // Positive = clockwise, Negative = counterclockwise
-      const crossProduct = radiusX * deltaY - radiusY * deltaX;
+      const crossProduct = radiusY * deltaX - radiusX * deltaY;
 
       // Calculate rotation magnitude based on distance from center
       const distance = Math.sqrt(radiusX * radiusX + radiusY * radiusY);
