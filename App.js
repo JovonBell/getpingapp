@@ -8,6 +8,9 @@ import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import WelcomeScreen from './screens/WelcomeScreen';
 import CreateAccountScreen from './screens/CreateAccountScreen';
+import WelcomeIntroScreen from './screens/WelcomeIntroScreen';
+import CirclesExplainerScreen from './screens/CirclesExplainerScreen';
+import BuildUniverseScreen from './screens/BuildUniverseScreen';
 import ImportContactsScreen from './screens/ImportContactsScreen';
 import SelectContactsScreen from './screens/SelectContactsScreen';
 import VisualizeCircleScreen from './screens/VisualizeCircleScreen';
@@ -115,6 +118,9 @@ export default function App() {
           >
             <Stack.Screen name="Welcome" component={WelcomeScreen} />
             <Stack.Screen name="CreateAccount" component={CreateAccountScreen} />
+            <Stack.Screen name="WelcomeIntro" component={WelcomeIntroScreen} />
+            <Stack.Screen name="CirclesExplainer" component={CirclesExplainerScreen} />
+            <Stack.Screen name="BuildUniverse" component={BuildUniverseScreen} />
             <Stack.Screen name="ImportContacts" component={ImportContactsScreen} />
             <Stack.Screen name="SelectContacts" component={SelectContactsScreen} />
             <Stack.Screen name="VisualizeCircle" component={VisualizeCircleScreen} />

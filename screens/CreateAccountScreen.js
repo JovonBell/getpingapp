@@ -117,7 +117,7 @@ export default function CreateAccountScreen({ navigation }) {
         {/* Continue Button */}
         <TouchableOpacity
           style={styles.continueButton}
-          onPress={() => navigation.navigate('ImportContacts')}
+          onPress={() => navigation.navigate('WelcomeIntro')}
         >
           <Text style={styles.continueButtonText}>continue</Text>
         </TouchableOpacity>
@@ -132,7 +132,7 @@ export default function CreateAccountScreen({ navigation }) {
         {/* Social Login Buttons */}
         <TouchableOpacity
           style={styles.socialButton}
-          onPress={() => navigation.navigate('ImportContacts')}
+          onPress={() => navigation.navigate('WelcomeIntro')}
         >
           <View style={styles.googleLogo}>
             <Text style={styles.googleG}>G</Text>
@@ -142,7 +142,7 @@ export default function CreateAccountScreen({ navigation }) {
 
         <TouchableOpacity
           style={styles.socialButton}
-          onPress={() => navigation.navigate('ImportContacts')}
+          onPress={() => navigation.navigate('WelcomeIntro')}
         >
           <Ionicons name="logo-apple" size={24} color="#000000" />
           <Text style={styles.socialButtonText}>continue with apple</Text>
