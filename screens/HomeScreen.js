@@ -187,8 +187,8 @@ export default function HomeScreen({ navigation, route }) {
       if (deltaAngle > 180) deltaAngle -= 360;
       if (deltaAngle < -180) deltaAngle += 360;
 
-      // Update rotation - multiply by sensitivity factor
-      setRotation(prev => prev + deltaAngle * 0.8);
+      // Update rotation - negate deltaAngle for correct direction
+      setRotation(prev => prev - deltaAngle * 0.8);
 
       lastTouchAngle.current = currentAngle;
     }
