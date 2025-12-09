@@ -38,10 +38,12 @@ export default function HomeScreen({ navigation, route }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
+  const [circleCenterY, setCircleCenterY] = useState(250);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const zoomScale = useRef(new Animated.Value(1)).current;
   const starAnimations = useRef([...Array(30)].map(() => new Animated.Value(0))).current;
+  const networkViewRef = useRef(null);
 
   // Fixed star positions (generated once and never change)
   const starPositions = useRef(
@@ -124,7 +126,6 @@ export default function HomeScreen({ navigation, route }) {
 
   // Center of the circle visualization
   const circleCenterX = SCREEN_WIDTH / 2;
-  const circleCenterY = 250; // Approximate center of network visualization
 
   const handleTouchStart = (event) => {
     if (event.nativeEvent.touches.length === 2) {
@@ -385,7 +386,13 @@ export default function HomeScreen({ navigation, route }) {
 
           {/* Rotatable network visualization */}
           <View
+            ref={networkViewRef}
             style={styles.networkView}
+            onLayout={() => {
+              networkViewRef.current?.measure((_x, _y, _width, height, _pageX, pageY) => {
+                setCircleCenterY(pageY + height / 2);
+              });
+            }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
