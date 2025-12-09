@@ -140,11 +140,8 @@ export default function HomeScreen({ navigation, route }) {
       // Single finger drag for rotation
       isDragging.current = true;
       const touch = event.nativeEvent.touches[0];
-      // Calculate initial angle from center to touch point
-      lastTouchAngle.current = Math.atan2(
-        touch.pageY - circleCenterY,
-        touch.pageX - circleCenterX
-      ) * (180 / Math.PI);
+      // Store initial touch position (not angle)
+      lastTouchAngle.current = { x: touch.pageX, y: touch.pageY };
     }
   };
 
@@ -171,26 +168,33 @@ export default function HomeScreen({ navigation, route }) {
 
       lastDistance.current = distance;
     } else if (event.nativeEvent.touches.length === 1 && isDragging.current) {
-      // Drag to rotate - calculate angular movement
+      // NEW APPROACH: Use cross product for intuitive rotation
       const touch = event.nativeEvent.touches[0];
 
-      // Calculate current angle from center to touch point
-      const currentAngle = Math.atan2(
-        touch.pageY - circleCenterY,
-        touch.pageX - circleCenterX
-      ) * (180 / Math.PI);
+      // Get touch position relative to circle center
+      const touchX = touch.pageX;
+      const touchY = touch.pageY;
 
-      // Calculate the angular difference
-      let deltaAngle = currentAngle - lastTouchAngle.current;
+      // Vector from center to current touch
+      const radiusX = touchX - circleCenterX;
+      const radiusY = touchY - circleCenterY;
 
-      // Handle angle wrapping (e.g., from 179 to -179 degrees)
-      if (deltaAngle > 180) deltaAngle -= 360;
-      if (deltaAngle < -180) deltaAngle += 360;
+      // Get movement delta
+      const deltaX = touch.pageX - (lastTouchAngle.current.x || touch.pageX);
+      const deltaY = touch.pageY - (lastTouchAngle.current.y || touch.pageY);
 
-      // Update rotation - negate deltaAngle for correct direction
-      setRotation(prev => prev - deltaAngle * 0.8);
+      // Cross product determines rotation direction
+      // Positive = clockwise, Negative = counterclockwise
+      const crossProduct = radiusX * deltaY - radiusY * deltaX;
 
-      lastTouchAngle.current = currentAngle;
+      // Calculate rotation magnitude based on distance from center
+      const distance = Math.sqrt(radiusX * radiusX + radiusY * radiusY);
+      const rotationDelta = (crossProduct / (distance * distance)) * 200; // Sensitivity multiplier
+
+      setRotation(prev => prev + rotationDelta);
+
+      // Store current position for next frame
+      lastTouchAngle.current = { x: touch.pageX, y: touch.pageY };
     }
   };
 
