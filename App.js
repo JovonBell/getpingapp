@@ -1,4 +1,5 @@
 import React from 'react';
+import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -58,19 +59,13 @@ function MainTabs() {
         name="HomeTab"
         component={HomeScreen}
         options={{
-          tabBarLabel: 'home',
+          tabBarLabel: 'circles',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="AddTab"
-        component={AddContactScreen}
-        options={{
-          tabBarLabel: 'add',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-add-outline" size={size} color={color} />
+            <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ position: 'absolute', width: size * 0.9, height: size * 0.9, borderRadius: size * 0.45, borderWidth: 1.5, borderColor: color }} />
+              <View style={{ position: 'absolute', width: size * 0.6, height: size * 0.6, borderRadius: size * 0.3, borderWidth: 1.5, borderColor: color }} />
+              <View style={{ position: 'absolute', width: size * 0.3, height: size * 0.3, borderRadius: size * 0.15, borderWidth: 1.5, borderColor: color }} />
+            </View>
           ),
         }}
       />
@@ -78,9 +73,9 @@ function MainTabs() {
         name="AlertsTab"
         component={AlertsScreen}
         options={{
-          tabBarLabel: 'alerts',
+          tabBarLabel: 'pings!',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications-outline" size={size} color={color} />
+            <Ionicons name="alert-circle-outline" size={size} color={color} />
           ),
         }}
       />
@@ -123,6 +118,7 @@ export default function App() {
             <Stack.Screen name="ImportContacts" component={ImportContactsScreen} />
             <Stack.Screen name="SelectContacts" component={SelectContactsScreen} />
             <Stack.Screen name="VisualizeCircle" component={VisualizeCircleScreen} />
+            <Stack.Screen name="AddContact" component={AddContactScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
             <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />

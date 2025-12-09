@@ -65,7 +65,7 @@ export default function ContactsListScreen({ navigation }) {
                 <Text style={styles.messageBadgeText}>!</Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('AddTab')}>
+            <TouchableOpacity onPress={() => navigation.navigate('AddContact')}>
               <Ionicons name="person-add" size={24} color="#00ff88" />
             </TouchableOpacity>
           </View>
