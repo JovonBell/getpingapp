@@ -7,6 +7,7 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,8 +22,11 @@ export default function ContactUsScreen({ navigation }) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
-    Alert.alert('Success', 'Your message has been sent! We\'ll get back to you soon.');
-    navigation.goBack();
+    const subject = encodeURIComponent('ping! support');
+    const body = encodeURIComponent(`From: ${name} <${email}>\n\n${message}`);
+    Linking.openURL(`mailto:support@getping.app?subject=${subject}&body=${body}`).catch(() => {
+      Alert.alert('Error', 'Could not open email client. Please email support@getping.app');
+    });
   };
 
   return (

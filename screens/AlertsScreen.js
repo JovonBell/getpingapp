@@ -8,15 +8,24 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-
-const DUMMY_ALERTS = [
-  { id: '1', type: 'ping', name: 'Alice Johnson', message: 'sent you a ping!', time: '2m ago' },
-  { id: '2', type: 'connection', name: 'Bob Smith', message: 'wants to connect', time: '1h ago' },
-  { id: '3', type: 'ping', name: 'Carol White', message: 'sent you a ping!', time: '3h ago' },
-  { id: '4', type: 'update', name: 'David Brown', message: 'updated their status', time: '5h ago' },
-];
+import { getCurrentUser } from '../utils/supabaseStorage';
+import { getUnreadMessageCount } from '../utils/messagesStorage';
 
 export default function AlertsScreen({ navigation }) {
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  React.useEffect(() => {
+    const loadUnread = async () => {
+      const { success, user } = await getCurrentUser();
+      if (!success || !user) return;
+      const res = await getUnreadMessageCount(user.id);
+      if (res.success) setUnreadCount(res.count);
+    };
+    loadUnread();
+    const unsub = navigation.addListener('focus', loadUnread);
+    return unsub;
+  }, [navigation]);
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -32,9 +41,11 @@ export default function AlertsScreen({ navigation }) {
               onPress={() => navigation.navigate('Messages')}
             >
               <Ionicons name="chatbubble-outline" size={24} color="#ffffff" />
-              <View style={styles.messageBadge}>
-                <Text style={styles.messageBadgeText}>!</Text>
-              </View>
+              {unreadCount > 0 && (
+                <View style={styles.messageBadge}>
+                  <Text style={styles.messageBadgeText}>{unreadCount > 99 ? '99+' : String(unreadCount)}</Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity>
               <Ionicons name="checkmark-done" size={24} color="#00ff88" />
@@ -43,24 +54,13 @@ export default function AlertsScreen({ navigation }) {
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {DUMMY_ALERTS.map((alert) => (
-            <TouchableOpacity key={alert.id} style={styles.alertItem}>
-              <View style={styles.alertIcon}>
-                <Ionicons
-                  name={alert.type === 'ping' ? 'radio-outline' : alert.type === 'connection' ? 'people-outline' : 'notifications-outline'}
-                  size={24}
-                  color="#00ff88"
-                />
-              </View>
-              <View style={styles.alertContent}>
-                <Text style={styles.alertText}>
-                  <Text style={styles.alertName}>{alert.name}</Text>
-                  {' '}{alert.message}
-                </Text>
-                <Text style={styles.alertTime}>{alert.time}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          <View style={{ paddingTop: 40, alignItems: 'center' }}>
+            <Ionicons name="notifications-outline" size={48} color="#4FFFB0" />
+            <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '600', marginTop: 12 }}>No alerts yet</Text>
+            <Text style={{ color: '#ffffff', opacity: 0.7, textAlign: 'center', marginTop: 8, paddingHorizontal: 20 }}>
+              When you receive pings and updates from your circles, they’ll show up here.
+            </Text>
+          </View>
         </ScrollView>
       </LinearGradient>
     </View>

@@ -5,107 +5,90 @@ import {
   View,
   TouchableOpacity,
   FlatList,
-  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-
-const DUMMY_MESSAGES = [
-  {
-    id: '1',
-    name: 'Alice Johnson',
-    message: 'Hey! Are you free this weekend?',
-    time: '2m',
-    unread: true,
-    initials: 'AJ',
-    color: '#00ff88',
-  },
-  {
-    id: '2',
-    name: 'Bob Smith',
-    message: 'Thanks for the help earlier!',
-    time: '1h',
-    unread: true,
-    initials: 'BS',
-    color: '#ffaa00',
-  },
-  {
-    id: '3',
-    name: 'Carol White',
-    message: 'See you tomorrow ✌️',
-    time: '3h',
-    unread: false,
-    initials: 'CW',
-    color: '#ff6b6b',
-  },
-  {
-    id: '4',
-    name: 'David Brown',
-    message: 'Did you get my last message?',
-    time: '5h',
-    unread: false,
-    initials: 'DB',
-    color: '#4ecdc4',
-  },
-  {
-    id: '5',
-    name: 'Emma Davis',
-    message: 'Love the new feature!',
-    time: '1d',
-    unread: false,
-    initials: 'ED',
-    color: '#00ff88',
-  },
-  {
-    id: '6',
-    name: 'Chart Erarian',
-    message: 'Let me know when you\'re available',
-    time: '2d',
-    unread: false,
-    initials: 'CE',
-    color: '#ffaa00',
-  },
-];
+import { getCurrentUser } from '../utils/supabaseStorage';
+import { fetchRecentThreads } from '../utils/messagesStorage';
 
 export default function MessagesScreen({ navigation, route }) {
-  // Get contact from route params if navigating from HomeScreen
   const contactFromRoute = route?.params?.contact;
+  const [loading, setLoading] = React.useState(true);
+  const [threads, setThreads] = React.useState([]);
+  const [currentUserId, setCurrentUserId] = React.useState(null);
 
-  // If a contact was passed, navigate to chat immediately
-  React.useEffect(() => {
-    if (contactFromRoute) {
-      navigation.navigate('Chat', { contact: contactFromRoute });
+  const loadThreads = async () => {
+    setLoading(true);
+    const { success, user } = await getCurrentUser();
+    const uid = success ? user?.id : null;
+    setCurrentUserId(uid);
+    if (!uid) {
+      setThreads([]);
+      setLoading(false);
+      return;
     }
+    const res = await fetchRecentThreads(uid);
+    setThreads(res.threads || []);
+    setLoading(false);
+  };
+
+  React.useEffect(() => {
+    loadThreads();
+    const unsub = navigation.addListener('focus', loadThreads);
+    return unsub;
+  }, [navigation]);
+
+  React.useEffect(() => {
+    if (!contactFromRoute) return;
+    const receiverId = contactFromRoute?.matchedUserId || contactFromRoute?.userId || null;
+    if (!receiverId) return;
+    navigation.navigate('Chat', { contact: contactFromRoute, receiverId });
   }, [contactFromRoute, navigation]);
 
-  const renderMessage = ({ item }) => (
+  const renderMessage = ({ item }) => {
+    const profile = item?.profile;
+    const name = profile?.display_name || 'ping user';
+    const last = item?.lastMessage;
+    const unread = last?.receiver_id === currentUserId && last?.read === false;
+    const initials = (name || 'P').split(' ').slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+
+    return (
     <TouchableOpacity
       style={styles.messageItem}
-      onPress={() => navigation.navigate('Chat', { contact: item })}
+      onPress={() =>
+        navigation.navigate('Chat', {
+          receiverId: item.otherUserId,
+          contact: { name, initials, matchedUserId: item.otherUserId },
+        })
+      }
     >
-      <View style={[styles.avatar, { backgroundColor: item.color }]}>
-        <Text style={styles.avatarText}>{item.initials}</Text>
+      <View style={[styles.avatar, { backgroundColor: '#2a4a3a' }]}>
+        <Text style={styles.avatarText}>{initials}</Text>
       </View>
       <View style={styles.messageContent}>
         <View style={styles.messageHeader}>
-          <Text style={styles.messageName}>{item.name}</Text>
-          <Text style={styles.messageTime}>{item.time}</Text>
+          <Text style={styles.messageName}>{name}</Text>
+          <Text style={styles.messageTime}>
+            {last?.created_at ? new Date(last.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+          </Text>
         </View>
         <View style={styles.messagePreview}>
           <Text
             style={[
               styles.messageText,
-              item.unread && styles.messageTextUnread,
+              unread && styles.messageTextUnread,
             ]}
             numberOfLines={1}
           >
-            {item.message}
+            {last?.content || ''}
           </Text>
-          {item.unread && <View style={styles.unreadDot} />}
+          {unread && <View style={styles.unreadDot} />}
         </View>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -138,13 +121,20 @@ export default function MessagesScreen({ navigation, route }) {
         </View>
 
         {/* Messages List */}
-        <FlatList
-          data={DUMMY_MESSAGES}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
-          style={styles.messagesList}
-          showsVerticalScrollIndicator={false}
-        />
+        {loading ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color="#4FFFB0" />
+            <Text style={{ color: '#ffffff', opacity: 0.7, marginTop: 10 }}>Loading…</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={threads}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.otherUserId}
+            style={styles.messagesList}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </LinearGradient>
     </View>
   );

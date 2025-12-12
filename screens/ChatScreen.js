@@ -8,85 +8,87 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { getCurrentUser } from '../utils/supabaseStorage';
+import { fetchConversation, markConversationRead, sendMessage } from '../utils/messagesStorage';
+import { fetchRecipientPushTokens, sendExpoPush } from '../utils/pushNotifications';
 
 export default function ChatScreen({ navigation, route }) {
   const { contact } = route.params || {};
+  const receiverId = route?.params?.receiverId || contact?.matchedUserId || contact?.userId || null;
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([
-    {
-      id: '1',
-      text: 'Hey! How are you?',
-      sender: 'them',
-      time: '10:30 AM',
-    },
-    {
-      id: '2',
-      text: 'I\'m doing great! Just working on some projects.',
-      sender: 'me',
-      time: '10:32 AM',
-    },
-    {
-      id: '3',
-      text: 'That sounds awesome! What are you working on?',
-      sender: 'them',
-      time: '10:33 AM',
-    },
-    {
-      id: '4',
-      text: 'Building a new networking app called Ping. It visualizes your social connections in a really cool way.',
-      sender: 'me',
-      time: '10:35 AM',
-    },
-    {
-      id: '5',
-      text: 'That sounds really interesting! I\'d love to see it when it\'s ready.',
-      sender: 'them',
-      time: '10:36 AM',
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const flatListRef = useRef(null);
 
-  useEffect(() => {
-    // Scroll to bottom on mount
-    if (flatListRef.current) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: false });
-      }, 100);
-    }
-  }, []);
-
-  const handleSend = () => {
-    if (message.trim()) {
-      const newMessage = {
-        id: Date.now().toString(),
-        text: message.trim(),
-        sender: 'me',
-        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages([...messages, newMessage]);
-      setMessage('');
-
-      // Scroll to bottom after sending
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
+  const load = async () => {
+    const { success, user } = await getCurrentUser();
+    const uid = success ? user?.id : null;
+    setCurrentUserId(uid);
+    if (!uid || !receiverId) return;
+    const res = await fetchConversation(uid, receiverId, 200);
+    setMessages(res.messages || []);
+    await markConversationRead(uid, receiverId);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
   };
 
-  const renderMessage = ({ item }) => (
+  useEffect(() => {
+    if (!receiverId) {
+      Alert.alert('Not on ping yet', 'This contact is not on ping yet, so you can’t message them yet.');
+      return;
+    }
+    load();
+    const unsub = navigation.addListener('focus', load);
+    return unsub;
+  }, [navigation, receiverId]);
+
+  const handleSend = () => {
+    (async () => {
+      const text = message.trim();
+      if (!text) return;
+      if (!currentUserId || !receiverId) return;
+
+      setMessage('');
+      const res = await sendMessage(currentUserId, receiverId, text);
+      if (!res.success) {
+        Alert.alert('Send failed', res.error || 'Please try again.');
+        return;
+      }
+      await load();
+
+      // Push notify recipient (best-effort)
+      try {
+        const tokensRes = await fetchRecipientPushTokens(receiverId);
+        await sendExpoPush(tokensRes.tokens, {
+          title: 'ping!',
+          body: `${contact?.name || 'Someone'}: ${text}`,
+          data: { type: 'message', senderId: currentUserId },
+        });
+      } catch (e) {
+        // ignore
+      }
+    })();
+  };
+
+  const renderMessage = ({ item }) => {
+    const mine = item.sender_id === currentUserId;
+    return (
     <View
       style={[
         styles.messageBubble,
-        item.sender === 'me' ? styles.myMessage : styles.theirMessage,
+        mine ? styles.myMessage : styles.theirMessage,
       ]}
     >
-      <Text style={styles.messageText}>{item.text}</Text>
-      <Text style={styles.messageTime}>{item.time}</Text>
+      <Text style={styles.messageText}>{item.content}</Text>
+      <Text style={styles.messageTime}>
+        {item.created_at ? new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+      </Text>
     </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>

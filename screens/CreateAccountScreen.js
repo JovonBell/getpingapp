@@ -4,20 +4,30 @@ import {
   Text,
   View,
   TouchableOpacity,
-  TextInput,
+  Alert,
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { signInWithGoogle } from '../utils/supabaseStorage';
 
 export default function CreateAccountScreen({ navigation }) {
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [phoneFocused, setPhoneFocused] = useState(false);
-  const [emailFocused, setEmailFocused] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await signInWithGoogle();
+      if (!res.success) {
+        if (String(res.error).includes('canceled')) return;
+        Alert.alert('Sign in failed', res.error || 'Please try again.');
+      }
+      // On success: App.js auth gate will switch stacks automatically.
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -36,117 +46,29 @@ export default function CreateAccountScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>create account</Text>
-          <Text style={styles.subtitle}>visualize your circle.</Text>
+          <Text style={styles.subtitle}>sign in to visualize your circle.</Text>
         </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Input Fields */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>phone number</Text>
-          <TextInput
-            style={[
-              styles.input,
-              phoneFocused && styles.inputFocused,
-            ]}
-            placeholder="phone number"
-            placeholderTextColor="#999"
-            value={phone}
-            onChangeText={setPhone}
-            onFocus={() => setPhoneFocused(true)}
-            onBlur={() => setPhoneFocused(false)}
-            keyboardType="phone-pad"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>email</Text>
-          <TextInput
-            style={[
-              styles.input,
-              emailFocused && styles.inputFocused,
-            ]}
-            placeholder="email"
-            placeholderTextColor="#999"
-            value={email}
-            onChangeText={setEmail}
-            onFocus={() => setEmailFocused(true)}
-            onBlur={() => setEmailFocused(false)}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>password</Text>
-          <View style={styles.passwordContainer}>
-            <TextInput
-              style={[
-                styles.input,
-                styles.passwordInput,
-                passwordFocused && styles.inputFocused,
-              ]}
-              placeholder="password"
-              placeholderTextColor="#999"
-              value={password}
-              onChangeText={setPassword}
-              onFocus={() => setPasswordFocused(true)}
-              onBlur={() => setPasswordFocused(false)}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+          {/* Sign in with Google */}
+          <View style={{ alignItems: 'center', marginTop: 10 }}>
             <TouchableOpacity
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeIcon}
+              style={styles.socialButton}
+              onPress={handleGoogleSignIn}
+              disabled={busy}
             >
-              <Ionicons
-                name={showPassword ? 'eye-off' : 'eye'}
-                size={20}
-                color="#999"
-              />
+              <View style={styles.googleLogo}>
+                <Text style={styles.googleG}>G</Text>
+              </View>
+              <Text style={styles.socialButtonText}>continue with google</Text>
             </TouchableOpacity>
+            <Text style={styles.helperText}>
+              We use Google Sign In so you can quickly access your circles across devices.
+            </Text>
           </View>
-        </View>
-
-        {/* Continue Button */}
-        <TouchableOpacity
-          style={styles.continueButton}
-          onPress={() => navigation.navigate('WelcomeIntro')}
-        >
-          <Text style={styles.continueButtonText}>continue</Text>
-        </TouchableOpacity>
-
-        {/* Separator */}
-        <View style={styles.separator}>
-          <View style={styles.separatorLine} />
-          <Text style={styles.separatorText}>or</Text>
-          <View style={styles.separatorLine} />
-        </View>
-
-        {/* Social Login Buttons */}
-        <TouchableOpacity
-          style={styles.socialButton}
-          onPress={() => navigation.navigate('WelcomeIntro')}
-        >
-          <View style={styles.googleLogo}>
-            <Text style={styles.googleG}>G</Text>
-          </View>
-          <Text style={styles.socialButtonText}>continue with google</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.socialButton}
-          onPress={() => navigation.navigate('WelcomeIntro')}
-        >
-          <Ionicons name="logo-apple" size={24} color="#000000" />
-          <Text style={styles.socialButtonText}>continue with apple</Text>
-        </TouchableOpacity>
 
         {/* Footer Links */}
         <View style={styles.footer}>
@@ -260,6 +182,14 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     paddingHorizontal: 16,
     fontSize: 14,
+  },
+  helperText: {
+    marginTop: 14,
+    color: '#ffffff',
+    opacity: 0.75,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   socialButton: {
     backgroundColor: '#f5f5dc',

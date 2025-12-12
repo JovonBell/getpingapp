@@ -2,17 +2,39 @@
   "expo": {
     "name": "ping!",
     "slug": "getpingapp",
+    "scheme": "getpingapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    },
+    "plugins": [
+      "expo-apple-authentication",
+      "expo-contacts",
+      "expo-image-picker",
+      "expo-notifications",
+      "expo-web-browser"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.getpingapp"
+      "bundleIdentifier": "com.getpingapp",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "NSContactsUsageDescription": "Ping uses your contacts to help you build your circles and find who you already know on ping.",
+        "NSCameraUsageDescription": "Ping uses your camera to let you take and upload a profile photo.",
+        "NSPhotoLibraryUsageDescription": "Ping uses your photo library to let you choose and upload a profile photo.",
+        "NSPhotoLibraryAddUsageDescription": "Ping saves your selected profile photo."
+      }
     },
     "android": {
       "package": "com.getpingapp"
     }
   }
 }
-

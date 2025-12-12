@@ -5,11 +5,16 @@ import {
   View,
   TouchableOpacity,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function AboutScreen({ navigation }) {
+  const openUrl = (url) => Linking.openURL(url).catch(() => {});
+  const TERMS_URL = 'https://getping.app/terms';
+  const PRIVACY_URL = 'https://getping.app/privacy';
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -66,15 +71,15 @@ export default function AboutScreen({ navigation }) {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Legal</Text>
-            <TouchableOpacity style={styles.legalItem}>
+            <TouchableOpacity style={styles.legalItem} onPress={() => openUrl(TERMS_URL)}>
               <Text style={styles.legalText}>Terms of Service</Text>
               <Ionicons name="chevron-forward" size={20} color="#666" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.legalItem}>
+            <TouchableOpacity style={styles.legalItem} onPress={() => openUrl(PRIVACY_URL)}>
               <Text style={styles.legalText}>Privacy Policy</Text>
               <Ionicons name="chevron-forward" size={20} color="#666" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.legalItem}>
+            <TouchableOpacity style={styles.legalItem} onPress={() => openUrl('https://getping.app/licenses')}>
               <Text style={styles.legalText}>Licenses</Text>
               <Ionicons name="chevron-forward" size={20} color="#666" />
             </TouchableOpacity>

@@ -5,9 +5,13 @@ import {
   View,
   TouchableOpacity,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { signOut } from '../utils/supabaseStorage';
+import { getCurrentUser } from '../utils/supabaseStorage';
+import { getUnreadMessageCount } from '../utils/messagesStorage';
 
 const SETTINGS_SECTIONS = [
   {
@@ -37,6 +41,28 @@ const SETTINGS_SECTIONS = [
 ];
 
 export default function SettingsScreen({ navigation }) {
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  const handleLogout = async () => {
+    const res = await signOut();
+    if (!res.success) {
+      Alert.alert('Logout failed', res.error || 'Please try again.');
+    }
+    // On success: App.js auth gate will switch stacks automatically.
+  };
+
+  React.useEffect(() => {
+    const loadUnread = async () => {
+      const { success, user } = await getCurrentUser();
+      if (!success || !user) return;
+      const res = await getUnreadMessageCount(user.id);
+      if (res.success) setUnreadCount(res.count);
+    };
+    loadUnread();
+    const unsub = navigation.addListener('focus', loadUnread);
+    return unsub;
+  }, [navigation]);
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -51,9 +77,11 @@ export default function SettingsScreen({ navigation }) {
             onPress={() => navigation.navigate('Messages')}
           >
             <Ionicons name="chatbubble-outline" size={24} color="#ffffff" />
-            <View style={styles.messageBadge}>
-              <Text style={styles.messageBadgeText}>!</Text>
-            </View>
+            {unreadCount > 0 && (
+              <View style={styles.messageBadge}>
+                <Text style={styles.messageBadgeText}>{unreadCount > 99 ? '99+' : String(unreadCount)}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -92,7 +120,15 @@ export default function SettingsScreen({ navigation }) {
             </View>
           ))}
 
-          <TouchableOpacity style={styles.logoutButton}>
+          <TouchableOpacity 
+            style={styles.diagnosticsButton} 
+            onPress={() => navigation.navigate('Diagnostics')}
+          >
+            <Ionicons name="bug-outline" size={20} color="#4FFFB0" />
+            <Text style={styles.diagnosticsText}>Database Diagnostics</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={20} color="#ff6b6b" />
             <Text style={styles.logoutText}>Log Out</Text>
           </TouchableOpacity>
@@ -178,12 +214,30 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
   },
-  logoutButton: {
+  diagnosticsButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
     marginTop: 20,
+    marginBottom: 10,
+    gap: 8,
+    backgroundColor: 'rgba(79, 255, 176, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#4FFFB0',
+  },
+  diagnosticsText: {
+    color: '#4FFFB0',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    marginTop: 10,
     marginBottom: 40,
     gap: 8,
   },

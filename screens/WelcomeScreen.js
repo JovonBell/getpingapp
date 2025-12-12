@@ -1,8 +1,23 @@
 import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Alert, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { signInWithGoogle } from '../utils/supabaseStorage';
 
 export default function WelcomeScreen({ navigation }) {
+  const handleGoogleSignIn = async () => {
+    try {
+      const res = await signInWithGoogle();
+      if (!res.success) {
+        // ignore cancel errors (user backed out)
+        if (String(res.error).includes('canceled')) return;
+        Alert.alert('Sign in failed', res.error || 'Please try again.');
+      }
+      // On success: App.js auth gate will switch stacks automatically.
+    } catch (e) {
+      Alert.alert('Sign in failed', e?.message || 'Please try again.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -26,6 +41,16 @@ export default function WelcomeScreen({ navigation }) {
         <Text style={styles.tagline}>the future of connection is now.</Text>
 
         {/* Buttons */}
+        <TouchableOpacity
+          style={styles.googleButton}
+          onPress={handleGoogleSignIn}
+        >
+          <View style={styles.googleLogo}>
+            <Text style={styles.googleG}>G</Text>
+          </View>
+          <Text style={styles.googleButtonText}>Sign in with Google</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.getStartedButton}
           onPress={() => navigation.navigate('CreateAccount')}
@@ -119,6 +144,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#ffffff',
     marginBottom: 50,
+  },
+  googleButton: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    width: 260,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleLogo: {
+    width: 24,
+    height: 24,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  googleG: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4285F4',
+  },
+  googleButtonText: {
+    color: '#1a1a1a',
+    fontSize: 16,
+    fontWeight: '600',
   },
   getStartedButton: {
     backgroundColor: '#a8e6cf',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,34 +6,81 @@ import {
   TouchableOpacity,
   FlatList,
   TextInput,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-
-// Dummy contact data
-const DUMMY_CONTACTS = [
-  { id: '1', name: 'Chart Erarian', email: 'sage@cat.com', phone: '(555) 123-4567', initials: 'AB' },
-  { id: '2', name: 'Cannel Gosty', email: 'sage@cat.com', phone: '(555) 234-5678', initials: 'CR' },
-  { id: '3', name: 'Dalion Mockey', email: 'sage@cat.com', phone: '(555) 345-6789', initials: 'DA' },
-  { id: '4', name: 'Mary Manniott', email: 'sage@cat.com', phone: '(555) 456-7890', initials: 'BH' },
-  { id: '5', name: 'Brian Chemm', email: 'sage@cat.com', phone: '(555) 567-8901', initials: 'BC' },
-  { id: '6', name: 'Alice Johnson', email: 'alice@email.com', phone: '(555) 678-9012', initials: 'AJ' },
-  { id: '7', name: 'Bob Smith', email: 'bob@email.com', phone: '(555) 789-0123', initials: 'BS' },
-  { id: '8', name: 'Carol White', email: 'carol@email.com', phone: '(555) 890-1234', initials: 'CW' },
-  { id: '9', name: 'David Brown', email: 'david@email.com', phone: '(555) 901-2345', initials: 'DB' },
-  { id: '10', name: 'Emma Davis', email: 'emma@email.com', phone: '(555) 012-3456', initials: 'ED' },
-];
+import * as Contacts from 'expo-contacts';
+import { getCurrentUser } from '../utils/supabaseStorage';
+import { saveImportedContacts, getImportedContacts } from '../utils/contactsStorage';
+import { buildIdentifierHashes, expoContactsToAppContacts, hashContactsForMatching } from '../utils/contactsImport';
+import { findIdentityMapByHashes, findUsersByHashes } from '../utils/identitiesStorage';
+import { upsertConnections } from '../utils/connectionsStorage';
 
 export default function SelectContactsScreen({ navigation, route }) {
   const selectAll = route?.params?.selectAll || false;
   const isInitialImport = route?.params?.isInitialImport || false;
-  const [selectedContacts, setSelectedContacts] = useState(
-    selectAll ? DUMMY_CONTACTS.map(c => c.id) : []
-  );
+  const isFirstCircle = route?.params?.isFirstCircle ?? true;
+  const existingCircles = route?.params?.existingCircles || [];
+  const [contacts, setContacts] = useState([]);
+  const [loadingContacts, setLoadingContacts] = useState(true);
+  const [selectedContactIds, setSelectedContactIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
 
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      setLoadingContacts(true);
+      try {
+        if (isInitialImport) {
+          const { status } = await Contacts.requestPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert(
+              'Contacts Permission',
+              'We need access to your contacts to import them into your universe.',
+              [{ text: 'OK', onPress: () => navigation.goBack() }]
+            );
+            if (mounted) setContacts([]);
+            return;
+          }
+
+          const result = await Contacts.getContactsAsync({
+            fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
+            pageSize: 1000,
+            pageOffset: 0,
+          });
+
+          const appContacts = expoContactsToAppContacts(result?.data || []);
+          if (mounted) setContacts(appContacts);
+        } else {
+          const { success, contacts: stored } = await getImportedContacts();
+          if (mounted) setContacts(success ? stored : []);
+        }
+      } catch (e) {
+        console.error('Failed loading contacts:', e);
+        if (mounted) setContacts([]);
+      } finally {
+        if (mounted) setLoadingContacts(false);
+      }
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [isInitialImport, navigation]);
+
+  useEffect(() => {
+    // Initialize selection once contacts are loaded
+    if (selectAll && contacts.length > 0) {
+      setSelectedContactIds(contacts.map((c) => c.id));
+    }
+  }, [selectAll, contacts.length]);
+
   const toggleContact = (contactId) => {
-    setSelectedContacts(prev =>
+    setSelectedContactIds((prev) =>
       prev.includes(contactId)
         ? prev.filter(id => id !== contactId)
         : [...prev, contactId]
@@ -41,17 +88,22 @@ export default function SelectContactsScreen({ navigation, route }) {
   };
 
   const toggleSelectAll = () => {
-    if (selectedContacts.length === DUMMY_CONTACTS.length) {
-      setSelectedContacts([]);
+    if (selectedContactIds.length === contacts.length) {
+      setSelectedContactIds([]);
     } else {
-      setSelectedContacts(DUMMY_CONTACTS.map(c => c.id));
+      setSelectedContactIds(contacts.map(c => c.id));
     }
   };
 
-  const filteredContacts = DUMMY_CONTACTS.filter(contact =>
-    contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    contact.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredContacts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return contacts;
+    return contacts.filter((contact) =>
+      (contact?.name || '').toLowerCase().includes(q) ||
+      (contact?.email || '').toLowerCase().includes(q) ||
+      (contact?.phone || '').includes(searchQuery.trim())
+    );
+  }, [contacts, searchQuery]);
 
   // Group contacts by first letter
   const groupedContacts = filteredContacts.reduce((acc, contact) => {
@@ -64,7 +116,7 @@ export default function SelectContactsScreen({ navigation, route }) {
   }, {});
 
   const renderContact = ({ item }) => {
-    const isSelected = selectedContacts.includes(item.id);
+    const isSelected = selectedContactIds.includes(item.id);
 
     return (
       <TouchableOpacity
@@ -120,7 +172,7 @@ export default function SelectContactsScreen({ navigation, route }) {
         {/* Title */}
         <View style={styles.titleContainer}>
           <Text style={styles.title}>
-            {isInitialImport ? 'select contacts' : 'Create Your First Circle'}
+            {isInitialImport ? 'select contacts' : (isFirstCircle ? 'Create Your First Circle' : 'Create a New Circle')}
           </Text>
           <Text style={styles.subtitle}>
             {isInitialImport 
@@ -136,9 +188,9 @@ export default function SelectContactsScreen({ navigation, route }) {
         >
           <View style={[
             styles.checkbox,
-            selectedContacts.length === DUMMY_CONTACTS.length && styles.checkboxSelected
+            selectedContactIds.length === contacts.length && styles.checkboxSelected
           ]}>
-            {selectedContacts.length === DUMMY_CONTACTS.length && (
+            {selectedContactIds.length === contacts.length && (
               <Ionicons name="checkmark" size={20} color="#1a1a1a" />
             )}
           </View>
@@ -158,29 +210,82 @@ export default function SelectContactsScreen({ navigation, route }) {
         </View>
 
         {/* Contact List */}
-        <FlatList
-          data={Object.keys(groupedContacts).sort()}
-          renderItem={({ item: letter }) => renderSection(letter, groupedContacts[letter])}
-          keyExtractor={item => item}
-          style={styles.contactList}
-          showsVerticalScrollIndicator={false}
-        />
+        {loadingContacts ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color="#4FFFB0" />
+            <Text style={{ color: '#ffffff', opacity: 0.7, marginTop: 10 }}>Loading contacts…</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={Object.keys(groupedContacts).sort()}
+            renderItem={({ item: letter }) => renderSection(letter, groupedContacts[letter])}
+            keyExtractor={item => item}
+            style={styles.contactList}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
 
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            {selectedContacts.length} selected
+            {selectedContactIds.length} selected
           </Text>
           <TouchableOpacity
             style={styles.importButton}
-            onPress={() => {
-              const contacts = DUMMY_CONTACTS.filter(c => selectedContacts.includes(c.id));
+            onPress={async () => {
+              const selected = contacts.filter(c => selectedContactIds.includes(c.id));
               if (isInitialImport) {
+                // Persist imported universe locally
+                let enriched = selected;
+
+                // Best-effort match & create connections in Supabase (requires migration)
+                try {
+                  const { success: userSuccess, user } = await getCurrentUser();
+                  if (userSuccess && user) {
+                    const byContact = await hashContactsForMatching(selected);
+                    const { emailHashes, phoneHashes } = await buildIdentifierHashes(selected);
+                    const [emailMatches, phoneMatches] = await Promise.all([
+                      findUsersByHashes('email', emailHashes),
+                      findUsersByHashes('phone', phoneHashes),
+                    ]);
+
+                    const matchedUserIds = Array.from(
+                      new Set([...(emailMatches.userIds || []), ...(phoneMatches.userIds || [])])
+                    );
+
+                    await upsertConnections(user.id, matchedUserIds, 3);
+
+                    // Contact-level match so "Message" knows who to target
+                    const [emailMapRes, phoneMapRes] = await Promise.all([
+                      findIdentityMapByHashes('email', emailHashes),
+                      findIdentityMapByHashes('phone', phoneHashes),
+                    ]);
+
+                    const emailMap = emailMapRes.map || {};
+                    const phoneMap = phoneMapRes.map || {};
+
+                    enriched = selected.map((c) => {
+                      const hashes = byContact[String(c.id)] || { emailHashes: [], phoneHashes: [] };
+                      const matched =
+                        hashes.emailHashes.find((h) => emailMap[h]) ||
+                        hashes.phoneHashes.find((h) => phoneMap[h]) ||
+                        null;
+
+                      const matchedUserId = matched ? (emailMap[matched] || phoneMap[matched]) : null;
+                      return { ...c, matchedUserId };
+                    });
+                  }
+                } catch (e) {
+                  console.warn('Matching/import connections failed (continuing):', e?.message || e);
+                }
+
+                await saveImportedContacts(enriched);
+
                 // Initial import - go to confirmation screen
-                navigation.navigate('ImportConfirmation', { contacts });
+                navigation.navigate('ImportConfirmation', { contacts: enriched });
               } else {
                 // Creating a circle - go to name/visualize screen
-                navigation.navigate('VisualizeCircle', { contacts });
+                navigation.navigate('VisualizeCircle', { contacts: selected, isFirstCircle, existingCircles });
               }
             }}
           >

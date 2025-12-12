@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { saveProfile } from '../utils/profileStorage';
 import { saveProfileToSupabase, uploadAvatar, getCurrentUser } from '../utils/supabaseStorage';
+import { normalizeEmail, normalizePhone, sha256 } from '../utils/contactsImport';
+import { upsertUserIdentities } from '../utils/identitiesStorage';
 
 export default function ProfileEditScreen({ navigation, route }) {
   // Get current profile data from route params or use defaults
@@ -168,6 +170,17 @@ export default function ProfileEditScreen({ navigation, route }) {
         if (!supabaseResult.success) {
           console.warn('Failed to sync to Supabase:', supabaseResult.error);
           // Still show success since local save worked
+        }
+
+        // Keep identity hashes up to date for contact matching
+        try {
+          const email = normalizeEmail(updatedProfile.email);
+          const phone = normalizePhone(updatedProfile.phone);
+          const emailHashes = email ? [await sha256(email)] : [];
+          const phoneHashes = phone ? [await sha256(phone)] : [];
+          await upsertUserIdentities(user.id, { emailHashes, phoneHashes });
+        } catch (e) {
+          console.warn('Failed to upsert identity hashes (continuing):', e?.message || e);
         }
       }
 

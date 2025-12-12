@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { getImportedContacts, saveImportedContacts } from '../utils/contactsStorage';
 
 export default function AddContactScreen({ navigation, route }) {
   const [name, setName] = useState('');
@@ -26,9 +27,6 @@ export default function AddContactScreen({ navigation, route }) {
   };
 
   const handleTierSelect = (tier) => {
-    // Get existing contacts from route params or use empty array
-    const existingContacts = route?.params?.contacts || [];
-
     // Create initials from name
     const nameParts = name.trim().split(' ');
     const initials = nameParts.length > 1
@@ -45,17 +43,17 @@ export default function AddContactScreen({ navigation, route }) {
       tier: tier,
     };
 
-    // Add to contacts array
-    const updatedContacts = [...existingContacts, newContact];
-
-    // Navigate to HomeTab with updated contacts
-    setShowTierPicker(false);
-    setName('');
-    setPhone('');
-    setEmail('');
-
-    // Navigate to home with the new contact
-    navigation.navigate('HomeTab', { contacts: updatedContacts });
+    // Persist into imported contacts store (the app-wide universe)
+    (async () => {
+      const { contacts: existing } = await getImportedContacts();
+      const updated = [...(existing || []), newContact];
+      await saveImportedContacts(updated);
+      setShowTierPicker(false);
+      setName('');
+      setPhone('');
+      setEmail('');
+      navigation.goBack();
+    })();
   };
 
   return (

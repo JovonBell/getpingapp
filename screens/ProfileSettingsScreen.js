@@ -114,7 +114,7 @@ export default function ProfileSettingsScreen({ navigation }) {
               <Ionicons name="chevron-forward" size={20} color="#666" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.settingItem}>
+            <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('AccountDeletion')}>
               <View style={styles.settingLeft}>
                 <Ionicons name="trash-outline" size={24} color="#ff6b6b" />
                 <Text style={[styles.settingLabel, { color: '#ff6b6b' }]}>

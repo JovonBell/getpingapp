@@ -9,29 +9,39 @@ import {
   Dimensions,
   FlatList,
   Modal,
+  Linking,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
+import PlanetZoom3D from '../components/PlanetZoom3D';
+import { getImportedContacts as loadImportedContacts } from '../utils/contactsStorage';
+import { getCurrentUser } from '../utils/supabaseStorage';
+import { loadCirclesWithMembers } from '../utils/circlesStorage';
+import { getUnreadMessageCount } from '../utils/messagesStorage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation, route }) {
-  // Contacts passed in after first-circle setup
+  // Back-compat: older flow passes a single circle as { contacts, circleName }.
   const routeContacts = route?.params?.contacts || [];
-  const circleName = route?.params?.circleName || 'Your first Circle';
+  const routeCircleName = route?.params?.circleName || 'Your first Circle';
   const isFirstCircle = route?.params?.isFirstCircle || false;
-  const [selectedContacts] = useState(routeContacts);
-  const hasCircle = selectedContacts.length > 0;
+
+  // Imported contacts can exist before a circle is created (from ImportConfirmationScreen).
+  const [importedContacts, setImportedContacts] = useState(route?.params?.importedContacts || []);
+
+  // Circles model: each circle is a ring with a name + contacts.
+  const [circles, setCircles] = useState([]);
+  const [circlesLoading, setCirclesLoading] = useState(true);
+  const hasCircle = circles.length > 0;
   // Helper to get first name from full name
   const getFirstName = (fullName) => fullName.split(' ')[0];
 
   const [rotation, setRotation] = useState(0);
-  const [selectedContact, setSelectedContact] = useState(null);
-  const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [circleCenterY, setCircleCenterY] = useState(250);
   
   // First circle celebration states
@@ -39,6 +49,117 @@ export default function HomeScreen({ navigation, route }) {
   const [showProfilePrompt, setShowProfilePrompt] = useState(false);
   const congratsAnim = useRef(new Animated.Value(0)).current;
   const profilePromptAnim = useRef(new Animated.Value(0)).current;
+
+  // 3D planet zoom overlay state
+  const [planetOpen, setPlanetOpen] = useState(false);
+  const [planetStartIndex, setPlanetStartIndex] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Delete circle states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedCircleToDelete, setSelectedCircleToDelete] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Load imported contacts from local storage (so the universe persists across restarts).
+  useEffect(() => {
+    let mounted = true;
+    const boot = async () => {
+      // If route provided contacts (just imported), keep them and also refresh from storage.
+      const fromRoute = route?.params?.importedContacts;
+      if (fromRoute && Array.isArray(fromRoute) && fromRoute.length > 0) {
+        if (mounted) setImportedContacts(fromRoute);
+        return;
+      }
+      const { contacts: stored } = await loadImportedContacts();
+      if (mounted) setImportedContacts(stored || []);
+    };
+    boot();
+    return () => {
+      mounted = false;
+    };
+  }, [route?.params?.importedContacts]);
+
+  // Load circles from Supabase (authoritative) when the Home tab is focused.
+  useEffect(() => {
+    let mounted = true;
+    
+    const load = async () => {
+      console.log('[HomeScreen] Loading circles from Supabase...');
+      setCirclesLoading(true);
+      
+      try {
+        const { success: userSuccess, user } = await getCurrentUser();
+        console.log('[HomeScreen] User check:', { userSuccess, userId: user?.id });
+        
+        if (!userSuccess || !user) {
+          console.warn('[HomeScreen] No authenticated user found');
+          if (mounted) {
+            setCircles([]);
+            setCirclesLoading(false);
+          }
+          return;
+        }
+        
+        const res = await loadCirclesWithMembers(user.id);
+        console.log('[HomeScreen] Circles loaded:', { success: res.success, count: res.circles?.length, error: res.error });
+        
+        if (mounted) {
+          if (res.success) {
+            setCircles(res.circles || []);
+            console.log('[HomeScreen] ✅ Circles set to state:', res.circles?.length || 0);
+          } else {
+            console.error('[HomeScreen] Failed to load circles:', res.error);
+          }
+          setCirclesLoading(false);
+        }
+      } catch (e) {
+        console.error('[HomeScreen] Exception loading circles:', e?.message || e);
+        if (mounted) {
+          setCirclesLoading(false);
+        }
+      }
+    };
+
+    load();
+    const unsub = navigation.addListener('focus', () => {
+      console.log('[HomeScreen] Tab focused, reloading circles...');
+      load();
+    });
+    
+    return () => {
+      mounted = false;
+      unsub();
+    };
+  }, [navigation]);
+
+  useEffect(() => {
+    const loadUnread = async () => {
+      const { success, user } = await getCurrentUser();
+      if (!success || !user) return;
+      const res = await getUnreadMessageCount(user.id);
+      if (res.success) setUnreadCount(res.count);
+    };
+    loadUnread();
+    const unsub = navigation.addListener('focus', loadUnread);
+    return unsub;
+  }, [navigation]);
+
+  // Sync circles when coming back from VisualizeCircle (new multi-circle flow) or legacy params.
+  const lastCirclesTokenRef = useRef(null);
+  useEffect(() => {
+    const nextCircles = route?.params?.circles;
+    const token = route?.params?.circlesToken;
+    if (nextCircles && Array.isArray(nextCircles) && token && token !== lastCirclesTokenRef.current) {
+      lastCirclesTokenRef.current = token;
+      setCircles(nextCircles);
+      return;
+    }
+
+    // Legacy single-circle params (only initialize if we don't already have circles)
+    if (routeContacts && Array.isArray(routeContacts) && routeContacts.length > 0 && circles.length === 0) {
+      setCircles([{ id: 'circle-0', name: routeCircleName, contacts: routeContacts }]);
+    }
+  }, [route?.params?.circles, route?.params?.circlesToken, routeContacts, routeCircleName, circles.length]);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const zoomScale = useRef(new Animated.Value(1)).current;
@@ -53,32 +174,91 @@ export default function HomeScreen({ navigation, route }) {
     }))
   ).current;
 
+  const allCircleContacts = circles.reduce((acc, c) => acc.concat(c?.contacts || []), []);
+  const allSearchContacts = hasCircle ? allCircleContacts : importedContacts;
+
   // Filter contacts based on search
   const filteredContacts = searchQuery.length > 0
-    ? selectedContacts.filter(contact =>
-        contact.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ? allSearchContacts.filter(contact =>
+        contact?.name?.toLowerCase?.().includes(searchQuery.toLowerCase())
       )
     : [];
 
   // Colors for contacts
   const colors = ['#4FFFB0', '#ffaa00', '#ff6b6b', '#4ecdc4'];
 
-  // Single-ring radius for first circle
-  const RING_RADIUS = 105;
+  const BASE_RING_RADIUS = 70;
+  const SINGLE_DOTTED_RADIUS = 160;
+  const MAX_DOTTED_RADIUS = 180;
 
-  // Calculate positions for contacts - evenly distributed on one ring
-  const getContactPosition = (index, total) => {
-    const angleOffset = (index * (360 / total)) * (Math.PI / 180);
-    const radius = RING_RADIUS;
+  // Keep rings within the 400x400 SVG viewBox even as more circles are added.
+  // Increased spacing between rings for better visual separation
+  let ringStep = circles.length <= 1 ? (SINGLE_DOTTED_RADIUS - BASE_RING_RADIUS) : 55;
+  if (circles.length > 0 && BASE_RING_RADIUS + ringStep * circles.length > MAX_DOTTED_RADIUS) {
+    ringStep = (MAX_DOTTED_RADIUS - BASE_RING_RADIUS) / circles.length;
+  }
+
+  const getRingRadius = (ringIndex) => BASE_RING_RADIUS + ringStep * ringIndex;
+  const getDottedRingRadius = () => BASE_RING_RADIUS + ringStep * circles.length;
+
+  // Calculate positions for contacts - evenly distributed on their ring
+  // arrayIndex is the index in ringedContacts/planetItems for reliable color mapping
+  // Offset each ring by half the angle step to create a staggered/scattered effect
+  const getContactPosition = (indexOnRing, totalOnRing, ringIndex, arrayIndex) => {
+    const angleStep = 360 / Math.max(1, totalOnRing);
+    const ringOffset = ringIndex % 2 === 0 ? 0 : angleStep / 2; // Stagger odd rings
+    const angleOffset = (indexOnRing * angleStep + ringOffset) * (Math.PI / 180);
+    const radius = getRingRadius(ringIndex);
 
     return {
       x: 200 + radius * Math.cos(angleOffset + rotation * (Math.PI / 180)),
       y: 200 + radius * Math.sin(angleOffset + rotation * (Math.PI / 180)),
       radius: 8,
-      color: colors[index % colors.length],
-      ring: 0,
+      color: colors[arrayIndex % colors.length],
+      ring: ringIndex,
     };
   };
+
+  const primaryCircleName = circles?.[0]?.name || routeCircleName;
+
+  // Flatten circles -> ringed contact entries (stable ordering with useMemo to prevent rebuilding)
+  const ringedContacts = React.useMemo(() => {
+    const result = [];
+    circles.forEach((circle, ringIndex) => {
+      const contacts = circle?.contacts || [];
+      contacts.forEach((contact, indexOnRing) => {
+        result.push({
+          contact,
+          ringIndex,
+          indexOnRing,
+          totalOnRing: contacts.length,
+          globalIndex: result.length,
+        });
+      });
+    });
+    return result;
+  }, [circles]);
+
+  // Items used by 3D planet view (index must align with handlePerson3DPress indices)
+  // Use array index as the source of truth for mapping
+  const planetItems = React.useMemo(() => {
+    return ringedContacts.map((entry, arrayIndex) => ({
+      ...entry.contact,
+      color: colors[arrayIndex % colors.length],
+    }));
+  }, [ringedContacts]);
+
+  // Map contact ID to array index for reliable lookups
+  const planetIndexById = React.useMemo(() => {
+    return ringedContacts.reduce((acc, entry, arrayIndex) => {
+      acc[entry?.contact?.id] = arrayIndex;
+      return acc;
+    }, {});
+  }, [ringedContacts]);
+
+  const dottedRingRadius = hasCircle ? getDottedRingRadius() : SINGLE_DOTTED_RADIUS;
+  const addCirclePlusX = 200 + dottedRingRadius;
+  const deleteCircleMinusX = 200 - dottedRingRadius;
 
   // Animate flowing stars
   useEffect(() => {
@@ -138,14 +318,14 @@ export default function HomeScreen({ navigation, route }) {
     if (parent) {
       parent.navigate('ProfileEdit', {
         fromFirstCircle: true,
-        contacts: selectedContacts,
-        circleName,
+        contacts: circles?.[0]?.contacts || [],
+        circleName: circles?.[0]?.name || routeCircleName,
       });
     } else {
       navigation.navigate('ProfileEdit', {
         fromFirstCircle: true,
-        contacts: selectedContacts,
-        circleName,
+        contacts: circles?.[0]?.contacts || [],
+        circleName: circles?.[0]?.name || routeCircleName,
       });
     }
     setShowProfilePrompt(false);
@@ -243,94 +423,65 @@ export default function HomeScreen({ navigation, route }) {
     const parent = navigation.getParent();
     
     if (hasCircle) {
-      // If circle already exists, go to profile edit
-      console.log('Has circle, navigating to ProfileEdit...');
-      if (parent) {
-        parent.navigate('ProfileEdit');
-      } else {
-        navigation.navigate('ProfileEdit');
-      }
+      // If circle exists, center tap edits profile
+      if (parent) parent.navigate('ProfileEdit');
+      else navigation.navigate('ProfileEdit');
     } else {
       // No circle yet, start the "create your first circle" workflow
       console.log('No circle, navigating to SelectContacts...');
       if (parent) {
-        parent.navigate('SelectContacts', { selectAll: false });
+        parent.navigate('SelectContacts', { selectAll: false, isFirstCircle: true });
       } else {
-        navigation.navigate('SelectContacts', { selectAll: false });
+        navigation.navigate('SelectContacts', { selectAll: false, isFirstCircle: true });
       }
     }
   };
 
-  const handleContactPress = (contact, index) => {
-    // Calculate position of the contact dot
-    const pos = getContactPosition(index, selectedContacts.length);
-
-    // Convert SVG coordinates to screen coordinates
-    // SVG is centered in the screen, viewBox is 400x400
-    const svgCenterX = SCREEN_WIDTH / 2;
-    const svgCenterY = 250; // Adjust for header and search bar
-
-    // Scale factor (SVG viewBox is 400, so scale accordingly)
-    const scale = SCREEN_WIDTH / 400;
-
-    // Calculate screen position
-    const screenX = svgCenterX + (pos.x - 200) * scale;
-    const screenY = svgCenterY + (pos.y - 200) * scale;
-
-    // Position popup with better bounds checking
-    const popupWidth = 160;
-    const popupHeight = 120;
-    const padding = 10;
-    const searchBarBottom = 180; // Approximate bottom of search bar
-
-    let popupX = screenX + 20;
-    let popupY = screenY - 60;
-
-    // Check right edge
-    if (popupX + popupWidth > SCREEN_WIDTH - padding) {
-      popupX = screenX - popupWidth - 20;
-    }
-
-    // Check left edge
-    if (popupX < padding) {
-      popupX = padding;
-    }
-
-    // Check top edge (avoid search bar)
-    if (popupY < searchBarBottom) {
-      popupY = searchBarBottom + padding;
-    }
-
-    // Check bottom edge
-    const bottomNavHeight = 90;
-    if (popupY + popupHeight > SCREEN_HEIGHT - bottomNavHeight - padding) {
-      popupY = SCREEN_HEIGHT - bottomNavHeight - popupHeight - padding;
-    }
-
-    setPopupPosition({ x: popupX, y: popupY });
-    setSelectedContact({ ...contact, index });
-
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 1.1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  const handleCreateNewCircle = () => {
+    const parent = navigation.getParent();
+    const params = { selectAll: false, isFirstCircle: false, existingCircles: circles };
+    if (parent) parent.navigate('SelectContacts', params);
+    else navigation.navigate('SelectContacts', params);
   };
 
-  const closePopup = () => {
-    setSelectedContact(null);
-    setShowMoreInfo(false);
+  const handleDeleteCircleClick = () => {
+    // Allow deletion even if there's only one circle left
+    if (circles.length === 0) return;
+    setShowDeleteModal(true);
   };
 
-  const handleSeeMoreInfo = () => {
-    setShowMoreInfo(true);
+  const handleSelectCircleToDelete = (circle) => {
+    setSelectedCircleToDelete(circle);
+    setShowDeleteModal(false);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedCircleToDelete) return;
+    
+    // Remove from local state
+    const updatedCircles = circles.filter(c => c.id !== selectedCircleToDelete.id);
+    setCircles(updatedCircles);
+    
+    // TODO: Delete from Supabase (will need to add a delete function in circlesStorage)
+    // For now, just update local state
+    
+    setShowDeleteConfirm(false);
+    setSelectedCircleToDelete(null);
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setSelectedCircleToDelete(null);
+  };
+
+  const handlePerson3DPress = (contact, index) => {
+    setPlanetStartIndex(index);
+    setPlanetOpen(true);
+  };
+
+  const handlePlanetMoreInfo = () => {
+    // handled inside PlanetZoom3D via callback
   };
 
   const handleSearchFocus = () => {
@@ -356,9 +507,13 @@ export default function HomeScreen({ navigation, route }) {
               onPress={() => navigation.navigate('Messages')}
             >
               <Ionicons name="chatbubble-outline" size={24} color="#ffffff" />
-              <View style={styles.messageBadge}>
-                <Text style={styles.messageBadgeText}>!</Text>
-              </View>
+              {unreadCount > 0 && (
+                <View style={styles.messageBadge}>
+                  <Text style={styles.messageBadgeText}>
+                    {unreadCount > 99 ? '99+' : String(unreadCount)}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.profilePic}
@@ -397,9 +552,12 @@ export default function HomeScreen({ navigation, route }) {
                         <TouchableOpacity
                           style={styles.searchResultItem}
                           onPress={() => {
-                            handleContactPress(item, selectedContacts.indexOf(item));
-                            setSearchQuery('');
-                            setShowSearchResults(false);
+                            const idx = planetIndexById?.[item?.id];
+                            if (typeof idx === 'number') {
+                              handlePerson3DPress(item, idx);
+                              setSearchQuery('');
+                              setShowSearchResults(false);
+                            }
                           }}
                         >
                           <View style={[styles.resultAvatar, { backgroundColor: colors[index % colors.length] }]}>
@@ -422,7 +580,7 @@ export default function HomeScreen({ navigation, route }) {
 
             <View style={styles.circleNameContainer}>
               <Text style={styles.circleNameLabel}>current circle</Text>
-              <Text style={styles.circleNameValue}>{circleName}</Text>
+              <Text style={styles.circleNameValue}>{primaryCircleName}</Text>
             </View>
           </>
         )}
@@ -466,7 +624,7 @@ export default function HomeScreen({ navigation, route }) {
             {hasCircle && (
               <View style={styles.circleLabelContainer}>
                 <Ionicons name="people-outline" size={16} color="#4FFFB0" />
-                <Text style={styles.circleLabelText}>{circleName}</Text>
+                <Text style={styles.circleLabelText}>{primaryCircleName}</Text>
               </View>
             )}
 
@@ -477,17 +635,76 @@ export default function HomeScreen({ navigation, route }) {
                   <Circle cx="200" cy="200" r="25" fill="#4FFFB0" opacity="0.5" />
                   <Circle cx="200" cy="200" r="15" fill="#ffffff" />
 
-                  {/* Concentric circles */}
-                  <Circle cx="200" cy="200" r="70" stroke="#4FFFB0" strokeWidth="1" fill="none" opacity="0.3" />
-                  <Circle cx="200" cy="200" r="105" stroke="#4FFFB0" strokeWidth="1" fill="none" opacity="0.2" />
-                  <Circle cx="200" cy="200" r="140" stroke="#4FFFB0" strokeWidth="1" fill="none" opacity="0.1" />
+                  {/* Circles */}
+                  {!hasCircle ? (
+                    <>
+                      {/* Empty state: glowing concentric circles */}
+                      <Circle cx="200" cy="200" r="70" stroke="#4FFFB0" strokeWidth="1" fill="none" opacity="0.25" />
+                      <Circle cx="200" cy="200" r="105" stroke="#4FFFB0" strokeWidth="1" fill="none" opacity="0.18" />
+                    </>
+                  ) : (
+                    <>
+                      {/* Solid rings (one per circle) */}
+                      {circles.map((circle, ringIndex) => (
+                        <Circle
+                          key={circle?.id || `ring-${ringIndex}`}
+                          cx="200"
+                          cy="200"
+                          r={getRingRadius(ringIndex)}
+                          stroke="#4FFFB0"
+                          strokeWidth={ringIndex === 0 ? 1.5 : 1.25}
+                          fill="none"
+                          opacity={ringIndex === 0 ? 0.35 : 0.22}
+                        />
+                      ))}
+                    </>
+                  )}
 
-                  {/* Lines connecting contacts to center and each other */}
-                  {selectedContacts.map((contact, index) => {
-                    const pos = getContactPosition(index, selectedContacts.length);
+                  {/* Outer dotted ring + plus/minus (always visible) */}
+                  <Circle
+                    cx="200"
+                    cy="200"
+                    r={dottedRingRadius}
+                    stroke="#4FFFB0"
+                    strokeWidth="1"
+                    strokeDasharray="3 8"
+                    fill="none"
+                    opacity="0.25"
+                  />
+                  
+                  {/* Plus button (always visible) */}
+                  <Circle
+                    cx={addCirclePlusX}
+                    cy="200"
+                    r="10"
+                    fill="rgba(79, 255, 176, 0.18)"
+                    stroke="#4FFFB0"
+                    strokeWidth="2"
+                    onPress={handleCreateNewCircle}
+                  />
+                  <SvgText x={addCirclePlusX} y="205" fill="#4FFFB0" fontSize="16" fontWeight="700" textAnchor="middle">+</SvgText>
+                  
+                  {/* Minus button (only show if there are circles to delete) */}
+                  {hasCircle && (
+                    <>
+                      <Circle
+                        cx={deleteCircleMinusX}
+                        cy="200"
+                        r="10"
+                        fill="rgba(255, 107, 107, 0.18)"
+                        stroke="#ff6b6b"
+                        strokeWidth="2"
+                        onPress={handleDeleteCircleClick}
+                      />
+                      <SvgText x={deleteCircleMinusX} y="205" fill="#ff6b6b" fontSize="16" fontWeight="700" textAnchor="middle">−</SvgText>
+                    </>
+                  )}
+
+                  {/* Lines connecting contacts to center */}
+                  {ringedContacts.map((entry, arrayIndex) => {
+                    const pos = getContactPosition(entry.indexOnRing, entry.totalOnRing, entry.ringIndex, arrayIndex);
                     return (
-                      <React.Fragment key={`lines-${contact.id}`}>
-                        {/* Line from center to contact */}
+                      <React.Fragment key={`lines-${entry.contact.id}`}>
                         <Line
                           x1="200"
                           y1="200"
@@ -495,38 +712,17 @@ export default function HomeScreen({ navigation, route }) {
                           y2={pos.y}
                           stroke={pos.color}
                           strokeWidth="1"
-                          opacity="0.3"
+                          opacity="0.26"
                         />
-                        {/* Lines to nearby contacts on same or adjacent rings */}
-                        {selectedContacts.slice(0, index).map((otherContact, otherIndex) => {
-                          const otherPos = getContactPosition(otherIndex, selectedContacts.length);
-                          const ringDiff = Math.abs(pos.ring - otherPos.ring);
-
-                          if (ringDiff <= 1 && Math.random() > 0.5) {
-                            return (
-                              <Line
-                                key={`${contact.id}-${otherContact.id}`}
-                                x1={pos.x}
-                                y1={pos.y}
-                                x2={otherPos.x}
-                                y2={otherPos.y}
-                                stroke="#4FFFB0"
-                                strokeWidth="0.5"
-                                opacity="0.15"
-                              />
-                            );
-                          }
-                          return null;
-                        })}
                       </React.Fragment>
                     );
                   })}
 
                   {/* Contact nodes */}
-                  {selectedContacts.map((contact, index) => {
-                    const pos = getContactPosition(index, selectedContacts.length);
+                  {ringedContacts.map((entry, arrayIndex) => {
+                    const pos = getContactPosition(entry.indexOnRing, entry.totalOnRing, entry.ringIndex, arrayIndex);
                     return (
-                      <React.Fragment key={contact.id}>
+                      <React.Fragment key={entry.contact.id}>
                         {/* Contact glow */}
                         <Circle
                           cx={pos.x}
@@ -542,7 +738,7 @@ export default function HomeScreen({ navigation, route }) {
                           r={pos.radius}
                           fill={pos.color}
                           opacity="0.9"
-                          onPress={() => handleContactPress(contact, index)}
+                          onPress={() => handlePerson3DPress(entry.contact, arrayIndex)}
                         />
                         {/* Contact first name */}
                         <SvgText
@@ -553,7 +749,7 @@ export default function HomeScreen({ navigation, route }) {
                           textAnchor="middle"
                           opacity="0.8"
                         >
-                          {getFirstName(contact.name)}
+                          {getFirstName(entry.contact.name)}
                         </SvgText>
                       </React.Fragment>
                     );
@@ -575,138 +771,15 @@ export default function HomeScreen({ navigation, route }) {
           )}
           </View>
 
-        <Text style={styles.tapInstruction}>
-          {hasCircle
-            ? 'Tap a circle to open • Tap the center to edit your profile'
-            : 'tap the center to create your first Circle • drag to rotate • pinch to zoom'}
-        </Text>
+        <View style={styles.tapInstructionContainer}>
+          <Text style={styles.tapInstruction}>
+            {hasCircle
+              ? 'Tap a circle to open • Tap the center to edit your profile'
+              : 'tap the center to create your first Circle • drag to rotate • pinch to zoom'}
+          </Text>
+        </View>
 
-        {/* Small Contact Popup Box */}
-        {selectedContact !== null && !showMoreInfo && (
-          <TouchableOpacity
-            style={styles.popupOverlay}
-            activeOpacity={1}
-            onPress={closePopup}
-          >
-            <View
-              style={[
-                styles.popupBox,
-                {
-                  left: popupPosition.x,
-                  top: popupPosition.y,
-                }
-              ]}
-            >
-              <Text style={styles.popupName}>{selectedContact?.name}</Text>
-              <Text style={styles.popupPhone}>{selectedContact?.phone}</Text>
-
-              <View style={styles.popupActions}>
-                <TouchableOpacity
-                  style={styles.popupButton}
-                  onPress={() => {
-                    closePopup();
-                    navigation.navigate('Messages', { contact: selectedContact });
-                  }}
-                >
-                  <Ionicons name="chatbubble" size={20} color="#4FFFB0" />
-                  <Text style={styles.popupButtonText}>Message</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.popupButton}
-                  onPress={handleSeeMoreInfo}
-                >
-                  <Ionicons name="information-circle" size={20} color="#4FFFB0" />
-                  <Text style={styles.popupButtonText}>More Info</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableOpacity>
-        )}
-
-        {/* More Info Side Panel */}
-        <Modal
-          visible={showMoreInfo}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={closePopup}
-        >
-          <View style={styles.modalOverlay}>
-            <TouchableOpacity
-              style={styles.overlayDismiss}
-              activeOpacity={1}
-              onPress={closePopup}
-            />
-            <View style={styles.sidePanel}>
-              <View style={styles.panelHeader}>
-                <TouchableOpacity style={styles.closeButton} onPress={closePopup}>
-                  <Ionicons name="close" size={28} color="#ffffff" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.panelContent}>
-                <View style={[
-                  styles.panelAvatar,
-                  { backgroundColor: selectedContact ? colors[selectedContact.index % colors.length] : '#4FFFB0' }
-                ]}>
-                  <Text style={styles.panelAvatarText}>
-                    {selectedContact?.initials || 'NA'}
-                  </Text>
-                </View>
-
-                <Text style={styles.panelName}>{selectedContact?.name}</Text>
-                <View style={styles.panelInfo}>
-                  <Ionicons name="call-outline" size={16} color="#999" />
-                  <Text style={styles.panelPhone}>{selectedContact?.phone}</Text>
-                </View>
-
-                <View style={styles.panelActions}>
-                  <TouchableOpacity style={styles.actionButton}>
-                    <Ionicons name="call" size={24} color="#4FFFB0" />
-                    <Text style={styles.actionLabel}>Call</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => {
-                      closePopup();
-                      navigation.navigate('Messages', { contact: selectedContact });
-                    }}
-                  >
-                    <Ionicons name="chatbubble" size={24} color="#4FFFB0" />
-                    <Text style={styles.actionLabel}>Message</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.actionButton}>
-                    <Ionicons name="person" size={24} color="#4FFFB0" />
-                    <Text style={styles.actionLabel}>Profile</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.panelDivider} />
-
-                <View style={styles.panelDetails}>
-                  <Text style={styles.detailsTitle}>Connection Details</Text>
-
-                  <View style={styles.detailRow}>
-                    <Ionicons name="radio-button-on" size={20} color="#4FFFB0" />
-                    <Text style={styles.detailLabel}>Ring Tier: Close Friends</Text>
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <Ionicons name="calendar-outline" size={20} color="#4FFFB0" />
-                    <Text style={styles.detailLabel}>Connected: 3 months ago</Text>
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <Ionicons name="chatbubbles-outline" size={20} color="#4FFFB0" />
-                    <Text style={styles.detailLabel}>Last interaction: 2 days ago</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-        </Modal>
+        {/* NOTE: Per UX requirement, HomeScreen shows NO popups/panels. Interaction happens only via the 3D sphere view. */}
 
         {/* First Circle Congratulations Popup */}
         {showCongratsPopup && (
@@ -733,9 +806,10 @@ export default function HomeScreen({ navigation, route }) {
           </Animated.View>
         )}
 
-        {/* Profile Setup Prompt */}
-        {showProfilePrompt && (
+        {/* Profile Setup Prompt (bottom-right under circles, pointing to center) */}
+        {hasCircle && showProfilePrompt && (
           <Animated.View style={[styles.profilePromptContainer, { opacity: profilePromptAnim }]}>
+            <View style={styles.profilePromptArrow} />
             <TouchableOpacity
               style={styles.profilePrompt}
               onPress={handleSetupProfile}
@@ -746,6 +820,107 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           </Animated.View>
         )}
+
+        <PlanetZoom3D
+          visible={planetOpen}
+          onClose={() => {
+            setPlanetOpen(false);
+          }}
+          items={planetItems}
+          initialIndex={planetStartIndex}
+          onMoreInfo={() => {
+            // More info is now handled inside PlanetZoom3D component
+          }}
+          onMessage={async (contact) => {
+            setPlanetOpen(false);
+            if (contact && contact.phone) {
+              // Open native iMessage with the contact's phone number
+              const phoneNumber = contact.phone.replace(/[^0-9]/g, ''); // Remove non-numeric characters
+              const smsUrl = `sms:${phoneNumber}`;
+              
+              try {
+                const canOpen = await Linking.canOpenURL(smsUrl);
+                if (canOpen) {
+                  await Linking.openURL(smsUrl);
+                } else {
+                  Alert.alert('Unable to open Messages', 'Could not open the Messages app.');
+                }
+              } catch (error) {
+                Alert.alert('Error', 'Failed to open Messages app.');
+              }
+            } else {
+              Alert.alert('No Phone Number', 'This contact does not have a phone number.');
+            }
+          }}
+        />
+
+        {/* Delete Circle Selection Modal */}
+        <Modal
+          visible={showDeleteModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDeleteModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.deleteModal}>
+              <Text style={styles.deleteModalTitle}>Select Circle to Delete</Text>
+              <FlatList
+                data={circles}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.circleOption}
+                    onPress={() => handleSelectCircleToDelete(item)}
+                  >
+                    <Text style={styles.circleOptionName}>{item.name}</Text>
+                    <Text style={styles.circleOptionCount}>
+                      {item.contacts?.length || 0} contacts
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              />
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowDeleteModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          visible={showDeleteConfirm}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={handleCancelDelete}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.confirmModal}>
+              <Ionicons name="warning-outline" size={60} color="#ff6b6b" />
+              <Text style={styles.confirmTitle}>Delete Circle?</Text>
+              <Text style={styles.confirmMessage}>
+                Are you sure you want to delete "{selectedCircleToDelete?.name}"?
+              </Text>
+              <Text style={styles.confirmWarning}>This action cannot be undone.</Text>
+              <View style={styles.confirmButtons}>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.confirmCancel]}
+                  onPress={handleCancelDelete}
+                >
+                  <Text style={styles.confirmCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.confirmDelete]}
+                  onPress={handleConfirmDelete}
+                >
+                  <Text style={styles.confirmDeleteText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </LinearGradient>
     </View>
   );
@@ -917,15 +1092,17 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   tapInstruction: {
-    position: 'absolute',
-    bottom: 140,
-    left: 24,
-    right: 24,
-    textAlign: 'right',
+    textAlign: 'center',
     color: '#ffffff',
     fontSize: 14,
     lineHeight: 20,
     opacity: 0.85,
+  },
+  tapInstructionContainer: {
+    paddingHorizontal: 24,
+    paddingBottom: 22,
+    paddingTop: 10,
+    alignItems: 'center',
   },
   centerTapTarget: {
     position: 'absolute',
@@ -1182,9 +1359,23 @@ const styles = StyleSheet.create({
   // Profile Prompt Styles
   profilePromptContainer: {
     position: 'absolute',
-    top: '28%',
-    right: 20,
-    zIndex: 1000,
+    right: 16,
+    bottom: 90,
+    zIndex: 1500,
+    alignItems: 'flex-end',
+  },
+  profilePromptArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderTopWidth: 14,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#4FFFB0',
+    marginRight: 42,
+    marginBottom: 6,
+    opacity: 0.6,
   },
   profilePrompt: {
     backgroundColor: 'rgba(42, 74, 58, 0.95)',
@@ -1209,5 +1400,115 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#cccccc',
     lineHeight: 18,
+  },
+  // Delete Circle Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteModal: {
+    backgroundColor: '#1a2a1a',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#ff6b6b',
+    padding: 24,
+    marginHorizontal: 30,
+    maxHeight: 400,
+    width: '80%',
+  },
+  deleteModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  circleOption: {
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ff6b6b',
+  },
+  circleOptionName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  circleOptionCount: {
+    fontSize: 14,
+    color: '#cccccc',
+  },
+  cancelButton: {
+    backgroundColor: '#2a3a2a',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  // Delete Confirmation Modal Styles
+  confirmModal: {
+    backgroundColor: '#1a2a1a',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#ff6b6b',
+    padding: 28,
+    marginHorizontal: 30,
+    alignItems: 'center',
+  },
+  confirmTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  confirmMessage: {
+    fontSize: 16,
+    color: '#cccccc',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  confirmWarning: {
+    fontSize: 14,
+    color: '#ff6b6b',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  confirmButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  confirmCancel: {
+    backgroundColor: '#2a3a2a',
+  },
+  confirmDelete: {
+    backgroundColor: '#ff6b6b',
+  },
+  confirmCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  confirmDeleteText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
   },
 });

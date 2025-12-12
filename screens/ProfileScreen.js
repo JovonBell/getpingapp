@@ -14,21 +14,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { getProfile } from '../utils/profileStorage';
 import { getProfileFromSupabase, getCurrentUser } from '../utils/supabaseStorage';
 
-// Default profile data
+// Empty profile fallback (avoid shipping fake demo data)
 const DEFAULT_PROFILE = {
-  name: 'John Doe',
-  jobTitle: 'Software Engineer',
-  company: 'Tech Corp',
-  location: 'San Francisco, CA',
-  bio: 'Passionate about building great products and connecting with people.',
-  email: 'john.doe@example.com',
-  phone: '(555) 123-4567',
+  name: '',
+  jobTitle: '',
+  company: '',
+  location: '',
+  bio: '',
+  email: '',
+  phone: '',
   avatar: null,
-  socialLinks: {
-    linkedin: 'https://linkedin.com/in/johndoe',
-    twitter: 'https://twitter.com/johndoe',
-    instagram: 'https://instagram.com/johndoe',
-  },
+  socialLinks: {},
 };
 
 export default function ProfileScreen({ navigation, route }) {
@@ -106,11 +102,11 @@ export default function ProfileScreen({ navigation, route }) {
   };
 
   const openEmail = () => {
-    Linking.openURL(`mailto:${profile.email}`);
+    if (profile.email) Linking.openURL(`mailto:${profile.email}`);
   };
 
   const openPhone = () => {
-    Linking.openURL(`tel:${profile.phone}`);
+    if (profile.phone) Linking.openURL(`tel:${profile.phone}`);
   };
 
   return (
@@ -144,8 +140,23 @@ export default function ProfileScreen({ navigation, route }) {
                 </View>
               )}
             </View>
-            <Text style={styles.name}>{profile.name}</Text>
-            <Text style={styles.jobTitle}>{profile.jobTitle}</Text>
+            {!profile?.name ? (
+              <>
+                <Text style={styles.name}>Your profile</Text>
+                <Text style={styles.jobTitle}>Set this up so people recognize you.</Text>
+                <TouchableOpacity
+                  style={{ marginTop: 14, backgroundColor: '#4FFFB0', paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12 }}
+                  onPress={() => navigation.navigate('ProfileEdit', { profile })}
+                >
+                  <Text style={{ color: '#1a1a1a', fontWeight: '700' }}>Set up profile</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.name}>{profile.name}</Text>
+                <Text style={styles.jobTitle}>{profile.jobTitle}</Text>
+              </>
+            )}
 
             <View style={styles.metaInfo}>
               {profile.company && (

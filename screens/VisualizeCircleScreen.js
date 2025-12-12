@@ -8,14 +8,19 @@ import {
   Dimensions,
   TextInput,
   FlatList,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
+import { getCurrentUser } from '../utils/supabaseStorage';
+import { createCircleWithMembers } from '../utils/circlesStorage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function VisualizeCircleScreen({ navigation, route }) {
   const allContacts = route?.params?.contacts || [];
+  const isFirstCircle = route?.params?.isFirstCircle ?? true;
+  const existingCircles = route?.params?.existingCircles || [];
   const [circleName, setCircleName] = useState('');
   // Track which contacts are selected - start with all selected
   const [selectedContactIds, setSelectedContactIds] = useState(
@@ -104,17 +109,83 @@ export default function VisualizeCircleScreen({ navigation, route }) {
   };
 
   const handleVisualize = () => {
-    const finalName = circleName.trim() || 'My First Circle';
-    const selectedContacts = allContacts.filter(c => selectedContactIds.includes(c.id));
-    // Navigate to Home with first circle data and show celebration
-    navigation.navigate('Home', {
-      screen: 'HomeTab',
-      params: { 
-        contacts: selectedContacts, 
-        circleName: finalName,
-        isFirstCircle: true,
-      },
-    });
+    (async () => {
+      const finalName = circleName.trim() || (isFirstCircle ? 'My First Circle' : 'My Circle');
+      const selectedContacts = allContacts.filter(c => selectedContactIds.includes(c.id));
+
+      console.log('[VisualizeCircle] Creating circle:', { finalName, contactCount: selectedContacts.length, isFirstCircle });
+
+      // Persist to Supabase - CRITICAL for persistence across app restarts
+      let savedToSupabase = false;
+      try {
+        const { success: userSuccess, user } = await getCurrentUser();
+        console.log('[VisualizeCircle] User check:', { userSuccess, userId: user?.id });
+        
+        if (userSuccess && user) {
+          const tier = (existingCircles?.length || 0) + 1;
+          console.log('[VisualizeCircle] Saving to Supabase with tier:', tier);
+          
+          const result = await createCircleWithMembers(user.id, { name: finalName, tier, contacts: selectedContacts });
+          console.log('[VisualizeCircle] Supabase save result:', result);
+          
+          if (result.success) {
+            console.log('[VisualizeCircle] ✅ Circle successfully saved to Supabase!');
+            savedToSupabase = true;
+          } else {
+            console.error('[VisualizeCircle] ❌ Failed to save circle to Supabase:', result.error);
+            Alert.alert(
+              'Save Error',
+              'Circle could not be saved to database. Please check your internet connection and try again.',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+        } else {
+          console.error('[VisualizeCircle] ❌ No authenticated user, cannot save circle');
+          Alert.alert(
+            'Authentication Error',
+            'You must be logged in to create circles.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      } catch (e) {
+        console.error('[VisualizeCircle] Exception saving circle:', e?.message || e);
+        Alert.alert(
+          'Error',
+          'An error occurred while saving your circle. Please try again.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      if (!savedToSupabase) {
+        console.error('[VisualizeCircle] Circle was not saved to Supabase, aborting navigation');
+        return;
+      }
+
+      // Local navigation update (immediate UX). Home will also re-load from Supabase on focus.
+      const newCircle = {
+        id: `circle-${Date.now()}`,
+        name: finalName,
+        contacts: selectedContacts,
+      };
+      const circles = isFirstCircle ? [newCircle] : [...existingCircles, newCircle];
+      const circlesToken = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+      console.log('[VisualizeCircle] Navigating to Home with circles:', circles.length);
+
+      navigation.navigate('Home', {
+        screen: 'HomeTab',
+        params: {
+          circles,
+          circlesToken,
+          isFirstCircle,
+          contacts: circles?.[0]?.contacts || [],
+          circleName: circles?.[0]?.name || finalName,
+        },
+      });
+    })();
   };
 
   const floatTranslateY = ringFloatAnim.interpolate({

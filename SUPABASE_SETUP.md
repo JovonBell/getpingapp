@@ -96,13 +96,39 @@ CREATE POLICY "Anyone can view avatars"
 4. Save changes
 5. Check your Supabase dashboard to see the data
 
-## Features Now Available
+## Updated Setup (required for v1 shipping)
 
-✅ **Cloud sync** - Profile data syncs across devices
-✅ **User authentication** - Secure sign up/sign in
-✅ **Profile pictures** - Upload and store in Supabase Storage
-✅ **Offline support** - Falls back to local storage if offline
-✅ **Real-time updates** - Changes sync immediately
+### A) Run database migrations (in this order)
+1. `supabase_migration_phase1_clean.sql` (profiles, connections, messages + RPCs)
+2. `supabase_migration_phase1_contacts_identities.sql` (hashed identity matching + idempotent connections)
+3. `supabase_migration_phase2_circles.sql` (imported_contacts + circles + circle_members)
+4. `supabase_migration_phase2_contact_matches.sql` (optional: imported_contacts.matched_user_id)
+5. `supabase_migration_phase2_push.sql` (device_tokens for Expo push)
+
+### B) Enable Sign in with Apple in Supabase Auth
+In Supabase Dashboard:
+- Authentication → Providers → Apple
+- Configure Apple provider using your Apple Developer credentials (Services ID / Key ID / Team ID / Private key)
+- Ensure your iOS bundle identifier matches `app.json` (`com.getpingapp`)
+
+### C) Deploy required Edge Function(s)
+Account deletion is required for App Store if you support accounts.
+
+- Deploy: `supabase/functions/delete-account/index.ts`
+- Name: `delete-account`
+- Set function secret: `SUPABASE_SERVICE_ROLE_KEY`
+
+The app calls this via `supabase.functions.invoke('delete-account')`.
+
+## Features Now Available (after the above)
+
+✅ Apple sign-in (Supabase Auth)
+✅ Profile sync (Supabase `profiles` + local AsyncStorage fallback)
+✅ Device contacts import (`expo-contacts`) with privacy-preserving matching (hashed identifiers)
+✅ Circles persisted (Supabase `circles` + `circle_members` + `imported_contacts`)
+✅ Messaging (Supabase `messages`) + unread count RPC
+✅ Push notifications (Expo push tokens stored in `device_tokens`)
+✅ Account deletion (Edge Function)
 
 ## Troubleshooting
 

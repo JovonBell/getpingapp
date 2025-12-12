@@ -1,11 +1,13 @@
-import React from 'react';
-import { View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { supabase } from './lib/supabase';
+import { registerForPushNotificationsAsync } from './utils/pushNotifications';
 import WelcomeScreen from './screens/WelcomeScreen';
 import CreateAccountScreen from './screens/CreateAccountScreen';
 import WelcomeIntroScreen from './screens/WelcomeIntroScreen';
@@ -33,6 +35,8 @@ import ThemeSettingsScreen from './screens/ThemeSettingsScreen';
 import HelpCenterScreen from './screens/HelpCenterScreen';
 import ContactUsScreen from './screens/ContactUsScreen';
 import AboutScreen from './screens/AboutScreen';
+import AccountDeletionScreen from './screens/AccountDeletionScreen';
+import DiagnosticsScreen from './screens/DiagnosticsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -109,56 +113,133 @@ function MainTabs() {
 }
 
 export default function App() {
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!mounted) return;
+        setSession(data?.session ?? null);
+
+        // Check if user has completed onboarding by checking if they have a profile
+        if (data?.session?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', data.session.user.id)
+            .single();
+          
+          if (mounted) setHasCompletedOnboarding(!!profile);
+        }
+      } finally {
+        if (mounted) setAuthLoading(false);
+      }
+    };
+
+    load();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      setSession(nextSession ?? null);
+      
+      // Check onboarding status when auth state changes
+      if (nextSession?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', nextSession.user.id)
+          .single();
+        
+        setHasCompletedOnboarding(!!profile);
+      } else {
+        setHasCompletedOnboarding(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+    // Best-effort push registration (requires device + permissions + device_tokens table migration)
+    registerForPushNotificationsAsync(userId).catch(() => {});
+  }, [session?.user?.id]);
+
   return (
     <ThemeProvider>
       <LanguageProvider>
         <NavigationContainer>
-          <Stack.Navigator
-            screenOptions={{
-              headerShown: false,
-            }}
-          >
-            <Stack.Screen name="Welcome" component={WelcomeScreen} />
-            <Stack.Screen name="CreateAccount" component={CreateAccountScreen} />
-            <Stack.Screen
-              name="WelcomeIntro"
-              component={WelcomeIntroScreen}
-              options={{ animation: 'fade' }}
-            />
-            <Stack.Screen
-              name="CirclesExplainer"
-              component={CirclesExplainerScreen}
-              options={{ animation: 'fade' }}
-            />
-            <Stack.Screen
-              name="BuildUniverse"
-              component={BuildUniverseScreen}
-              options={{ animation: 'fade' }}
-            />
-            <Stack.Screen
-              name="ImportContacts"
-              component={ImportContactsScreen}
-              options={{ animation: 'fade' }}
-            />
-            <Stack.Screen name="SelectContacts" component={SelectContactsScreen} />
-            <Stack.Screen name="ImportConfirmation" component={ImportConfirmationScreen} />
-            <Stack.Screen name="VisualizeCircle" component={VisualizeCircleScreen} />
-            <Stack.Screen name="FirstCircleCelebration" component={FirstCircleCelebrationScreen} />
-            <Stack.Screen name="AddContact" component={AddContactScreen} />
-            <Stack.Screen name="Profile" component={ProfileScreen} />
-            <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
-            <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />
-            <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
-            <Stack.Screen name="NotificationsSettings" component={NotificationsSettingsScreen} />
-            <Stack.Screen name="LanguageSettings" component={LanguageSettingsScreen} />
-            <Stack.Screen name="ThemeSettings" component={ThemeSettingsScreen} />
-            <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
-            <Stack.Screen name="ContactUs" component={ContactUsScreen} />
-            <Stack.Screen name="About" component={AboutScreen} />
-            <Stack.Screen name="Messages" component={MessagesScreen} />
-            <Stack.Screen name="Chat" component={ChatScreen} />
-            <Stack.Screen name="Home" component={MainTabs} />
-          </Stack.Navigator>
+          {authLoading ? (
+            <View style={{ flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator size="large" color="#4FFFB0" />
+            </View>
+          ) : (
+            <Stack.Navigator 
+              screenOptions={{ headerShown: false }}
+              initialRouteName={session ? (hasCompletedOnboarding ? "Home" : "WelcomeIntro") : "Welcome"}
+            >
+              {!session ? (
+                <>
+                  <Stack.Screen name="Welcome" component={WelcomeScreen} />
+                  <Stack.Screen name="CreateAccount" component={CreateAccountScreen} />
+                </>
+              ) : (
+                <>
+                  {/* Onboarding screens - only shown for new users */}
+                  <Stack.Screen
+                    name="WelcomeIntro"
+                    component={WelcomeIntroScreen}
+                    options={{ animation: 'fade' }}
+                  />
+                  <Stack.Screen
+                    name="CirclesExplainer"
+                    component={CirclesExplainerScreen}
+                    options={{ animation: 'fade' }}
+                  />
+                  <Stack.Screen
+                    name="BuildUniverse"
+                    component={BuildUniverseScreen}
+                    options={{ animation: 'fade' }}
+                  />
+                  <Stack.Screen
+                    name="ImportContacts"
+                    component={ImportContactsScreen}
+                    options={{ animation: 'fade' }}
+                  />
+                  <Stack.Screen name="SelectContacts" component={SelectContactsScreen} />
+                  <Stack.Screen name="ImportConfirmation" component={ImportConfirmationScreen} />
+                  <Stack.Screen name="VisualizeCircle" component={VisualizeCircleScreen} />
+                  <Stack.Screen name="FirstCircleCelebration" component={FirstCircleCelebrationScreen} />
+                  
+                  {/* Main app screens */}
+                  <Stack.Screen name="Home" component={MainTabs} />
+                  <Stack.Screen name="AddContact" component={AddContactScreen} />
+                  <Stack.Screen name="Profile" component={ProfileScreen} />
+                  <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
+                  <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />
+                  <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
+                  <Stack.Screen name="NotificationsSettings" component={NotificationsSettingsScreen} />
+                  <Stack.Screen name="LanguageSettings" component={LanguageSettingsScreen} />
+                  <Stack.Screen name="ThemeSettings" component={ThemeSettingsScreen} />
+                  <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+                  <Stack.Screen name="ContactUs" component={ContactUsScreen} />
+                  <Stack.Screen name="About" component={AboutScreen} />
+                  <Stack.Screen name="AccountDeletion" component={AccountDeletionScreen} />
+                  <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} />
+                  <Stack.Screen name="Messages" component={MessagesScreen} />
+                  <Stack.Screen name="Chat" component={ChatScreen} />
+                </>
+              )}
+            </Stack.Navigator>
+          )}
         </NavigationContainer>
       </LanguageProvider>
     </ThemeProvider>

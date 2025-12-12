@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,29 +6,48 @@ import {
   TouchableOpacity,
   FlatList,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-
-const DUMMY_CONTACTS = [
-  { id: '1', name: 'Chart Erarian', email: 'sage@cat.com', phone: '(555) 123-4567', initials: 'AB' },
-  { id: '2', name: 'Cannel Gosty', email: 'sage@cat.com', phone: '(555) 234-5678', initials: 'CR' },
-  { id: '3', name: 'Dalion Mockey', email: 'sage@cat.com', phone: '(555) 345-6789', initials: 'DA' },
-  { id: '4', name: 'Mary Manniott', email: 'sage@cat.com', phone: '(555) 456-7890', initials: 'BH' },
-  { id: '5', name: 'Brian Chemm', email: 'sage@cat.com', phone: '(555) 567-8901', initials: 'BC' },
-  { id: '6', name: 'Alice Johnson', email: 'alice@email.com', phone: '(555) 678-9012', initials: 'AJ' },
-  { id: '7', name: 'Bob Smith', email: 'bob@email.com', phone: '(555) 789-0123', initials: 'BS' },
-  { id: '8', name: 'Carol White', email: 'carol@email.com', phone: '(555) 890-1234', initials: 'CW' },
-  { id: '9', name: 'David Brown', email: 'david@email.com', phone: '(555) 901-2345', initials: 'DB' },
-  { id: '10', name: 'Emma Davis', email: 'emma@email.com', phone: '(555) 012-3456', initials: 'ED' },
-];
+import { getImportedContacts } from '../utils/contactsStorage';
+import { getCurrentUser } from '../utils/supabaseStorage';
+import { getUnreadMessageCount } from '../utils/messagesStorage';
 
 export default function ContactsListScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [contacts, setContacts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const filteredContacts = DUMMY_CONTACTS.filter(contact =>
-    contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    contact.phone.includes(searchQuery)
+  const loadContacts = async () => {
+    setLoading(true);
+    const { contacts: stored } = await getImportedContacts();
+    setContacts(stored || []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadContacts();
+    const unsub = navigation.addListener('focus', loadContacts);
+    return unsub;
+  }, [navigation]);
+
+  useEffect(() => {
+    const loadUnread = async () => {
+      const { success, user } = await getCurrentUser();
+      if (!success || !user) return;
+      const res = await getUnreadMessageCount(user.id);
+      if (res.success) setUnreadCount(res.count);
+    };
+    loadUnread();
+    const unsub = navigation.addListener('focus', loadUnread);
+    return unsub;
+  }, [navigation]);
+
+  const filteredContacts = contacts.filter((contact) =>
+    (contact?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (contact?.phone || '').includes(searchQuery)
   );
 
   const renderContact = ({ item }) => (
@@ -61,11 +80,15 @@ export default function ContactsListScreen({ navigation }) {
               onPress={() => navigation.navigate('Messages')}
             >
               <Ionicons name="chatbubble-outline" size={24} color="#ffffff" />
-              <View style={styles.messageBadge}>
-                <Text style={styles.messageBadgeText}>!</Text>
-              </View>
+              {unreadCount > 0 && (
+                <View style={styles.messageBadge}>
+                  <Text style={styles.messageBadgeText}>{unreadCount > 99 ? '99+' : String(unreadCount)}</Text>
+                </View>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('AddContact')}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('AddContact')}
+            >
               <Ionicons name="person-add" size={24} color="#00ff88" />
             </TouchableOpacity>
           </View>
@@ -84,13 +107,37 @@ export default function ContactsListScreen({ navigation }) {
         </View>
 
         {/* Contact List */}
-        <FlatList
-          data={filteredContacts}
-          renderItem={renderContact}
-          keyExtractor={item => item.id}
-          style={styles.contactList}
-          showsVerticalScrollIndicator={false}
-        />
+        {loading ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color="#4FFFB0" />
+            <Text style={{ color: '#ffffff', opacity: 0.7, marginTop: 10 }}>Loading…</Text>
+          </View>
+        ) : filteredContacts.length > 0 ? (
+          <FlatList
+            data={filteredContacts}
+            renderItem={renderContact}
+            keyExtractor={item => item.id}
+            style={styles.contactList}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 }}>
+            <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '600', marginBottom: 8 }}>No contacts yet</Text>
+            <Text style={{ color: '#ffffff', opacity: 0.7, textAlign: 'center' }}>
+              Import your contacts to start building your universe.
+            </Text>
+            <TouchableOpacity
+              style={{ marginTop: 18, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, backgroundColor: 'rgba(79,255,176,0.15)', borderWidth: 1, borderColor: '#4FFFB0' }}
+              onPress={() => {
+                const parent = navigation.getParent?.();
+                if (parent) parent.navigate('ImportContacts');
+                else navigation.navigate('ImportContacts');
+              }}
+            >
+              <Text style={{ color: '#4FFFB0', fontWeight: '600' }}>Import contacts</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </LinearGradient>
     </View>
   );
