@@ -806,60 +806,40 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           )}
 
-          {/* Tap target for plus button - POSITIONED EXACTLY OVER SVG + BUTTON */}
+          {/* INVISIBLE tap target over plus button */}
           <TouchableOpacity
             style={[
               styles.plusButtonTapTarget,
               {
-                left: (SCREEN_WIDTH / 2) + (addCirclePlusX - 200) * (SCREEN_WIDTH / 400) - 60,
+                left: (SCREEN_WIDTH / 2) + (addCirclePlusX - 200) * (SCREEN_WIDTH / 400) - 50,
                 top: '45%',
-                marginTop: -60,
+                marginTop: -50,
               }
             ]}
             activeOpacity={0.7}
             onPress={() => {
-              console.log('');
-              console.log('═══════════════════════════════════════');
-              console.log('[HOME] ➕➕➕ PLUS BUTTON TAPPED!!!');
-              console.log('═══════════════════════════════════════');
-              console.log('');
+              console.log('[HOME] ➕ Plus button tapped - navigating to SelectContacts');
               handleCreateNewCircle();
             }}
-            onPressIn={() => console.log('[HOME] 👆 Plus button press IN')}
-            onPressOut={() => console.log('[HOME] 👆 Plus button press OUT')}
-          >
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>TAP</Text>
-            </View>
-          </TouchableOpacity>
+          />
 
-          {/* Tap target for minus button - POSITIONED EXACTLY OVER SVG - BUTTON */}
+          {/* INVISIBLE tap target over minus button */}
           {hasCircle && (
             <TouchableOpacity
               style={[
                 styles.minusButtonTapTarget,
                 {
-                  left: (SCREEN_WIDTH / 2) + (deleteCircleMinusX - 200) * (SCREEN_WIDTH / 400) - 60,
+                  left: (SCREEN_WIDTH / 2) + (deleteCircleMinusX - 200) * (SCREEN_WIDTH / 400) - 50,
                   top: '45%',
-                  marginTop: -60,
+                  marginTop: -50,
                 }
               ]}
               activeOpacity={0.7}
               onPress={() => {
-                console.log('');
-                console.log('═══════════════════════════════════════');
-                console.log('[HOME] ➖➖➖ MINUS BUTTON TAPPED!!!');
-                console.log('═══════════════════════════════════════');
-                console.log('');
+                console.log('[HOME] ➖ Minus button tapped - opening delete modal');
                 handleDeleteCircleClick();
               }}
-              onPressIn={() => console.log('[HOME] 👆 Minus button press IN')}
-              onPressOut={() => console.log('[HOME] 👆 Minus button press OUT')}
-            >
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>TAP</Text>
-              </View>
-            </TouchableOpacity>
+            />
           )}
 
         <View style={styles.tapInstructionContainer}>
@@ -1207,25 +1187,21 @@ const styles = StyleSheet.create({
   },
   plusButtonTapTarget: {
     position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     zIndex: 99999,
     elevation: 99999,
-    backgroundColor: 'rgba(79, 255, 176, 0.5)', // VISIBLE for debugging
-    borderWidth: 3,
-    borderColor: '#4FFFB0',
+    // backgroundColor: 'rgba(79, 255, 176, 0.3)', // Debug: uncomment to see tap area
   },
   minusButtonTapTarget: {
     position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     zIndex: 99999,
     elevation: 99999,
-    backgroundColor: 'rgba(255, 0, 0, 0.5)', // VISIBLE for debugging
-    borderWidth: 3,
-    borderColor: '#ff6b6b',
+    // backgroundColor: 'rgba(255, 0, 0, 0.3)', // Debug: uncomment to see tap area
   },
   circleNameContainer: {
     paddingHorizontal: 20,
