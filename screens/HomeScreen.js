@@ -459,24 +459,43 @@ export default function HomeScreen({ navigation, route }) {
   const handleConfirmDelete = async () => {
     if (!selectedCircleToDelete) return;
     
-    // Delete from Supabase first
+    console.log('[HOME] 🗑️ User confirmed delete for circle:', selectedCircleToDelete.id, selectedCircleToDelete.name);
+    
+    // Delete from Supabase first - THIS IS CRITICAL
     const { success: deleteSuccess, user } = await getCurrentUser();
+    console.log('[HOME] Current user check:', { deleteSuccess, userId: user?.id });
+    
     if (deleteSuccess && user) {
+      console.log('[HOME] Calling deleteCircle for:', selectedCircleToDelete.id);
       const deleteResult = await deleteCircle(selectedCircleToDelete.id);
+      console.log('[HOME] Delete result:', deleteResult);
+      
       if (!deleteResult.success) {
-        Alert.alert('Delete Error', `Failed to delete circle: ${deleteResult.error}`);
+        console.error('[HOME] ❌ DELETE FAILED:', deleteResult.error);
+        Alert.alert('Delete Error', `Failed to delete circle from database: ${deleteResult.error}\n\nThe circle may reappear on reload.`);
         setShowDeleteConfirm(false);
         setSelectedCircleToDelete(null);
         return;
       }
+      console.log('[HOME] ✅ Circle deleted from Supabase successfully!');
+    } else {
+      console.error('[HOME] ❌ No authenticated user, cannot delete from Supabase!');
+      Alert.alert('Error', 'You must be signed in to delete circles.');
+      setShowDeleteConfirm(false);
+      setSelectedCircleToDelete(null);
+      return;
     }
     
     // Remove from local state
+    console.log('[HOME] Removing from local state...');
     const updatedCircles = circles.filter(c => c.id !== selectedCircleToDelete.id);
     setCircles(updatedCircles);
+    console.log('[HOME] ✅ Local state updated. Remaining circles:', updatedCircles.length);
     
     setShowDeleteConfirm(false);
     setSelectedCircleToDelete(null);
+    
+    Alert.alert('Success', `Circle "${selectedCircleToDelete.name}" permanently deleted!`);
   };
 
   const handleCancelDelete = () => {
