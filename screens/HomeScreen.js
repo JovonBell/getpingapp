@@ -792,6 +792,8 @@ export default function HomeScreen({ navigation, route }) {
               </Animated.View>
             </View>
 
+          </View>
+
           {/* Large, invisible tap target over the nucleus - only when no circle exists */}
           {/* Positioned outside networkView to avoid touch handler interference */}
           {!hasCircle && (
@@ -804,7 +806,7 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           )}
 
-          {/* Tap target for plus button (always visible) - LARGE tap area */}
+          {/* Tap target for plus button (always visible) - OUTSIDE networkView so touches work */}
           <TouchableOpacity
             style={[
               styles.plusButtonTapTarget,
@@ -815,14 +817,17 @@ export default function HomeScreen({ navigation, route }) {
             ]}
             activeOpacity={0.7}
             onPress={() => {
-              console.log('[HOME] ➕ Plus button tapped!');
+              console.log('[HOME] ➕➕➕ PLUS BUTTON TAPPED!');
               handleCreateNewCircle();
             }}
+            onPressIn={() => console.log('[HOME] Plus button press IN')}
+            onPressOut={() => console.log('[HOME] Plus button press OUT')}
+            pointerEvents="box-only"
           >
-            <View style={{ flex: 1 }} />
+            <View style={{ flex: 1, backgroundColor: 'rgba(79, 255, 176, 0.01)' }} />
           </TouchableOpacity>
 
-          {/* Tap target for minus button - only when circles exist - LARGE tap area */}
+          {/* Tap target for minus button - only when circles exist - OUTSIDE networkView */}
           {hasCircle && (
             <TouchableOpacity
               style={[
@@ -834,14 +839,16 @@ export default function HomeScreen({ navigation, route }) {
               ]}
               activeOpacity={0.7}
               onPress={() => {
-                console.log('[HOME] ➖ Minus button tapped!');
+                console.log('[HOME] ➖➖➖ MINUS BUTTON TAPPED!');
                 handleDeleteCircleClick();
               }}
+              onPressIn={() => console.log('[HOME] Minus button press IN')}
+              onPressOut={() => console.log('[HOME] Minus button press OUT')}
+              pointerEvents="box-only"
             >
-              <View style={{ flex: 1 }} />
+              <View style={{ flex: 1, backgroundColor: 'rgba(255, 0, 0, 0.01)' }} />
             </TouchableOpacity>
           )}
-          </View>
 
         <View style={styles.tapInstructionContainer}>
           <Text style={styles.tapInstruction}>
@@ -1191,7 +1198,8 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    zIndex: 1000,
+    zIndex: 99999,
+    elevation: 99999,
     // backgroundColor: 'rgba(79, 255, 176, 0.3)', // Debug: uncomment to see tap area
   },
   minusButtonTapTarget: {
@@ -1199,7 +1207,8 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    zIndex: 1000,
+    zIndex: 99999,
+    elevation: 99999,
     // backgroundColor: 'rgba(255, 0, 0, 0.3)', // Debug: uncomment to see tap area
   },
   circleNameContainer: {
