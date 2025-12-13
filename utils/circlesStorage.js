@@ -162,6 +162,13 @@ export async function deleteCircle(circleId) {
       return { success: false, error: 'Missing circleId' };
     }
 
+    // Check if this looks like a valid UUID (Supabase uses UUIDs)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(circleId)) {
+      console.log('[DELETE CIRCLE] ⚠️ Not a valid UUID, skipping Supabase delete (local-only circle)');
+      return { success: true }; // Return success for local-only deletion
+    }
+
     // Delete circle members first (foreign key constraint)
     console.log('[DELETE CIRCLE] Step 1: Deleting circle members...');
     const { data: deletedMembers, error: membersErr } = await supabase

@@ -156,8 +156,14 @@ export default function HomeScreen({ navigation, route }) {
     }
 
     // Legacy single-circle params (only initialize if we don't already have circles)
+    // Generate a proper UUID-like ID for local state
     if (routeContacts && Array.isArray(routeContacts) && routeContacts.length > 0 && circles.length === 0) {
-      setCircles([{ id: 'circle-0', name: routeCircleName, contacts: routeContacts }]);
+      const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+      setCircles([{ id: uuid, name: routeCircleName, contacts: routeContacts }]);
     }
   }, [route?.params?.circles, route?.params?.circlesToken, routeContacts, routeCircleName, circles.length]);
 
