@@ -712,12 +712,12 @@ export default function HomeScreen({ navigation, route }) {
                   <Circle
                     cx={addCirclePlusX}
                     cy="200"
-                    r="10"
+                    r="14"
                     fill="rgba(79, 255, 176, 0.18)"
                     stroke="#4FFFB0"
                     strokeWidth="2"
                   />
-                  <SvgText x={addCirclePlusX} y="205" fill="#4FFFB0" fontSize="16" fontWeight="700" textAnchor="middle">+</SvgText>
+                  <SvgText x={addCirclePlusX} y="207" fill="#4FFFB0" fontSize="22" fontWeight="700" textAnchor="middle">+</SvgText>
                   
                   {/* Minus button (only show if there are circles to delete) */}
                   {hasCircle && (
@@ -725,12 +725,12 @@ export default function HomeScreen({ navigation, route }) {
                       <Circle
                         cx={deleteCircleMinusX}
                         cy="200"
-                        r="10"
+                        r="14"
                         fill="rgba(255, 107, 107, 0.18)"
                         stroke="#ff6b6b"
                         strokeWidth="2"
                       />
-                      <SvgText x={deleteCircleMinusX} y="205" fill="#ff6b6b" fontSize="16" fontWeight="700" textAnchor="middle">−</SvgText>
+                      <SvgText x={deleteCircleMinusX} y="207" fill="#ff6b6b" fontSize="22" fontWeight="700" textAnchor="middle">−</SvgText>
                     </>
                   )}
 
@@ -1192,7 +1192,7 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     zIndex: 1000,
-    backgroundColor: 'rgba(79, 255, 176, 0.3)', // Debug: visible tap area
+    // backgroundColor: 'rgba(79, 255, 176, 0.3)', // Debug: uncomment to see tap area
   },
   minusButtonTapTarget: {
     position: 'absolute',
@@ -1200,7 +1200,7 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     zIndex: 1000,
-    backgroundColor: 'rgba(255, 0, 0, 0.3)', // Debug: visible tap area
+    // backgroundColor: 'rgba(255, 0, 0, 0.3)', // Debug: uncomment to see tap area
   },
   circleNameContainer: {
     paddingHorizontal: 20,
