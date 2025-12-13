@@ -500,11 +500,17 @@ export default function HomeScreen({ navigation, route }) {
       return;
     }
     
-    // Remove from local state
+    // Remove from local state - FORCE empty array if this was the last circle
     console.log('[HOME] Removing from local state...');
     const updatedCircles = circles.filter(c => c.id !== selectedCircleToDelete.id);
-    setCircles(updatedCircles);
+    
+    // Force the state update to ensure UI reflects deletion
+    setCircles([...updatedCircles]); // Create new array reference to trigger re-render
     console.log('[HOME] ✅ Local state updated. Remaining circles:', updatedCircles.length);
+    
+    if (updatedCircles.length === 0) {
+      console.log('[HOME] All circles deleted - returning to empty state');
+    }
     
     setShowDeleteConfirm(false);
     setSelectedCircleToDelete(null);

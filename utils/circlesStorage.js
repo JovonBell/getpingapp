@@ -1,15 +1,24 @@
 import { supabase } from '../lib/supabase';
 
 async function upsertImportedContacts(userId, contacts) {
-  const rows = (contacts || []).map((c) => ({
-    user_id: userId,
-    contact_id: String(c.id),
-    name: c.name || 'Unknown',
-    initials: c.initials || null,
-    email: c.email || null,
-    phone: c.phone || null,
-    matched_user_id: c.matchedUserId || null,
-  }));
+  console.log('[UPSERT CONTACTS] Starting with', contacts?.length || 0, 'contacts');
+  
+  const rows = (contacts || []).map((c) => {
+    // Ensure contact_id is a clean string
+    const contactId = typeof c.id === 'object' ? JSON.stringify(c.id) : String(c.id || '');
+    
+    return {
+      user_id: userId,
+      contact_id: contactId,
+      name: String(c.name || 'Unknown'),
+      initials: c.initials ? String(c.initials) : null,
+      email: c.email ? String(c.email) : null,
+      phone: c.phone ? String(c.phone) : null,
+      matched_user_id: c.matchedUserId || null,
+    };
+  });
+
+  console.log('[UPSERT CONTACTS] Prepared rows:', rows.length);
 
   if (rows.length === 0) return { success: true, rows: [] };
 
@@ -18,53 +27,74 @@ async function upsertImportedContacts(userId, contacts) {
     .upsert(rows, { onConflict: 'user_id,contact_id' })
     .select('id,contact_id,name,initials,email,phone,matched_user_id');
 
-  if (error) throw error;
+  if (error) {
+    console.error('[UPSERT CONTACTS] Error:', error);
+    throw error;
+  }
+  
+  console.log('[UPSERT CONTACTS] Success, upserted:', data?.length || 0);
   return { success: true, rows: data || [] };
 }
 
 export async function createCircleWithMembers(userId, { name, tier, contacts }) {
   try {
+    console.log('[CREATE CIRCLE] Starting:', { userId, name, tier, contactCount: contacts?.length });
+    
     if (!userId) return { success: false, error: 'Missing userId' };
     if (!name) return { success: false, error: 'Missing circle name' };
 
     // Ensure imported contacts exist in DB and get their UUIDs
     const upserted = await upsertImportedContacts(userId, contacts || []);
     const byContactId = (upserted.rows || []).reduce((acc, r) => {
-      acc[String(r.contact_id)] = r.id;
+      const key = typeof r.contact_id === 'object' ? JSON.stringify(r.contact_id) : String(r.contact_id);
+      acc[key] = r.id;
       return acc;
     }, {});
 
-    // Create circle for this tier (upsert so tier is stable)
+    console.log('[CREATE CIRCLE] Contacts upserted, mapping:', Object.keys(byContactId).length);
+
+    // Create circle using INSERT instead of UPSERT to avoid conflicts
     const { data: circle, error: circleErr } = await supabase
       .from('circles')
-      .upsert(
-        { user_id: userId, name, tier },
-        { onConflict: 'user_id,tier' }
-      )
+      .insert({ user_id: userId, name, tier })
       .select('id,name,tier')
       .single();
 
-    if (circleErr) throw circleErr;
+    if (circleErr) {
+      console.error('[CREATE CIRCLE] Circle insert error:', circleErr);
+      throw circleErr;
+    }
 
-    // Insert members (upsert/ignore duplicates)
+    console.log('[CREATE CIRCLE] Circle created:', circle.id);
+
+    // Insert members
     const memberRows = (contacts || [])
-      .map((c) => byContactId[String(c.id)])
+      .map((c) => {
+        const key = typeof c.id === 'object' ? JSON.stringify(c.id) : String(c.id);
+        return byContactId[key];
+      })
       .filter(Boolean)
       .map((imported_contact_id) => ({
         circle_id: circle.id,
         imported_contact_id,
       }));
 
+    console.log('[CREATE CIRCLE] Member rows to insert:', memberRows.length);
+
     if (memberRows.length > 0) {
       const { error: memErr } = await supabase
         .from('circle_members')
-        .upsert(memberRows, { onConflict: 'circle_id,imported_contact_id' });
-      if (memErr) throw memErr;
+        .insert(memberRows);
+      if (memErr) {
+        console.error('[CREATE CIRCLE] Member insert error:', memErr);
+        throw memErr;
+      }
     }
 
+    console.log('[CREATE CIRCLE] ✅ Success!');
     return { success: true, circleId: circle.id };
   } catch (error) {
-    console.warn('createCircleWithMembers failed:', error?.message || error);
+    console.error('[CREATE CIRCLE] ❌ Failed:', error?.message || error);
     return { success: false, error: error?.message || String(error) };
   }
 }
