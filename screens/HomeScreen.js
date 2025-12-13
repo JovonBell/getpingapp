@@ -438,10 +438,18 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const handleCreateNewCircle = () => {
+    console.log('[HOME] ➕➕➕ CREATE NEW CIRCLE BUTTON PRESSED!');
+    console.log('[HOME] Existing circles:', circles.length);
     const parent = navigation.getParent();
     const params = { selectAll: false, isFirstCircle: false, existingCircles: circles };
-    if (parent) parent.navigate('SelectContacts', params);
-    else navigation.navigate('SelectContacts', params);
+    console.log('[HOME] Navigating to SelectContacts with params:', params);
+    if (parent) {
+      console.log('[HOME] Using parent navigation');
+      parent.navigate('SelectContacts', params);
+    } else {
+      console.log('[HOME] Using direct navigation');
+      navigation.navigate('SelectContacts', params);
+    }
   };
 
   const handleDeleteCircleClick = () => {
@@ -796,33 +804,39 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           )}
 
-          {/* Tap target for plus button (always visible) */}
+          {/* Tap target for plus button (always visible) - LARGE tap area */}
           <TouchableOpacity
             style={[
               styles.plusButtonTapTarget,
               {
-                left: (SCREEN_WIDTH / 2) - 200 + addCirclePlusX - 20,
-                top: 200 - 20,
+                left: (SCREEN_WIDTH / 2) - 200 + addCirclePlusX - 40,
+                top: 200 - 40,
               }
             ]}
             activeOpacity={0.7}
-            onPress={handleCreateNewCircle}
+            onPress={() => {
+              console.log('[HOME] ➕ Plus button tapped!');
+              handleCreateNewCircle();
+            }}
           >
             <View style={{ flex: 1 }} />
           </TouchableOpacity>
 
-          {/* Tap target for minus button - only when circles exist */}
+          {/* Tap target for minus button - only when circles exist - LARGE tap area */}
           {hasCircle && (
             <TouchableOpacity
               style={[
                 styles.minusButtonTapTarget,
                 {
-                  left: (SCREEN_WIDTH / 2) - 200 + deleteCircleMinusX - 20,
-                  top: 200 - 20,
+                  left: (SCREEN_WIDTH / 2) - 200 + deleteCircleMinusX - 40,
+                  top: 200 - 40,
                 }
               ]}
               activeOpacity={0.7}
-              onPress={handleDeleteCircleClick}
+              onPress={() => {
+                console.log('[HOME] ➖ Minus button tapped!');
+                handleDeleteCircleClick();
+              }}
             >
               <View style={{ flex: 1 }} />
             </TouchableOpacity>
@@ -1174,19 +1188,19 @@ const styles = StyleSheet.create({
   },
   plusButtonTapTarget: {
     position: 'absolute',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     zIndex: 1000,
-    // backgroundColor: 'rgba(79, 255, 176, 0.5)', // Debug: uncomment to see tap area
+    backgroundColor: 'rgba(79, 255, 176, 0.3)', // Debug: visible tap area
   },
   minusButtonTapTarget: {
     position: 'absolute',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     zIndex: 1000,
-    // backgroundColor: 'rgba(255, 0, 0, 0.5)', // Debug: uncomment to see tap area
+    backgroundColor: 'rgba(255, 0, 0, 0.3)', // Debug: visible tap area
   },
   circleNameContainer: {
     paddingHorizontal: 20,
