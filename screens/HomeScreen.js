@@ -708,7 +708,6 @@ export default function HomeScreen({ navigation, route }) {
                     fill="rgba(79, 255, 176, 0.18)"
                     stroke="#4FFFB0"
                     strokeWidth="2"
-                    onPress={handleCreateNewCircle}
                   />
                   <SvgText x={addCirclePlusX} y="205" fill="#4FFFB0" fontSize="16" fontWeight="700" textAnchor="middle">+</SvgText>
                   
@@ -722,7 +721,6 @@ export default function HomeScreen({ navigation, route }) {
                         fill="rgba(255, 107, 107, 0.18)"
                         stroke="#ff6b6b"
                         strokeWidth="2"
-                        onPress={handleDeleteCircleClick}
                       />
                       <SvgText x={deleteCircleMinusX} y="205" fill="#ff6b6b" fontSize="16" fontWeight="700" textAnchor="middle">−</SvgText>
                     </>
@@ -793,6 +791,38 @@ export default function HomeScreen({ navigation, route }) {
               style={styles.centerTapTarget}
               activeOpacity={1}
               onPress={handleCenterPress}
+            >
+              <View style={{ flex: 1 }} />
+            </TouchableOpacity>
+          )}
+
+          {/* Tap target for plus button (always visible) */}
+          <TouchableOpacity
+            style={[
+              styles.plusButtonTapTarget,
+              {
+                left: (SCREEN_WIDTH / 2) - 200 + addCirclePlusX - 20,
+                top: 200 - 20,
+              }
+            ]}
+            activeOpacity={0.7}
+            onPress={handleCreateNewCircle}
+          >
+            <View style={{ flex: 1 }} />
+          </TouchableOpacity>
+
+          {/* Tap target for minus button - only when circles exist */}
+          {hasCircle && (
+            <TouchableOpacity
+              style={[
+                styles.minusButtonTapTarget,
+                {
+                  left: (SCREEN_WIDTH / 2) - 200 + deleteCircleMinusX - 20,
+                  top: 200 - 20,
+                }
+              ]}
+              activeOpacity={0.7}
+              onPress={handleDeleteCircleClick}
             >
               <View style={{ flex: 1 }} />
             </TouchableOpacity>
@@ -1139,6 +1169,22 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     left: (SCREEN_WIDTH - 100) / 2,
     top: '45%',
+    zIndex: 1000,
+    // backgroundColor: 'rgba(255, 0, 0, 0.5)', // Debug: uncomment to see tap area
+  },
+  plusButtonTapTarget: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    zIndex: 1000,
+    // backgroundColor: 'rgba(79, 255, 176, 0.5)', // Debug: uncomment to see tap area
+  },
+  minusButtonTapTarget: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     zIndex: 1000,
     // backgroundColor: 'rgba(255, 0, 0, 0.5)', // Debug: uncomment to see tap area
   },
