@@ -17,6 +17,7 @@ import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import PlanetZoom3D from '../components/PlanetZoom3D';
 import CircleZoom3D from '../components/CircleZoom3D';
+import StarfieldBackground from '../components/StarfieldBackground';
 import { getImportedContacts as loadImportedContacts } from '../utils/contactsStorage';
 import { getCurrentUser } from '../utils/supabaseStorage';
 import { loadCirclesWithMembers, deleteCircle } from '../utils/circlesStorage';
@@ -189,22 +190,6 @@ export default function HomeScreen({ navigation, route }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const zoomScale = useRef(new Animated.Value(1)).current;
   const networkViewRef = useRef(null);
-
-  // Star positions and animations for upward flow
-  const NUM_STARS = 40;
-  const STAR_AREA_HEIGHT = 600; // Extended height for smooth wrapping
-  const starAnimations = useRef([...Array(NUM_STARS)].map(() => new Animated.Value(0))).current;
-  
-  const starPositions = useRef(
-    [...Array(NUM_STARS)].map(() => ({
-      x: Math.random() * SCREEN_WIDTH,
-      startY: Math.random() * STAR_AREA_HEIGHT, // Starting Y position
-      speed: 0.3 + Math.random() * 0.7, // Random speed for each star (0.3 to 1.0)
-      size: 1 + Math.random() * 2, // Random size
-      opacity: 0.3 + Math.random() * 0.5, // Random base opacity
-    }))
-  ).current;
-
   const allCircleContacts = circles.reduce((acc, c) => acc.concat(c?.contacts || []), []);
   const allSearchContacts = hasCircle ? allCircleContacts : importedContacts;
 
@@ -290,28 +275,6 @@ export default function HomeScreen({ navigation, route }) {
   const dottedRingRadius = hasCircle ? getDottedRingRadius() : SINGLE_DOTTED_RADIUS;
   const addCirclePlusX = 200 + dottedRingRadius;
   const deleteCircleMinusX = 200 - dottedRingRadius;
-
-  // Animate stars flowing upwards smoothly and continuously
-  useEffect(() => {
-    const animations = starAnimations.map((anim, i) => {
-      const star = starPositions[i];
-      // Duration based on speed - slower speed = longer duration
-      const duration = 8000 / star.speed; // 8-26 seconds per cycle
-      
-      return Animated.loop(
-        Animated.timing(anim, {
-          toValue: 1,
-          duration: duration,
-          useNativeDriver: true,
-          easing: t => t, // Linear easing for smooth constant flow
-        })
-      );
-    });
-
-    animations.forEach(anim => anim.start());
-
-    return () => animations.forEach(anim => anim.stop());
-  }, []);
 
   // Handle first circle congratulations popup
   useEffect(() => {
@@ -755,34 +718,8 @@ export default function HomeScreen({ navigation, route }) {
 
         {/* Network Visualization */}
         <View style={styles.networkContainer}>
-          {/* Flowing star background - moves upward independently */}
-          <View style={styles.starsFixed} pointerEvents="none">
-            {starAnimations.map((anim, i) => {
-              const star = starPositions[i];
-              return (
-                <Animated.View
-                  key={i}
-                  style={[
-                    styles.star,
-                    {
-                      left: star.x,
-                      width: star.size,
-                      height: star.size,
-                      opacity: star.opacity,
-                      transform: [
-                        {
-                          translateY: anim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [star.startY, star.startY - STAR_AREA_HEIGHT], // Move upward
-                          }),
-                        },
-                      ],
-                    },
-                  ]}
-                />
-              );
-            })}
-          </View>
+          {/* Animated starfield background */}
+          <StarfieldBackground containerHeight={400} />
 
           {/* Rotatable network visualization */}
           <View
@@ -1284,13 +1221,6 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
   },
-  starsFixed: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    zIndex: 1,
-    overflow: 'hidden', // Clip stars outside the view
-  },
   networkView: {
     flex: 1,
     alignItems: 'center',
@@ -1300,11 +1230,6 @@ const styles = StyleSheet.create({
   svgContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  star: {
-    position: 'absolute',
-    backgroundColor: '#ffffff',
-    borderRadius: 2,
   },
   tapInstruction: {
     textAlign: 'center',
