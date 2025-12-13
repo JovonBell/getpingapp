@@ -166,7 +166,7 @@ export default function VisualizeCircleScreen({ navigation, route }) {
 
       // Local navigation update (immediate UX). Home will also re-load from Supabase on focus.
       const newCircle = {
-        id: `circle-${Date.now()}`,
+        id: `circle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: finalName,
         contacts: selectedContacts,
       };

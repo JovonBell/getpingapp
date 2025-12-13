@@ -722,7 +722,7 @@ export default function HomeScreen({ navigation, route }) {
                   {ringedContacts.map((entry, arrayIndex) => {
                     const pos = getContactPosition(entry.indexOnRing, entry.totalOnRing, entry.ringIndex, arrayIndex);
                     return (
-                      <React.Fragment key={entry.contact.id}>
+                      <React.Fragment key={`contact-${entry.ringIndex}-${entry.indexOnRing}-${entry.contact.id}`}>
                         {/* Contact glow */}
                         <Circle
                           cx={pos.x}
