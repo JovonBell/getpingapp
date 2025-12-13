@@ -87,7 +87,7 @@ export default function ContactsListScreen({ navigation }) {
               )}
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => navigation.navigate('AddContact')}
+              onPress={() => navigation.navigate('SelectContacts', { mode: 'addContacts' })}
             >
               <Ionicons name="person-add" size={24} color="#00ff88" />
             </TouchableOpacity>

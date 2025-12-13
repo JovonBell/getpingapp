@@ -6,17 +6,23 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { getCurrentUser } from '../utils/supabaseStorage';
 import { fetchRecentThreads } from '../utils/messagesStorage';
+import { supabase } from '../lib/supabase';
 
 export default function MessagesScreen({ navigation, route }) {
   const contactFromRoute = route?.params?.contact;
   const [loading, setLoading] = React.useState(true);
   const [threads, setThreads] = React.useState([]);
   const [currentUserId, setCurrentUserId] = React.useState(null);
+  const [showUserSearch, setShowUserSearch] = React.useState(false);
+  const [userSearchQuery, setUserSearchQuery] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState([]);
 
   const loadThreads = async () => {
     setLoading(true);
@@ -45,6 +51,41 @@ export default function MessagesScreen({ navigation, route }) {
     if (!receiverId) return;
     navigation.navigate('Chat', { contact: contactFromRoute, receiverId });
   }, [contactFromRoute, navigation]);
+
+  const searchUsers = async (query) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id,display_name,avatar_url')
+        .ilike('display_name', `%${query}%`)
+        .neq('user_id', currentUserId)
+        .limit(20);
+
+      if (!error && data) {
+        setSearchResults(data.map(p => ({
+          userId: p.user_id,
+          name: p.display_name || 'ping user',
+          initials: (p.display_name || 'P').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase(),
+          avatarUrl: p.avatar_url,
+        })));
+      }
+    } catch (e) {
+      console.warn('User search error:', e);
+    }
+  };
+
+  React.useEffect(() => {
+    if (userSearchQuery) {
+      const timer = setTimeout(() => searchUsers(userSearchQuery), 300);
+      return () => clearTimeout(timer);
+    } else {
+      setSearchResults([]);
+    }
+  }, [userSearchQuery]);
 
   const renderMessage = ({ item }) => {
     const profile = item?.profile;
@@ -105,10 +146,10 @@ export default function MessagesScreen({ navigation, route }) {
             <Text style={styles.headerTitle}>Messages</Text>
           </View>
           <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.headerIcon}>
-              <Ionicons name="videocam-outline" size={24} color="#ffffff" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerIcon}>
+            <TouchableOpacity 
+              style={styles.headerIcon}
+              onPress={() => setShowUserSearch(true)}
+            >
               <Ionicons name="create-outline" size={24} color="#ffffff" />
             </TouchableOpacity>
           </View>
@@ -135,6 +176,72 @@ export default function MessagesScreen({ navigation, route }) {
             showsVerticalScrollIndicator={false}
           />
         )}
+
+        {/* User Search Modal */}
+        <Modal
+          visible={showUserSearch}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowUserSearch(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.searchModal}>
+              <View style={styles.searchModalHeader}>
+                <Text style={styles.searchModalTitle}>New Message</Text>
+                <TouchableOpacity onPress={() => {
+                  setShowUserSearch(false);
+                  setUserSearchQuery('');
+                  setSearchResults([]);
+                }}>
+                  <Ionicons name="close" size={28} color="#ffffff" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.searchInputContainer}>
+                <Ionicons name="search" size={20} color="#4FFFB0" />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search users by name..."
+                  placeholderTextColor="#666"
+                  value={userSearchQuery}
+                  onChangeText={setUserSearchQuery}
+                  autoFocus
+                />
+              </View>
+
+              <FlatList
+                data={searchResults}
+                keyExtractor={(item) => item.userId}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.userResultItem}
+                    onPress={() => {
+                      setShowUserSearch(false);
+                      setUserSearchQuery('');
+                      setSearchResults([]);
+                      navigation.navigate('Chat', {
+                        receiverId: item.userId,
+                        contact: { name: item.name, initials: item.initials, matchedUserId: item.userId },
+                      });
+                    }}
+                  >
+                    <View style={[styles.avatar, { backgroundColor: '#2a4a3a' }]}>
+                      <Text style={styles.avatarText}>{item.initials}</Text>
+                    </View>
+                    <Text style={styles.userResultName}>{item.name}</Text>
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                  userSearchQuery.trim() ? (
+                    <View style={styles.emptySearch}>
+                      <Text style={styles.emptySearchText}>No users found</Text>
+                    </View>
+                  ) : null
+                }
+              />
+            </View>
+          </View>
+        </Modal>
       </LinearGradient>
     </View>
   );
@@ -254,5 +361,66 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#4FFFB0',
     marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'flex-end',
+  },
+  searchModal: {
+    backgroundColor: '#0f1f0f',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    maxHeight: '80%',
+  },
+  searchModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  searchModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a2a1a',
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: 16,
+  },
+  userResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  userResultName: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  emptySearch: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  emptySearchText: {
+    color: '#666',
+    fontSize: 16,
   },
 });

@@ -20,7 +20,9 @@ import { upsertConnections } from '../utils/connectionsStorage';
 
 export default function SelectContactsScreen({ navigation, route }) {
   const selectAll = route?.params?.selectAll || false;
-  const isInitialImport = route?.params?.isInitialImport || false;
+  const mode = route?.params?.mode || '';
+  const isInitialImport = mode === 'initialImport' || route?.params?.isInitialImport || false;
+  const isAddContacts = mode === 'addContacts';
   const isFirstCircle = route?.params?.isFirstCircle ?? true;
   const existingCircles = route?.params?.existingCircles || [];
   const [contacts, setContacts] = useState([]);
@@ -34,7 +36,7 @@ export default function SelectContactsScreen({ navigation, route }) {
     const load = async () => {
       setLoadingContacts(true);
       try {
-        if (isInitialImport) {
+        if (isInitialImport || isAddContacts) {
           const { status } = await Contacts.requestPermissionsAsync();
           if (status !== 'granted') {
             Alert.alert(
@@ -234,7 +236,7 @@ export default function SelectContactsScreen({ navigation, route }) {
             style={styles.importButton}
             onPress={async () => {
               const selected = contacts.filter(c => selectedContactIds.includes(c.id));
-              if (isInitialImport) {
+              if (isInitialImport || isAddContacts) {
                 // Persist imported universe locally
                 let enriched = selected;
 
@@ -279,10 +281,23 @@ export default function SelectContactsScreen({ navigation, route }) {
                   console.warn('Matching/import connections failed (continuing):', e?.message || e);
                 }
 
-                await saveImportedContacts(enriched);
+                // Merge with existing contacts
+                const { success: existingSuccess, contacts: existingContacts } = await getImportedContacts();
+                const existing = existingSuccess ? existingContacts : [];
+                const existingIds = new Set(existing.map(c => c.id));
+                const newContacts = enriched.filter(c => !existingIds.has(c.id));
+                const merged = [...existing, ...newContacts];
+                
+                await saveImportedContacts(merged);
 
-                // Initial import - go to confirmation screen
-                navigation.navigate('ImportConfirmation', { contacts: enriched });
+                if (isAddContacts) {
+                  // Adding contacts - go back to contacts list
+                  Alert.alert('Success', `Added ${newContacts.length} new contacts!`);
+                  navigation.goBack();
+                } else {
+                  // Initial import - go to confirmation screen
+                  navigation.navigate('ImportConfirmation', { contacts: enriched });
+                }
               } else {
                 // Creating a circle - go to name/visualize screen
                 navigation.navigate('VisualizeCircle', { contacts: selected, isFirstCircle, existingCircles });
