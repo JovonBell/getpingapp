@@ -211,23 +211,27 @@ export default function SelectContactsScreen({ navigation, route }) {
           />
         </View>
 
-        {/* Contact List */}
-        {loadingContacts ? (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator size="large" color="#4FFFB0" />
-            <Text style={{ color: '#ffffff', opacity: 0.7, marginTop: 10 }}>Loading contacts…</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={Object.keys(groupedContacts).sort()}
-            renderItem={({ item: letter }) => renderSection(letter, groupedContacts[letter])}
-            keyExtractor={item => item}
-            style={styles.contactList}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
+        {/* Contact List Container - flex layout to reserve space for footer */}
+        <View style={styles.listContainer}>
+          {loadingContacts ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#4FFFB0" />
+              <Text style={styles.loadingText}>Loading contacts…</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={Object.keys(groupedContacts).sort()}
+              renderItem={({ item: letter }) => renderSection(letter, groupedContacts[letter])}
+              keyExtractor={item => item}
+              style={styles.contactList}
+              contentContainerStyle={styles.contactListContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            />
+          )}
+        </View>
 
-        {/* Footer */}
+        {/* Footer - fixed at bottom */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             {selectedContactIds.length} selected
@@ -399,9 +403,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: 14,
   },
+  listContainer: {
+    flex: 1,
+    minHeight: 0, // Important for flex children to respect constraints
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    color: '#ffffff',
+    opacity: 0.7,
+    marginTop: 10,
+  },
   contactList: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  contactListContent: {
+    paddingBottom: 20, // Extra padding at bottom for better scroll experience
   },
   sectionHeader: {
     fontSize: 14,
