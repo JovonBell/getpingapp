@@ -1,18 +1,23 @@
 # ping! (iOS / Expo)
 
-## Local dev
-- Install: `npm install`
-- Run: `npx expo start --lan`
+## Quick Start (No Setup Required!)
+The app is fully configured and ready to use:
+```bash
+npm install
+npx expo start --lan
+```
+Then scan the QR code with Expo Go!
 
-## Supabase setup (required)
-Follow `SUPABASE_SETUP.md`.
+**✅ Supabase backend is pre-configured** - everyone shares the same backend  
+**✅ Google OAuth is ready** - sign in works out of the box  
+**✅ All features functional** - circles, contacts, messaging, 3D view
 
-At minimum for v1 you must run these migrations (in order):
-- `supabase_migration_phase1_clean.sql`
-- `supabase_migration_phase1_contacts_identities.sql`
-- `supabase_migration_phase2_circles.sql`
-- `supabase_migration_phase2_contact_matches.sql`
-- `supabase_migration_phase2_push.sql`
+---
+
+## Supabase (Already Configured)
+The shared Supabase backend is at: `https://ahksxziueqkacyaqtgeu.supabase.co`
+
+**For developers:** If you need to modify the database schema, see `SUPABASE_SETUP.md` for migration scripts.
 
 ## EAS / TestFlight
 1. Install EAS CLI: `npm i -g eas-cli`
