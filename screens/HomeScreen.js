@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import PlanetZoom3D from '../components/PlanetZoom3D';
 import { getImportedContacts as loadImportedContacts } from '../utils/contactsStorage';
 import { getCurrentUser } from '../utils/supabaseStorage';
-import { loadCirclesWithMembers } from '../utils/circlesStorage';
+import { loadCirclesWithMembers, deleteCircle } from '../utils/circlesStorage';
 import { getUnreadMessageCount } from '../utils/messagesStorage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -459,12 +459,21 @@ export default function HomeScreen({ navigation, route }) {
   const handleConfirmDelete = async () => {
     if (!selectedCircleToDelete) return;
     
+    // Delete from Supabase first
+    const { success: deleteSuccess, user } = await getCurrentUser();
+    if (deleteSuccess && user) {
+      const deleteResult = await deleteCircle(selectedCircleToDelete.id);
+      if (!deleteResult.success) {
+        Alert.alert('Delete Error', `Failed to delete circle: ${deleteResult.error}`);
+        setShowDeleteConfirm(false);
+        setSelectedCircleToDelete(null);
+        return;
+      }
+    }
+    
     // Remove from local state
     const updatedCircles = circles.filter(c => c.id !== selectedCircleToDelete.id);
     setCircles(updatedCircles);
-    
-    // TODO: Delete from Supabase (will need to add a delete function in circlesStorage)
-    // For now, just update local state
     
     setShowDeleteConfirm(false);
     setSelectedCircleToDelete(null);

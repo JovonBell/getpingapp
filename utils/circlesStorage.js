@@ -131,4 +131,30 @@ export async function loadCirclesWithMembers(userId) {
   }
 }
 
+export async function deleteCircle(circleId) {
+  try {
+    if (!circleId) return { success: false, error: 'Missing circleId' };
+
+    // Delete circle members first (foreign key constraint)
+    const { error: membersErr } = await supabase
+      .from('circle_members')
+      .delete()
+      .eq('circle_id', circleId);
+
+    if (membersErr) throw membersErr;
+
+    // Delete the circle
+    const { error: circleErr } = await supabase
+      .from('circles')
+      .delete()
+      .eq('id', circleId);
+
+    if (circleErr) throw circleErr;
+
+    return { success: true };
+  } catch (error) {
+    console.warn('deleteCircle failed:', error?.message || error);
+    return { success: false, error: error?.message || String(error) };
+  }
+}
 
