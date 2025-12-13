@@ -35,6 +35,7 @@ export default function HomeScreen({ navigation, route }) {
   // Circles model: each circle is a ring with a name + contacts.
   const [circles, setCircles] = useState([]);
   const [circlesLoading, setCirclesLoading] = useState(true);
+  const [justDeleted, setJustDeleted] = useState(false); // Prevent reload after delete
   const hasCircle = circles.length > 0;
   // Helper to get first name from full name
   const getFirstName = (fullName) => fullName.split(' ')[0];
@@ -83,7 +84,13 @@ export default function HomeScreen({ navigation, route }) {
   useEffect(() => {
     let mounted = true;
     
-    const load = async () => {
+    const load = async (force = false) => {
+      // Skip reload if we just deleted (prevents bringing back deleted circles)
+      if (justDeleted && !force) {
+        console.log('[HomeScreen] Skipping reload - just deleted a circle');
+        return;
+      }
+      
       console.log('[HomeScreen] Loading circles from Supabase...');
       setCirclesLoading(true);
       
@@ -120,7 +127,7 @@ export default function HomeScreen({ navigation, route }) {
       }
     };
 
-    load();
+    load(true); // Force load on mount
     const unsub = navigation.addListener('focus', () => {
       console.log('[HomeScreen] Tab focused, reloading circles...');
       load();
@@ -476,24 +483,31 @@ export default function HomeScreen({ navigation, route }) {
     const circleToDelete = selectedCircleToDelete;
     console.log('[HOME] 🗑️ Deleting circle:', circleToDelete.id, circleToDelete.name);
     
-    // CLOSE MODALS FIRST
+    // 1. CLOSE MODALS FIRST
     setShowDeleteConfirm(false);
     setSelectedCircleToDelete(null);
     
-    // Delete from Supabase
-    const { success: userSuccess, user } = await getCurrentUser();
+    // 2. Set flag to prevent reload from bringing back deleted circles
+    setJustDeleted(true);
     
-    if (userSuccess && user) {
-      const deleteResult = await deleteCircle(circleToDelete.id);
-      console.log('[HOME] Supabase delete result:', deleteResult);
-    }
-    
-    // IMMEDIATELY update local state - don't wait for anything
+    // 3. UPDATE LOCAL STATE IMMEDIATELY - before any async
     setCircles(prevCircles => {
       const newCircles = prevCircles.filter(c => c.id !== circleToDelete.id);
-      console.log('[HOME] ✅ Circles updated:', prevCircles.length, '→', newCircles.length);
+      console.log('[HOME] ✅ UI Updated:', prevCircles.length, '→', newCircles.length, 'circles');
       return newCircles;
     });
+    
+    // 4. Delete from Supabase, then clear the flag
+    try {
+      const { success: userSuccess, user } = await getCurrentUser();
+      if (userSuccess && user) {
+        const result = await deleteCircle(circleToDelete.id);
+        console.log('[HOME] Supabase delete complete:', result.success);
+      }
+    } finally {
+      // Clear the flag after 2 seconds to allow future reloads
+      setTimeout(() => setJustDeleted(false), 2000);
+    }
   };
 
   const handleCancelDelete = () => {
