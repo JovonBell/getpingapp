@@ -473,49 +473,27 @@ export default function HomeScreen({ navigation, route }) {
   const handleConfirmDelete = async () => {
     if (!selectedCircleToDelete) return;
     
-    console.log('[HOME] 🗑️ User confirmed delete for circle:', selectedCircleToDelete.id, selectedCircleToDelete.name);
+    const circleToDelete = selectedCircleToDelete;
+    console.log('[HOME] 🗑️ Deleting circle:', circleToDelete.id, circleToDelete.name);
     
-    // Delete from Supabase first - THIS IS CRITICAL
-    const { success: deleteSuccess, user } = await getCurrentUser();
-    console.log('[HOME] Current user check:', { deleteSuccess, userId: user?.id });
-    
-    if (deleteSuccess && user) {
-      console.log('[HOME] Calling deleteCircle for:', selectedCircleToDelete.id);
-      const deleteResult = await deleteCircle(selectedCircleToDelete.id);
-      console.log('[HOME] Delete result:', deleteResult);
-      
-      if (!deleteResult.success) {
-        console.error('[HOME] ❌ DELETE FAILED:', deleteResult.error);
-        Alert.alert('Delete Error', `Failed to delete circle from database: ${deleteResult.error}\n\nThe circle may reappear on reload.`);
-        setShowDeleteConfirm(false);
-        setSelectedCircleToDelete(null);
-        return;
-      }
-      console.log('[HOME] ✅ Circle deleted from Supabase successfully!');
-    } else {
-      console.error('[HOME] ❌ No authenticated user, cannot delete from Supabase!');
-      Alert.alert('Error', 'You must be signed in to delete circles.');
-      setShowDeleteConfirm(false);
-      setSelectedCircleToDelete(null);
-      return;
-    }
-    
-    // Remove from local state - FORCE empty array if this was the last circle
-    console.log('[HOME] Removing from local state...');
-    const updatedCircles = circles.filter(c => c.id !== selectedCircleToDelete.id);
-    
-    // Force the state update to ensure UI reflects deletion
-    setCircles([...updatedCircles]); // Create new array reference to trigger re-render
-    console.log('[HOME] ✅ Local state updated. Remaining circles:', updatedCircles.length);
-    
-    if (updatedCircles.length === 0) {
-      console.log('[HOME] All circles deleted - returning to empty state');
-    }
-    
+    // CLOSE MODALS FIRST
     setShowDeleteConfirm(false);
     setSelectedCircleToDelete(null);
     
-    Alert.alert('Success', `Circle "${selectedCircleToDelete.name}" permanently deleted!`);
+    // Delete from Supabase
+    const { success: userSuccess, user } = await getCurrentUser();
+    
+    if (userSuccess && user) {
+      const deleteResult = await deleteCircle(circleToDelete.id);
+      console.log('[HOME] Supabase delete result:', deleteResult);
+    }
+    
+    // IMMEDIATELY update local state - don't wait for anything
+    setCircles(prevCircles => {
+      const newCircles = prevCircles.filter(c => c.id !== circleToDelete.id);
+      console.log('[HOME] ✅ Circles updated:', prevCircles.length, '→', newCircles.length);
+      return newCircles;
+    });
   };
 
   const handleCancelDelete = () => {

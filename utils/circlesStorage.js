@@ -53,10 +53,22 @@ export async function createCircleWithMembers(userId, { name, tier, contacts }) 
 
     console.log('[CREATE CIRCLE] Contacts upserted, mapping:', Object.keys(byContactId).length);
 
-    // Create circle using INSERT instead of UPSERT to avoid conflicts
+    // Find the next available tier to avoid duplicate key error
+    const { data: existingCircles } = await supabase
+      .from('circles')
+      .select('tier')
+      .eq('user_id', userId)
+      .order('tier', { ascending: false })
+      .limit(1);
+    
+    const maxTier = existingCircles?.[0]?.tier || 0;
+    const nextTier = maxTier + 1;
+    console.log('[CREATE CIRCLE] Using tier:', nextTier, '(max was', maxTier, ')');
+
+    // Create circle with next available tier
     const { data: circle, error: circleErr } = await supabase
       .from('circles')
-      .insert({ user_id: userId, name, tier })
+      .insert({ user_id: userId, name, tier: nextTier })
       .select('id,name,tier')
       .single();
 
