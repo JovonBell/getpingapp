@@ -806,13 +806,14 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           )}
 
-          {/* Tap target for plus button (always visible) - LARGE & VISIBLE */}
+          {/* Tap target for plus button - POSITIONED EXACTLY OVER SVG + BUTTON */}
           <TouchableOpacity
             style={[
               styles.plusButtonTapTarget,
               {
                 left: (SCREEN_WIDTH / 2) + (addCirclePlusX - 200) * (SCREEN_WIDTH / 400) - 60,
-                top: 155,
+                top: '45%',
+                marginTop: -60,
               }
             ]}
             activeOpacity={0.7}
@@ -828,18 +829,19 @@ export default function HomeScreen({ navigation, route }) {
             onPressOut={() => console.log('[HOME] 👆 Plus button press OUT')}
           >
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>+</Text>
+              <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>TAP</Text>
             </View>
           </TouchableOpacity>
 
-          {/* Tap target for minus button - only when circles exist - LARGE & VISIBLE */}
+          {/* Tap target for minus button - POSITIONED EXACTLY OVER SVG - BUTTON */}
           {hasCircle && (
             <TouchableOpacity
               style={[
                 styles.minusButtonTapTarget,
                 {
                   left: (SCREEN_WIDTH / 2) + (deleteCircleMinusX - 200) * (SCREEN_WIDTH / 400) - 60,
-                  top: 155,
+                  top: '45%',
+                  marginTop: -60,
                 }
               ]}
               activeOpacity={0.7}
@@ -855,7 +857,7 @@ export default function HomeScreen({ navigation, route }) {
               onPressOut={() => console.log('[HOME] 👆 Minus button press OUT')}
             >
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>−</Text>
+                <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>TAP</Text>
               </View>
             </TouchableOpacity>
           )}
