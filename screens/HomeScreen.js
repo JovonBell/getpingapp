@@ -704,7 +704,7 @@ export default function HomeScreen({ navigation, route }) {
                   {ringedContacts.map((entry, arrayIndex) => {
                     const pos = getContactPosition(entry.indexOnRing, entry.totalOnRing, entry.ringIndex, arrayIndex);
                     return (
-                      <React.Fragment key={`lines-${entry.contact.id}`}>
+                      <React.Fragment key={`lines-${entry.ringIndex}-${entry.indexOnRing}-${entry.contact.id}`}>
                         <Line
                           x1="200"
                           y1="200"
