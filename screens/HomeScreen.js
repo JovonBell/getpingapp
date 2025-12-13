@@ -154,6 +154,12 @@ export default function HomeScreen({ navigation, route }) {
   // Sync circles when coming back from VisualizeCircle (new multi-circle flow) or legacy params.
   const lastCirclesTokenRef = useRef(null);
   useEffect(() => {
+    // SKIP if we just deleted - don't overwrite with old data
+    if (justDeleted) {
+      console.log('[HomeScreen] Skipping route params sync - justDeleted is true');
+      return;
+    }
+    
     const nextCircles = route?.params?.circles;
     const token = route?.params?.circlesToken;
     if (nextCircles && Array.isArray(nextCircles) && token && token !== lastCirclesTokenRef.current) {
@@ -172,7 +178,7 @@ export default function HomeScreen({ navigation, route }) {
       });
       setCircles([{ id: uuid, name: routeCircleName, contacts: routeContacts }]);
     }
-  }, [route?.params?.circles, route?.params?.circlesToken, routeContacts, routeCircleName, circles.length]);
+  }, [route?.params?.circles, route?.params?.circlesToken, routeContacts, routeCircleName, circles.length, justDeleted]);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const zoomScale = useRef(new Animated.Value(1)).current;
@@ -477,37 +483,39 @@ export default function HomeScreen({ navigation, route }) {
     setShowDeleteConfirm(true);
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = () => {
     if (!selectedCircleToDelete) return;
     
-    const circleToDelete = selectedCircleToDelete;
-    console.log('[HOME] 🗑️ Deleting circle:', circleToDelete.id, circleToDelete.name);
+    const circleId = selectedCircleToDelete.id;
+    const circleName = selectedCircleToDelete.name;
+    console.log('[HOME] 🗑️ DELETING:', circleId, circleName);
     
-    // 1. CLOSE MODALS FIRST
+    // FORCE CLOSE MODALS
     setShowDeleteConfirm(false);
+    setShowDeleteModal(false);
     setSelectedCircleToDelete(null);
     
-    // 2. Set flag to prevent reload from bringing back deleted circles
+    // BLOCK RELOADS
     setJustDeleted(true);
     
-    // 3. UPDATE LOCAL STATE IMMEDIATELY - before any async
-    setCircles(prevCircles => {
-      const newCircles = prevCircles.filter(c => c.id !== circleToDelete.id);
-      console.log('[HOME] ✅ UI Updated:', prevCircles.length, '→', newCircles.length, 'circles');
-      return newCircles;
-    });
+    // FORCE DELETE FROM LOCAL STATE - calculate new array directly
+    const remaining = circles.filter(c => c.id !== circleId);
+    console.log('[HOME] Setting circles from', circles.length, 'to', remaining.length);
+    setCircles(remaining);
     
-    // 4. Delete from Supabase, then clear the flag
-    try {
-      const { success: userSuccess, user } = await getCurrentUser();
-      if (userSuccess && user) {
-        const result = await deleteCircle(circleToDelete.id);
-        console.log('[HOME] Supabase delete complete:', result.success);
+    // Delete from Supabase in background
+    (async () => {
+      try {
+        const { user } = await getCurrentUser();
+        if (user) {
+          await deleteCircle(circleId);
+          console.log('[HOME] ✅ Supabase delete done');
+        }
+      } catch (e) {
+        console.error('[HOME] Supabase delete error:', e);
       }
-    } finally {
-      // Clear the flag after 2 seconds to allow future reloads
-      setTimeout(() => setJustDeleted(false), 2000);
-    }
+      setTimeout(() => setJustDeleted(false), 3000);
+    })();
   };
 
   const handleCancelDelete = () => {
