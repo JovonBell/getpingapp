@@ -135,7 +135,7 @@ export default function VisualizeCircleScreen({ navigation, route }) {
             console.error('[VisualizeCircle] ❌ Failed to save circle to Supabase:', result.error);
             Alert.alert(
               'Save Error',
-              'Circle could not be saved to database. Please check your internet connection and try again.',
+              `Failed to save circle: ${result.error || 'Unknown error'}\n\nPlease check:\n1. Internet connection\n2. Database tables exist\n3. You are signed in`,
               [{ text: 'OK' }]
             );
             return;
