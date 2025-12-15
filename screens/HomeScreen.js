@@ -188,14 +188,20 @@ export default function HomeScreen({ navigation, route }) {
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const zoomScale = useRef(new Animated.Value(1)).current;
-  const starAnimations = useRef([...Array(30)].map(() => new Animated.Value(0))).current;
   const networkViewRef = useRef(null);
 
-  // Fixed star positions (generated once and never change)
+  // Star positions and animations for upward flow
+  const NUM_STARS = 40;
+  const STAR_AREA_HEIGHT = 600; // Extended height for smooth wrapping
+  const starAnimations = useRef([...Array(NUM_STARS)].map(() => new Animated.Value(0))).current;
+  
   const starPositions = useRef(
-    [...Array(30)].map(() => ({
+    [...Array(NUM_STARS)].map(() => ({
       x: Math.random() * SCREEN_WIDTH,
-      y: Math.random() * 400,
+      startY: Math.random() * STAR_AREA_HEIGHT, // Starting Y position
+      speed: 0.3 + Math.random() * 0.7, // Random speed for each star (0.3 to 1.0)
+      size: 1 + Math.random() * 2, // Random size
+      opacity: 0.3 + Math.random() * 0.5, // Random base opacity
     }))
   ).current;
 
@@ -285,14 +291,19 @@ export default function HomeScreen({ navigation, route }) {
   const addCirclePlusX = 200 + dottedRingRadius;
   const deleteCircleMinusX = 200 - dottedRingRadius;
 
-  // Animate flowing stars
+  // Animate stars flowing upwards smoothly and continuously
   useEffect(() => {
     const animations = starAnimations.map((anim, i) => {
+      const star = starPositions[i];
+      // Duration based on speed - slower speed = longer duration
+      const duration = 8000 / star.speed; // 8-26 seconds per cycle
+      
       return Animated.loop(
         Animated.timing(anim, {
           toValue: 1,
-          duration: 3000 + (i * 100),
+          duration: duration,
           useNativeDriver: true,
+          easing: t => t, // Linear easing for smooth constant flow
         })
       );
     });
@@ -744,24 +755,33 @@ export default function HomeScreen({ navigation, route }) {
 
         {/* Network Visualization */}
         <View style={styles.networkContainer}>
-          {/* Fixed star background */}
-          <View style={styles.starsFixed}>
-            {starAnimations.map((anim, i) => (
-              <Animated.View
-                key={i}
-                style={[
-                  styles.star,
-                  {
-                    left: starPositions[i].x,
-                    top: starPositions[i].y,
-                    opacity: anim.interpolate({
-                      inputRange: [0, 0.5, 1],
-                      outputRange: [0.2, 0.8, 0.2],
-                    }),
-                  },
-                ]}
-              />
-            ))}
+          {/* Flowing star background - moves upward independently */}
+          <View style={styles.starsFixed} pointerEvents="none">
+            {starAnimations.map((anim, i) => {
+              const star = starPositions[i];
+              return (
+                <Animated.View
+                  key={i}
+                  style={[
+                    styles.star,
+                    {
+                      left: star.x,
+                      width: star.size,
+                      height: star.size,
+                      opacity: star.opacity,
+                      transform: [
+                        {
+                          translateY: anim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [star.startY, star.startY - STAR_AREA_HEIGHT], // Move upward
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              );
+            })}
           </View>
 
           {/* Rotatable network visualization */}
@@ -1269,6 +1289,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     zIndex: 1,
+    overflow: 'hidden', // Clip stars outside the view
   },
   networkView: {
     flex: 1,
@@ -1282,11 +1303,8 @@ const styles = StyleSheet.create({
   },
   star: {
     position: 'absolute',
-    width: 2,
-    height: 2,
     backgroundColor: '#ffffff',
-    borderRadius: 1,
-    opacity: 0.5,
+    borderRadius: 2,
   },
   tapInstruction: {
     textAlign: 'center',
