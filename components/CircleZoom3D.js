@@ -28,6 +28,7 @@ export default function CircleZoom3D({
   }, [contacts]);
 
   const [selectedIndex, setSelectedIndex] = useState(null);
+  const [labelPositions, setLabelPositions] = useState([]);
 
   const stateRef = useRef({
     raf: null,
@@ -269,6 +270,41 @@ export default function CircleZoom3D({
       camera.position.set(camX, camY, s.cameraDistance);
       camera.lookAt(0, 0, 0);
 
+      // Project 3D planet positions to 2D screen coordinates for labels
+      const newLabelPositions = planetMeshes.map((item, i) => {
+        const planet = item.planet;
+        
+        // Create a position slightly below the planet for the label
+        const labelWorldPos = new THREE.Vector3(
+          planet.position.x,
+          planet.position.y - 0.7, // Position label below planet
+          planet.position.z
+        );
+        
+        // Project to screen space
+        const projected = labelWorldPos.clone().project(camera);
+        
+        // Convert to screen coordinates
+        const screenX = (projected.x + 1) / 2 * SCREEN_WIDTH;
+        const screenY = (-projected.y + 1) / 2 * SCREEN_HEIGHT;
+        
+        // Check if behind camera
+        const isBehindCamera = projected.z > 1;
+        
+        return {
+          x: screenX,
+          y: screenY,
+          visible: !isBehindCamera,
+          name: item.contact?.name || 'Contact',
+          color: item.contact?.color || '#4FFFB0',
+        };
+      });
+      
+      // Update label positions every few frames to avoid excessive re-renders
+      if (Date.now() % 3 === 0) {
+        setLabelPositions(newLabelPositions);
+      }
+
       renderer.render(scene, camera);
       gl.endFrameEXP();
       s.raf = requestAnimationFrame(tick);
@@ -439,6 +475,30 @@ export default function CircleZoom3D({
               <Ionicons name="close" size={24} color="#ffffff" />
             </TouchableOpacity>
           </View>
+
+          {/* Name labels orbiting with planets */}
+          {labelPositions.map((label, i) => {
+            if (!label.visible) return null;
+            
+            return (
+              <View
+                key={i}
+                style={[
+                  styles.nameLabel,
+                  {
+                    left: label.x - 40, // Center the label (assuming ~80px width)
+                    top: label.y,
+                    borderColor: label.color,
+                  },
+                ]}
+                pointerEvents="none"
+              >
+                <Text style={styles.nameLabelText} numberOfLines={1}>
+                  {label.name.split(' ')[0]}
+                </Text>
+              </View>
+            );
+          })}
 
           {/* Selected contact popup */}
           {selectedContact && (
@@ -642,5 +702,25 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     opacity: 0.7,
+  },
+
+  // Name labels that orbit with planets
+  nameLabel: {
+    position: 'absolute',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(10, 26, 10, 0.85)',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 60,
+    maxWidth: 100,
+  },
+  nameLabelText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
