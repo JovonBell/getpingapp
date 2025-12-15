@@ -54,27 +54,52 @@ export async function createCircleWithMembers(userId, { name, tier, contacts }) 
     console.log('[CREATE CIRCLE] Contacts upserted, mapping:', Object.keys(byContactId).length);
 
     // Find the next available tier to avoid duplicate key error
-    const { data: existingCircles } = await supabase
+    const { data: existingCircles, error: tierQueryErr } = await supabase
       .from('circles')
       .select('tier')
       .eq('user_id', userId)
       .order('tier', { ascending: false })
       .limit(1);
     
-    const maxTier = existingCircles?.[0]?.tier || 0;
-    const nextTier = maxTier + 1;
+    if (tierQueryErr) {
+      console.error('[CREATE CIRCLE] Error querying existing circles:', tierQueryErr);
+      throw tierQueryErr;
+    }
+    
+    const maxTier = existingCircles?.[0]?.tier ?? -1;
+    let nextTier = maxTier + 1;
     console.log('[CREATE CIRCLE] Using tier:', nextTier, '(max was', maxTier, ')');
 
-    // Create circle with next available tier
-    const { data: circle, error: circleErr } = await supabase
-      .from('circles')
-      .insert({ user_id: userId, name, tier: nextTier })
-      .select('id,name,tier')
-      .single();
+    // Create circle with next available tier, retry with incremented tier if duplicate
+    let circle = null;
+    let attempts = 0;
+    const maxAttempts = 5;
+    
+    while (!circle && attempts < maxAttempts) {
+      const { data, error: circleErr } = await supabase
+        .from('circles')
+        .insert({ user_id: userId, name, tier: nextTier })
+        .select('id,name,tier')
+        .single();
 
-    if (circleErr) {
-      console.error('[CREATE CIRCLE] Circle insert error:', circleErr);
-      throw circleErr;
+      if (circleErr) {
+        // Check if it's a duplicate tier error
+        if (circleErr.code === '23505' && circleErr.message?.includes('circles_user_tier_unique')) {
+          console.warn('[CREATE CIRCLE] Tier', nextTier, 'already exists, trying tier', nextTier + 1);
+          nextTier++;
+          attempts++;
+          continue;
+        }
+        
+        console.error('[CREATE CIRCLE] Circle insert error:', circleErr);
+        throw circleErr;
+      }
+      
+      circle = data;
+    }
+    
+    if (!circle) {
+      throw new Error('Failed to create circle after ' + maxAttempts + ' attempts');
     }
 
     console.log('[CREATE CIRCLE] Circle created:', circle.id);
