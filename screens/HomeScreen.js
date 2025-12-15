@@ -213,8 +213,8 @@ export default function HomeScreen({ navigation, route }) {
   const colors = ['#4FFFB0', '#ffaa00', '#ff6b6b', '#4ecdc4'];
 
   const BASE_RING_RADIUS = 70;
-  const SINGLE_DOTTED_RADIUS = 160;
-  const MAX_DOTTED_RADIUS = 180;
+  const SINGLE_DOTTED_RADIUS = 150;
+  const MAX_DOTTED_RADIUS = 165;
 
   // Keep rings within the 400x400 SVG viewBox even as more circles are added.
   // Increased spacing between rings for better visual separation
