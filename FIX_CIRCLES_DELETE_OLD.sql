@@ -28,3 +28,5 @@ SELECT
   (SELECT COUNT(*) FROM public.circles WHERE user_id = auth.uid()) as circles_count,
   (SELECT COUNT(*) FROM public.imported_contacts WHERE user_id = auth.uid()) as contacts_count;
 
+
+

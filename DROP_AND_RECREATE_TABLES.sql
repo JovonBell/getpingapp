@@ -137,3 +137,5 @@ WHERE table_schema = 'public'
   AND table_name IN ('circles', 'imported_contacts', 'circle_members')
 ORDER BY table_name, ordinal_position;
 
+
+

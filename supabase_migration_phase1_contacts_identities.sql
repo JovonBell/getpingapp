@@ -53,3 +53,5 @@ CREATE UNIQUE INDEX IF NOT EXISTS connections_user_connected_unique
   ON public.connections (user_id, connected_user_id);
 
 
+
+

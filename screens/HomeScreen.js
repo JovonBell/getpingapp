@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import PlanetZoom3D from '../components/PlanetZoom3D';
+import CircleZoom3D from '../components/CircleZoom3D';
 import { getImportedContacts as loadImportedContacts } from '../utils/contactsStorage';
 import { getCurrentUser } from '../utils/supabaseStorage';
 import { loadCirclesWithMembers, deleteCircle } from '../utils/circlesStorage';
@@ -54,12 +55,17 @@ export default function HomeScreen({ navigation, route }) {
   // 3D planet zoom overlay state
   const [planetOpen, setPlanetOpen] = useState(false);
   const [planetStartIndex, setPlanetStartIndex] = useState(0);
+  const [activeCircleItems, setActiveCircleItems] = useState([]); // Contacts from the active circle only
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Delete circle states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedCircleToDelete, setSelectedCircleToDelete] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Circle zoom 3D view state (when tapping on a ring)
+  const [circleZoomOpen, setCircleZoomOpen] = useState(false);
+  const [selectedCircleForZoom, setSelectedCircleForZoom] = useState(null);
 
   // Load imported contacts from local storage (so the universe persists across restarts).
   useEffect(() => {
@@ -355,6 +361,9 @@ export default function HomeScreen({ navigation, route }) {
   const lastDistance = useRef(0);
   const lastTouchPos = useRef({ x: 0, y: 0 });
   const isDragging = useRef(false);
+  const touchStartTime = useRef(0);
+  const touchStartPos = useRef({ x: 0, y: 0 });
+  const totalTouchMovement = useRef(0);
 
   // Center of the circle visualization
   const circleCenterX = SCREEN_WIDTH / 2;
@@ -370,10 +379,13 @@ export default function HomeScreen({ navigation, route }) {
       );
       lastDistance.current = distance;
     } else if (event.nativeEvent.touches.length === 1) {
-      // Single finger drag
+      // Single finger - could be tap or drag
       isDragging.current = true;
       const touch = event.nativeEvent.touches[0];
       lastTouchPos.current = { x: touch.pageX, y: touch.pageY };
+      touchStartTime.current = Date.now();
+      touchStartPos.current = { x: touch.pageX, y: touch.pageY };
+      totalTouchMovement.current = 0;
     }
   };
 
@@ -408,6 +420,9 @@ export default function HomeScreen({ navigation, route }) {
       // Movement since last frame
       const deltaX = currentX - lastTouchPos.current.x;
       const deltaY = currentY - lastTouchPos.current.y;
+      
+      // Track total movement to distinguish tap from drag
+      totalTouchMovement.current += Math.abs(deltaX) + Math.abs(deltaY);
 
       // Vector from center to touch point
       const radiusX = currentX - circleCenterX;
@@ -432,7 +447,47 @@ export default function HomeScreen({ navigation, route }) {
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (event) => {
+    const touchDuration = Date.now() - touchStartTime.current;
+    const wasTap = touchDuration < 300 && totalTouchMovement.current < 15;
+    
+    if (wasTap && hasCircle) {
+      // Check if tap was on a ring
+      // We need to convert the tap position to SVG coordinates
+      // The SVG is centered and has viewBox="0 0 400 400" displayed in width=SCREEN_WIDTH
+      
+      // Get the tap position relative to the SVG center
+      const tapX = touchStartPos.current.x;
+      const tapY = touchStartPos.current.y;
+      
+      // SVG center in screen coordinates - the SVG is centered horizontally
+      // and the networkView is flex:1 centered
+      // SVG viewBox is 400x400, center is at 200,200 in SVG coords
+      // The SVG is rendered at width=SCREEN_WIDTH, so scale factor is SCREEN_WIDTH/400
+      const svgScale = SCREEN_WIDTH / 400;
+      const svgCenterScreenX = SCREEN_WIDTH / 2;
+      const svgCenterScreenY = circleCenterY; // This is calculated from the view layout
+      
+      // Convert tap to SVG coordinates
+      const svgX = 200 + (tapX - svgCenterScreenX) / svgScale;
+      const svgY = 200 + (tapY - svgCenterScreenY) / svgScale;
+      
+      // Calculate distance from center (200, 200) in SVG coords
+      const distFromCenter = Math.sqrt(Math.pow(svgX - 200, 2) + Math.pow(svgY - 200, 2));
+      
+      // Check if tap is on any ring (within tolerance)
+      const ringTolerance = 15; // pixels in SVG coords
+      
+      for (let ringIndex = 0; ringIndex < circles.length; ringIndex++) {
+        const ringRadius = getRingRadius(ringIndex);
+        if (Math.abs(distFromCenter - ringRadius) < ringTolerance) {
+          // Tapped on this ring!
+          handleRingPress(ringIndex);
+          break;
+        }
+      }
+    }
+    
     lastDistance.current = 0;
     isDragging.current = false;
   };
@@ -524,12 +579,65 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const handlePerson3DPress = (contact, index) => {
-    setPlanetStartIndex(index);
+    // Find which circle this contact belongs to using the ringedContacts entry
+    const entry = ringedContacts[index];
+    if (!entry) {
+      setPlanetStartIndex(0);
+      setPlanetOpen(true);
+      return;
+    }
+    
+    const ringIndex = entry.ringIndex;
+    const circle = circles[ringIndex];
+    
+    if (!circle || !circle.contacts) {
+      setPlanetStartIndex(0);
+      setPlanetOpen(true);
+      return;
+    }
+    
+    // Get only the contacts from this circle
+    const circleContacts = circle.contacts.map((c, idx) => ({
+      ...c,
+      color: colors[idx % colors.length],
+    }));
+    
+    // Find the index of the selected contact within this circle
+    const indexInCircle = circle.contacts.findIndex(c => c.id === contact.id);
+    
+    setActiveCircleItems(circleContacts);
+    setPlanetStartIndex(Math.max(0, indexInCircle));
     setPlanetOpen(true);
   };
 
   const handlePlanetMoreInfo = () => {
     // handled inside PlanetZoom3D via callback
+  };
+
+  // Handler for when a ring (circle) is tapped
+  const handleRingPress = (ringIndex) => {
+    const circle = circles[ringIndex];
+    if (circle) {
+      setSelectedCircleForZoom(circle);
+      setCircleZoomOpen(true);
+    }
+  };
+
+  // Handler when contact is pressed from CircleZoom3D (opens PlanetZoom3D focused view)
+  const handleCircleZoomContactPress = (contact) => {
+    if (!selectedCircleForZoom) return;
+    
+    const circleContacts = selectedCircleForZoom.contacts || [];
+    const circleItems = circleContacts.map((c, idx) => ({
+      ...c,
+      color: colors[idx % colors.length],
+    }));
+    const indexInCircle = circleContacts.findIndex(c => c.id === contact.id);
+    
+    setCircleZoomOpen(false);
+    setActiveCircleItems(circleItems);
+    setPlanetStartIndex(Math.max(0, indexInCircle));
+    setPlanetOpen(true);
   };
 
   const handleSearchFocus = () => {
@@ -600,9 +708,10 @@ export default function HomeScreen({ navigation, route }) {
                         <TouchableOpacity
                           style={styles.searchResultItem}
                           onPress={() => {
-                            const idx = planetIndexById?.[item?.id];
-                            if (typeof idx === 'number') {
-                              handlePerson3DPress(item, idx);
+                            // Find the contact in ringedContacts to get their circle info
+                            const ringedIndex = ringedContacts.findIndex(entry => entry.contact?.id === item?.id);
+                            if (ringedIndex >= 0) {
+                              handlePerson3DPress(item, ringedIndex);
                               setSearchQuery('');
                               setShowSearchResults(false);
                             }
@@ -692,7 +801,7 @@ export default function HomeScreen({ navigation, route }) {
                     </>
                   ) : (
                     <>
-                      {/* Solid rings (one per circle) */}
+                      {/* Solid rings (one per circle) - tap detected via touch handlers */}
                       {circles.map((circle, ringIndex) => (
                         <Circle
                           key={circle?.id || `ring-${ringIndex}`}
@@ -700,9 +809,9 @@ export default function HomeScreen({ navigation, route }) {
                           cy="200"
                           r={getRingRadius(ringIndex)}
                           stroke="#4FFFB0"
-                          strokeWidth={ringIndex === 0 ? 1.5 : 1.25}
+                          strokeWidth={ringIndex === 0 ? 2.5 : 2}
                           fill="none"
-                          opacity={ringIndex === 0 ? 0.35 : 0.22}
+                          opacity={ringIndex === 0 ? 0.5 : 0.35}
                         />
                       ))}
                     </>
@@ -830,7 +939,7 @@ export default function HomeScreen({ navigation, route }) {
         <View style={styles.tapInstructionContainer}>
           <Text style={styles.tapInstruction}>
             {hasCircle
-              ? 'Tap a circle to open • Tap the center to edit your profile'
+              ? 'Tap a person to view • Tap a ring to explore that circle'
               : 'tap the center to create your first Circle • drag to rotate • pinch to zoom'}
           </Text>
         </View>
@@ -882,7 +991,7 @@ export default function HomeScreen({ navigation, route }) {
           onClose={() => {
             setPlanetOpen(false);
           }}
-          items={planetItems}
+          items={activeCircleItems}
           initialIndex={planetStartIndex}
           onMoreInfo={() => {
             // More info is now handled inside PlanetZoom3D component
@@ -892,6 +1001,38 @@ export default function HomeScreen({ navigation, route }) {
             if (contact && contact.phone) {
               // Open native iMessage with the contact's phone number
               const phoneNumber = contact.phone.replace(/[^0-9]/g, ''); // Remove non-numeric characters
+              const smsUrl = `sms:${phoneNumber}`;
+              
+              try {
+                const canOpen = await Linking.canOpenURL(smsUrl);
+                if (canOpen) {
+                  await Linking.openURL(smsUrl);
+                } else {
+                  Alert.alert('Unable to open Messages', 'Could not open the Messages app.');
+                }
+              } catch (error) {
+                Alert.alert('Error', 'Failed to open Messages app.');
+              }
+            } else {
+              Alert.alert('No Phone Number', 'This contact does not have a phone number.');
+            }
+          }}
+        />
+
+        {/* Circle Zoom 3D View - shows when tapping on a ring */}
+        <CircleZoom3D
+          visible={circleZoomOpen}
+          onClose={() => {
+            setCircleZoomOpen(false);
+            setSelectedCircleForZoom(null);
+          }}
+          circleName={selectedCircleForZoom?.name || 'Circle'}
+          contacts={selectedCircleForZoom?.contacts || []}
+          onContactPress={handleCircleZoomContactPress}
+          onMessage={async (contact) => {
+            setCircleZoomOpen(false);
+            if (contact && contact.phone) {
+              const phoneNumber = contact.phone.replace(/[^0-9]/g, '');
               const smsUrl = `sms:${phoneNumber}`;
               
               try {
