@@ -310,20 +310,12 @@ export default function PlanetZoom3D({
     }
   };
 
-  // DON'T RENDER ANYTHING when not visible - prevents ALL event handler issues
-  if (!visible) {
-    return null;
-  }
-
   return (
     <Modal 
       visible={true}
       transparent={false} 
       animationType="slide" 
       onRequestClose={requestClose}
-      onDismiss={() => {
-        console.log('[PlanetZoom3D] Modal dismissed');
-      }}
     >
       <View style={styles.container}>
         <GLView style={styles.glFull} onContextCreate={onContextCreate} pointerEvents="none" />
@@ -414,10 +406,10 @@ export default function PlanetZoom3D({
               {!activeItem?.jobTitle && !activeItem?.location && !activeItem?.bio && (
                 <Text style={styles.moreInfoEmpty}>No additional information available</Text>
               )}
-            </Animated.View>
-          )}
-        </View>
+          </Animated.View>
+        )}
       </View>
+    </View>
     </Modal>
   );
 }

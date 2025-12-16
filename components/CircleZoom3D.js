@@ -460,20 +460,12 @@ export default function CircleZoom3D({
 
   const selectedContact = selectedIndex !== null ? normalizedContacts[selectedIndex] : null;
 
-  // DON'T RENDER ANYTHING when not visible - completely eliminates dead screen bug
-  if (!visible) {
-    return null;
-  }
-
   return (
     <Modal 
       visible={true}
       transparent={false} 
       animationType="slide" 
       onRequestClose={onClose}
-      onDismiss={() => {
-        console.log('[CircleZoom3D] Modal dismissed');
-      }}
     >
       <View style={styles.container}>
         <GLView style={styles.glFull} onContextCreate={onContextCreate} pointerEvents="none" />
@@ -570,10 +562,10 @@ export default function CircleZoom3D({
           <View style={styles.instructions} pointerEvents="none">
             <Text style={styles.instructionText}>
               {selectedContact ? 'Tap elsewhere to deselect' : 'Tap a planet • Drag to rotate • Pinch to zoom'}
-            </Text>
-          </View>
+          </Text>
         </View>
       </View>
+    </View>
     </Modal>
   );
 }

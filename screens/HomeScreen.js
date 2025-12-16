@@ -1006,70 +1006,74 @@ export default function HomeScreen({ navigation, route }) {
           </Animated.View>
         )}
 
-        <PlanetZoom3D
-          visible={planetOpen}
-          onClose={() => {
-            setPlanetOpen(false);
-          }}
-          items={activeCircleItems}
-          initialIndex={planetStartIndex}
-          onMoreInfo={() => {
-            // More info is now handled inside PlanetZoom3D component
-          }}
-          onMessage={async (contact) => {
-            setPlanetOpen(false);
-            if (contact && contact.phone) {
-              // Open native iMessage with the contact's phone number
-              const phoneNumber = contact.phone.replace(/[^0-9]/g, ''); // Remove non-numeric characters
-              const smsUrl = `sms:${phoneNumber}`;
-              
-              try {
-                const canOpen = await Linking.canOpenURL(smsUrl);
-                if (canOpen) {
-                  await Linking.openURL(smsUrl);
-                } else {
-                  Alert.alert('Unable to open Messages', 'Could not open the Messages app.');
+        {planetOpen && (
+          <PlanetZoom3D
+            visible={true}
+            onClose={() => {
+              setPlanetOpen(false);
+            }}
+            items={activeCircleItems}
+            initialIndex={planetStartIndex}
+            onMoreInfo={() => {
+              // More info is now handled inside PlanetZoom3D component
+            }}
+            onMessage={async (contact) => {
+              setPlanetOpen(false);
+              if (contact && contact.phone) {
+                // Open native iMessage with the contact's phone number
+                const phoneNumber = contact.phone.replace(/[^0-9]/g, ''); // Remove non-numeric characters
+                const smsUrl = `sms:${phoneNumber}`;
+                
+                try {
+                  const canOpen = await Linking.canOpenURL(smsUrl);
+                  if (canOpen) {
+                    await Linking.openURL(smsUrl);
+                  } else {
+                    Alert.alert('Unable to open Messages', 'Could not open the Messages app.');
+                  }
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to open Messages app.');
                 }
-              } catch (error) {
-                Alert.alert('Error', 'Failed to open Messages app.');
+              } else {
+                Alert.alert('No Phone Number', 'This contact does not have a phone number.');
               }
-            } else {
-              Alert.alert('No Phone Number', 'This contact does not have a phone number.');
-            }
-          }}
-        />
+            }}
+          />
+        )}
 
         {/* Circle Zoom 3D View - shows when tapping on a ring */}
-        <CircleZoom3D
-          visible={circleZoomOpen}
-          onClose={() => {
-            setCircleZoomOpen(false);
-            setSelectedCircleForZoom(null);
-          }}
-          circleName={selectedCircleForZoom?.name || 'Circle'}
-          contacts={selectedCircleForZoom?.contacts || []}
-          onContactPress={handleCircleZoomContactPress}
-          onMessage={async (contact) => {
-            setCircleZoomOpen(false);
-            if (contact && contact.phone) {
-              const phoneNumber = contact.phone.replace(/[^0-9]/g, '');
-              const smsUrl = `sms:${phoneNumber}`;
-              
-              try {
-                const canOpen = await Linking.canOpenURL(smsUrl);
-                if (canOpen) {
-                  await Linking.openURL(smsUrl);
-                } else {
-                  Alert.alert('Unable to open Messages', 'Could not open the Messages app.');
+        {circleZoomOpen && (
+          <CircleZoom3D
+            visible={true}
+            onClose={() => {
+              setCircleZoomOpen(false);
+              setSelectedCircleForZoom(null);
+            }}
+            circleName={selectedCircleForZoom?.name || 'Circle'}
+            contacts={selectedCircleForZoom?.contacts || []}
+            onContactPress={handleCircleZoomContactPress}
+            onMessage={async (contact) => {
+              setCircleZoomOpen(false);
+              if (contact && contact.phone) {
+                const phoneNumber = contact.phone.replace(/[^0-9]/g, '');
+                const smsUrl = `sms:${phoneNumber}`;
+                
+                try {
+                  const canOpen = await Linking.canOpenURL(smsUrl);
+                  if (canOpen) {
+                    await Linking.openURL(smsUrl);
+                  } else {
+                    Alert.alert('Unable to open Messages', 'Could not open the Messages app.');
+                  }
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to open Messages app.');
                 }
-              } catch (error) {
-                Alert.alert('Error', 'Failed to open Messages app.');
+              } else {
+                Alert.alert('No Phone Number', 'This contact does not have a phone number.');
               }
-            } else {
-              Alert.alert('No Phone Number', 'This contact does not have a phone number.');
-            }
-          }}
-        />
+            }}
+          />
+        )}
 
         {/* Delete Circle Selection Modal */}
         <Modal
