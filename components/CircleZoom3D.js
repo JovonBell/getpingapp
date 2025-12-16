@@ -54,42 +54,24 @@ export default function CircleZoom3D({
   const rendererRef = useRef(null);
   const glRef = useRef(null);
 
+  // Setup effect - runs when component mounts (visible becomes true)
   useEffect(() => {
-    if (visible) {
-      setSelectedIndex(null);
-      stateRef.current.orbitAngle = 0;
-      stateRef.current.targetOrbitAngle = 0;
-      stateRef.current.cameraDistance = 14;
-      stateRef.current.targetCameraDistance = 14;
-      stateRef.current.isDragging = false;
-      stateRef.current.isPinching = false;
-    } else {
-      // Cleanup when modal closes to prevent dead screen
-      console.log('[CircleZoom3D] Modal closing, cleaning up gesture state...');
-      setSelectedIndex(null);
-      setLabelPositions([]);
-      
-      // Reset all gesture states
-      stateRef.current.isDragging = false;
-      stateRef.current.isPinching = false;
-      stateRef.current.lastDistance = 0;
-    }
+    setSelectedIndex(null);
+    stateRef.current.orbitAngle = 0;
+    stateRef.current.targetOrbitAngle = 0;
+    stateRef.current.cameraDistance = 14;
+    stateRef.current.targetCameraDistance = 14;
+    stateRef.current.isDragging = false;
+    stateRef.current.isPinching = false;
     
-    // Unconditional cleanup - runs on every effect cleanup
+    console.log('[CircleZoom3D] Mounted');
+    
+    // Cleanup when unmounting - component is destroyed when visible=false
     return () => {
-      if (!visible) {
-        console.log('[CircleZoom3D] Effect cleanup - forcing complete reset');
-        // Force reset ALL gesture states to ensure no lingering handlers
-        if (stateRef.current) {
-          stateRef.current.isDragging = false;
-          stateRef.current.isPinching = false;
-          stateRef.current.lastDistance = 0;
-          stateRef.current.lastX = 0;
-          stateRef.current.totalMovement = 0;
-        }
-      }
+      console.log('[CircleZoom3D] Unmounting - all handlers destroyed');
+      stateRef.current.cleanup?.();
     };
-  }, [visible]);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -395,9 +377,8 @@ export default function CircleZoom3D({
     return -1;
   };
 
-  // Touch handlers - only active when modal is visible
+  // Touch handlers
   const handleTouchStart = (event) => {
-    if (!visible) return;
     const touches = event.nativeEvent.touches;
     const s = stateRef.current;
 
@@ -422,7 +403,6 @@ export default function CircleZoom3D({
   };
 
   const handleTouchMove = (event) => {
-    if (!visible) return;
     const touches = event.nativeEvent.touches;
     const s = stateRef.current;
 
@@ -458,7 +438,6 @@ export default function CircleZoom3D({
   };
 
   const handleTouchEnd = (event) => {
-    if (!visible) return;
     const s = stateRef.current;
     const touchDuration = Date.now() - s.touchStartTime;
     const wasTap = touchDuration < 250 && s.totalMovement < 10;
@@ -481,28 +460,30 @@ export default function CircleZoom3D({
 
   const selectedContact = selectedIndex !== null ? normalizedContacts[selectedIndex] : null;
 
+  // DON'T RENDER ANYTHING when not visible - completely eliminates dead screen bug
+  if (!visible) {
+    return null;
+  }
+
   return (
     <Modal 
-      key={`circle-modal-${visible ? 'open' : 'closed'}`}
-      visible={visible} 
+      visible={true}
       transparent={false} 
       animationType="slide" 
       onRequestClose={onClose}
       onDismiss={() => {
-        console.log('[CircleZoom3D] Modal dismissed - all handlers released');
+        console.log('[CircleZoom3D] Modal dismissed');
       }}
     >
       <View style={styles.container}>
         <GLView style={styles.glFull} onContextCreate={onContextCreate} pointerEvents="none" />
 
-        {/* Gesture layer - only active when modal is visible */}
+        {/* Gesture layer */}
         <View
           style={styles.gestureLayer}
-          {...(visible ? {
-            onTouchStart: handleTouchStart,
-            onTouchMove: handleTouchMove,
-            onTouchEnd: handleTouchEnd,
-          } : {})}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           {/* Header */}
           <View style={styles.header} pointerEvents="box-none">

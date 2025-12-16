@@ -41,40 +41,30 @@ export default function PlanetZoom3D({
     gestureStartAngle: 0,
   });
 
+  // Setup effect - only runs when component mounts (visible becomes true)
   useEffect(() => {
-    if (visible) {
-      // When modal opens, use the initialIndex prop to set the correct starting contact
-      const startIndex = Math.max(0, Math.min(initialIndex, normalizedItems.length - 1));
-      setCurrentIndex(startIndex);
-      setDisplayIndex(startIndex);
-      displayIndexRef.current = startIndex;
-      
-      // Sync angle on open
-      const a = (2 * Math.PI * startIndex) / Math.max(1, normalizedItems.length);
-      stateRef.current.currentAngle = a;
-      stateRef.current.targetAngle = a;
-
-      // Reset more info popup on open
-      setShowMoreInfo(false);
-      moreInfoAnim.setValue(0);
-    } else {
-      // Cleanup when modal closes to prevent dead screen
-      console.log('[PlanetZoom3D] Modal closing, cleaning up...');
-      setShowMoreInfo(false);
-      moreInfoAnim.setValue(0);
-    }
+    const startIndex = Math.max(0, Math.min(initialIndex, normalizedItems.length - 1));
+    setCurrentIndex(startIndex);
+    setDisplayIndex(startIndex);
+    displayIndexRef.current = startIndex;
     
-    // Unconditional cleanup - runs on every effect cleanup
+    // Sync angle on open
+    const a = (2 * Math.PI * startIndex) / Math.max(1, normalizedItems.length);
+    stateRef.current.currentAngle = a;
+    stateRef.current.targetAngle = a;
+
+    // Reset more info popup on open
+    setShowMoreInfo(false);
+    moreInfoAnim.setValue(0);
+    
+    console.log('[PlanetZoom3D] Mounted with index:', startIndex);
+    
+    // Cleanup when unmounting
     return () => {
-      if (!visible) {
-        console.log('[PlanetZoom3D] Effect cleanup - forcing gesture reset');
-        // Force reset all gesture states
-        if (stateRef.current) {
-          stateRef.current.targetZoom = 0;
-        }
-      }
+      console.log('[PlanetZoom3D] Unmounting - all handlers destroyed');
+      stateRef.current.cleanup?.();
     };
-  }, [visible, initialIndex, normalizedItems.length, moreInfoAnim]);
+  }, [initialIndex, normalizedItems.length, moreInfoAnim]);
 
   useEffect(() => {
     // When index changes, set a new target angle
@@ -267,15 +257,13 @@ export default function PlanetZoom3D({
   const panResponder = useMemo(() => {
     const SWIPE_THRESHOLD = 30;
     return PanResponder.create({
-      onStartShouldSetPanResponder: () => visible, // Only capture when modal is visible
-      onMoveShouldSetPanResponder: (_evt, gesture) => visible && Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
-      onMoveShouldSetPanResponderCapture: (_evt, gesture) => visible && Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_evt, gesture) => Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
+      onMoveShouldSetPanResponderCapture: (_evt, gesture) => Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
       onPanResponderGrant: () => {
-        if (!visible) return;
         stateRef.current.gestureStartAngle = stateRef.current.targetAngle;
       },
       onPanResponderMove: (_evt, gesture) => {
-        if (!visible) return;
         const len = Math.max(1, normalizedItems.length);
         if (len <= 1) return;
         const step = (Math.PI * 2) / len;
@@ -284,7 +272,6 @@ export default function PlanetZoom3D({
         stateRef.current.targetAngle = stateRef.current.gestureStartAngle + delta;
       },
       onPanResponderRelease: (_evt, gesture) => {
-        if (!visible) return;
         const len = Math.max(1, normalizedItems.length);
         if (len <= 1) return;
 
@@ -298,13 +285,8 @@ export default function PlanetZoom3D({
         setCurrentIndex(finalIndex);
         stateRef.current.targetAngle = (TWO_PI * finalIndex) / len;
       },
-      onPanResponderTerminationRequest: () => true, // Allow termination
-      onPanResponderTerminate: () => {
-        // Forced termination - clean up
-        console.log('[PlanetZoom3D] PanResponder terminated');
-      },
     });
-  }, [normalizedItems.length, currentIndex, visible]);
+  }, [normalizedItems.length, currentIndex]);
 
   const activeItem = normalizedItems[displayIndex] || normalizedItems[0];
 
@@ -328,27 +310,30 @@ export default function PlanetZoom3D({
     }
   };
 
+  // DON'T RENDER ANYTHING when not visible - prevents ALL event handler issues
+  if (!visible) {
+    return null;
+  }
+
   return (
     <Modal 
-      key={`planet-modal-${visible ? 'open' : 'closed'}`}
-      visible={visible} 
+      visible={true}
       transparent={false} 
       animationType="slide" 
       onRequestClose={requestClose}
       onDismiss={() => {
-        console.log('[PlanetZoom3D] Modal dismissed - all handlers released');
+        console.log('[PlanetZoom3D] Modal dismissed');
       }}
     >
       <View style={styles.container}>
-        {/* GLView can swallow touches; disable pointer events and handle gestures on an overlay */}
         <GLView style={styles.glFull} onContextCreate={onContextCreate} pointerEvents="none" />
 
-        {/* Gesture layer - only active when modal is visible */}
+        {/* Gesture layer */}
         <View style={styles.gestureLayer} pointerEvents="box-none">
           <View 
             style={styles.gestureHitbox} 
-            pointerEvents={visible ? "auto" : "none"} 
-            {...(visible ? panResponder.panHandlers : {})}
+            pointerEvents="auto" 
+            {...panResponder.panHandlers}
           />
 
           {/* Info popup (top-right) */}
