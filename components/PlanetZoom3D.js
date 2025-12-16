@@ -41,8 +41,13 @@ export default function PlanetZoom3D({
     gestureStartAngle: 0,
   });
 
-  // Setup effect - only runs when component mounts (visible becomes true)
+  // Track if component is mounted - CRITICAL for preventing dead screen
+  const isMountedRef = useRef(true);
+
+  // Setup effect - only runs when component mounts
   useEffect(() => {
+    isMountedRef.current = true;
+    
     const startIndex = Math.max(0, Math.min(initialIndex, normalizedItems.length - 1));
     setCurrentIndex(startIndex);
     setDisplayIndex(startIndex);
@@ -59,27 +64,31 @@ export default function PlanetZoom3D({
     
     console.log('[PlanetZoom3D] Mounted with index:', startIndex);
     
-    // Cleanup when unmounting
+    // Cleanup when unmounting - CRITICAL
     return () => {
-      console.log('[PlanetZoom3D] Unmounting - all handlers destroyed');
+      console.log('[PlanetZoom3D] Unmounting - setting isMounted to false');
+      isMountedRef.current = false;
+      if (stateRef.current.raf) {
+        cancelAnimationFrame(stateRef.current.raf);
+        stateRef.current.raf = null;
+      }
+      if (stateRef.current.closeTimer) {
+        clearTimeout(stateRef.current.closeTimer);
+        stateRef.current.closeTimer = null;
+      }
       stateRef.current.cleanup?.();
+      stateRef.current.cleanup = null;
     };
   }, [initialIndex, normalizedItems.length, moreInfoAnim]);
 
   useEffect(() => {
+    if (!isMountedRef.current) return;
     // When index changes, set a new target angle
     const a = (2 * Math.PI * currentIndex) / Math.max(1, normalizedItems.length);
     stateRef.current.targetAngle = a;
     setDisplayIndex(currentIndex);
     displayIndexRef.current = currentIndex;
   }, [currentIndex, normalizedItems.length]);
-
-  useEffect(() => {
-    return () => {
-      if (stateRef.current.closeTimer) clearTimeout(stateRef.current.closeTimer);
-      stateRef.current.cleanup?.();
-    };
-  }, []);
 
   const onContextCreate = async (gl) => {
     const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
@@ -177,6 +186,12 @@ export default function PlanetZoom3D({
     };
 
     const tick = () => {
+      // CRITICAL: Stop animation loop if component unmounted
+      if (!isMountedRef.current) {
+        console.log('[PlanetZoom3D] tick stopped - component unmounted');
+        return;
+      }
+
       // Star drift
       stars.rotation.y += 0.0008;
 
@@ -192,7 +207,7 @@ export default function PlanetZoom3D({
       const len = Math.max(1, normalizedItems.length);
       const angleNorm = ((s.currentAngle % TWO_PI) + TWO_PI) % TWO_PI;
       const idxFromAngle = Math.round((angleNorm / TWO_PI) * len) % len;
-      if (idxFromAngle !== displayIndexRef.current) {
+      if (idxFromAngle !== displayIndexRef.current && isMountedRef.current) {
         displayIndexRef.current = idxFromAngle;
         setDisplayIndex(idxFromAngle);
       }
@@ -227,7 +242,11 @@ export default function PlanetZoom3D({
 
       renderer.render(scene, camera);
       gl.endFrameEXP();
-      s.raf = requestAnimationFrame(tick);
+      
+      // Only continue loop if still mounted
+      if (isMountedRef.current) {
+        s.raf = requestAnimationFrame(tick);
+      }
     };
 
     tick();
@@ -257,13 +276,15 @@ export default function PlanetZoom3D({
   const panResponder = useMemo(() => {
     const SWIPE_THRESHOLD = 30;
     return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_evt, gesture) => Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
-      onMoveShouldSetPanResponderCapture: (_evt, gesture) => Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
+      onStartShouldSetPanResponder: () => isMountedRef.current,
+      onMoveShouldSetPanResponder: (_evt, gesture) => isMountedRef.current && Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
+      onMoveShouldSetPanResponderCapture: (_evt, gesture) => isMountedRef.current && Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
       onPanResponderGrant: () => {
+        if (!isMountedRef.current) return;
         stateRef.current.gestureStartAngle = stateRef.current.targetAngle;
       },
       onPanResponderMove: (_evt, gesture) => {
+        if (!isMountedRef.current) return;
         const len = Math.max(1, normalizedItems.length);
         if (len <= 1) return;
         const step = (Math.PI * 2) / len;
@@ -272,6 +293,7 @@ export default function PlanetZoom3D({
         stateRef.current.targetAngle = stateRef.current.gestureStartAngle + delta;
       },
       onPanResponderRelease: (_evt, gesture) => {
+        if (!isMountedRef.current) return;
         const len = Math.max(1, normalizedItems.length);
         if (len <= 1) return;
 
@@ -284,6 +306,10 @@ export default function PlanetZoom3D({
 
         setCurrentIndex(finalIndex);
         stateRef.current.targetAngle = (TWO_PI * finalIndex) / len;
+      },
+      onPanResponderTerminate: () => {
+        // Released responder - good, this allows other touches to work
+        console.log('[PlanetZoom3D] PanResponder terminated');
       },
     });
   }, [normalizedItems.length, currentIndex]);

@@ -47,6 +47,9 @@ export default function CircleZoom3D({
     totalMovement: 0,
   });
 
+  // Track if component is mounted - CRITICAL for preventing dead screen
+  const isMountedRef = useRef(true);
+
   // References for raycasting
   const planetMeshesRef = useRef([]);
   const sceneRef = useRef(null);
@@ -56,6 +59,8 @@ export default function CircleZoom3D({
 
   // Setup effect - runs when component mounts (visible becomes true)
   useEffect(() => {
+    isMountedRef.current = true;
+    
     setSelectedIndex(null);
     stateRef.current.orbitAngle = 0;
     stateRef.current.targetOrbitAngle = 0;
@@ -66,16 +71,16 @@ export default function CircleZoom3D({
     
     console.log('[CircleZoom3D] Mounted');
     
-    // Cleanup when unmounting - component is destroyed when visible=false
+    // Cleanup when unmounting - CRITICAL
     return () => {
-      console.log('[CircleZoom3D] Unmounting - all handlers destroyed');
+      console.log('[CircleZoom3D] Unmounting - setting isMounted to false');
+      isMountedRef.current = false;
+      if (stateRef.current.raf) {
+        cancelAnimationFrame(stateRef.current.raf);
+        stateRef.current.raf = null;
+      }
       stateRef.current.cleanup?.();
-    };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      stateRef.current.cleanup?.();
+      stateRef.current.cleanup = null;
     };
   }, []);
 
@@ -230,6 +235,12 @@ export default function CircleZoom3D({
     planetMeshesRef.current = planetMeshes;
 
     const tick = () => {
+      // CRITICAL: Stop animation loop if component unmounted
+      if (!isMountedRef.current) {
+        console.log('[CircleZoom3D] tick stopped - component unmounted');
+        return;
+      }
+
       const s = stateRef.current;
 
       // Smooth rotation towards target
@@ -311,13 +322,17 @@ export default function CircleZoom3D({
       });
       
       // Update label positions every few frames to avoid excessive re-renders
-      if (Date.now() % 3 === 0) {
+      if (isMountedRef.current && Date.now() % 3 === 0) {
         setLabelPositions(newLabelPositions);
       }
 
       renderer.render(scene, camera);
       gl.endFrameEXP();
-      s.raf = requestAnimationFrame(tick);
+      
+      // Only continue loop if still mounted
+      if (isMountedRef.current) {
+        s.raf = requestAnimationFrame(tick);
+      }
     };
 
     tick();
@@ -377,8 +392,10 @@ export default function CircleZoom3D({
     return -1;
   };
 
-  // Touch handlers
+  // Touch handlers - check isMountedRef to prevent dead screen bug
   const handleTouchStart = (event) => {
+    if (!isMountedRef.current) return;
+    
     const touches = event.nativeEvent.touches;
     const s = stateRef.current;
 
@@ -403,6 +420,8 @@ export default function CircleZoom3D({
   };
 
   const handleTouchMove = (event) => {
+    if (!isMountedRef.current) return;
+    
     const touches = event.nativeEvent.touches;
     const s = stateRef.current;
 
@@ -438,6 +457,8 @@ export default function CircleZoom3D({
   };
 
   const handleTouchEnd = (event) => {
+    if (!isMountedRef.current) return;
+    
     const s = stateRef.current;
     const touchDuration = Date.now() - s.touchStartTime;
     const wasTap = touchDuration < 250 && s.totalMovement < 10;
@@ -445,9 +466,9 @@ export default function CircleZoom3D({
     if (wasTap && !s.isPinching) {
       // Check if we tapped on a planet
       const tappedIndex = performRaycast(s.touchStartPos.x, s.touchStartPos.y);
-      if (tappedIndex >= 0) {
+      if (tappedIndex >= 0 && isMountedRef.current) {
         setSelectedIndex(tappedIndex === selectedIndex ? null : tappedIndex);
-      } else {
+      } else if (isMountedRef.current) {
         // Tapped on empty space - deselect
         setSelectedIndex(null);
       }
