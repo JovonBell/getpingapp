@@ -2,7 +2,7 @@
 
 ## Changelog
 
-### December 16, 2025
+### Joshua Bell - December 16, 2025
 **UX Improvements & Bug Fixes**
 
 **circlesStorage.js:**
