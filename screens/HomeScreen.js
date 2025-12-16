@@ -964,6 +964,18 @@ export default function HomeScreen({ navigation, route }) {
           </Text>
         </View>
 
+        {/* Prominent CTA when no circles exist */}
+        {!hasCircle && !circlesLoading && (
+          <TouchableOpacity
+            style={styles.createFirstCircleButton}
+            onPress={handleCenterPress}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add-circle" size={24} color="#000000" style={{ marginRight: 8 }} />
+            <Text style={styles.createFirstCircleText}>Create Your First Circle</Text>
+          </TouchableOpacity>
+        )}
+
         {/* NOTE: Per UX requirement, HomeScreen shows NO popups/panels. Interaction happens only via the 3D sphere view. */}
 
         {/* First Circle Congratulations Popup */}
@@ -1322,6 +1334,27 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     paddingTop: 10,
     alignItems: 'center',
+  },
+  createFirstCircleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4FFFB0',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 28,
+    marginHorizontal: 40,
+    marginBottom: 20,
+    shadowColor: '#4FFFB0',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  createFirstCircleText: {
+    color: '#000000',
+    fontSize: 16,
+    fontWeight: '600',
   },
   centerTapTarget: {
     position: 'absolute',

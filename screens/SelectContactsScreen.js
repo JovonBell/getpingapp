@@ -29,6 +29,7 @@ export default function SelectContactsScreen({ navigation, route }) {
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [selectedContactIds, setSelectedContactIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -166,9 +167,7 @@ export default function SelectContactsScreen({ navigation, route }) {
           >
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.doneButton}>
-            <Text style={styles.doneText}>done</Text>
-          </TouchableOpacity>
+          <Text style={styles.selectedCount}>{selectedContactIds.length} selected</Text>
         </View>
 
         {/* Title */}
@@ -234,8 +233,17 @@ export default function SelectContactsScreen({ navigation, route }) {
           </Text>
           <TouchableOpacity
             style={styles.importButton}
+            disabled={isImporting}
             onPress={async () => {
               const selected = contacts.filter(c => selectedContactIds.includes(c.id));
+
+              if (selected.length === 0) {
+                Alert.alert('No Contacts Selected', 'Please select at least one contact to continue.');
+                return;
+              }
+
+              setIsImporting(true);
+
               if (isInitialImport || isAddContacts) {
                 // Persist imported universe locally
                 let enriched = selected;
@@ -282,31 +290,43 @@ export default function SelectContactsScreen({ navigation, route }) {
                 }
 
                 // Merge with existing contacts
-                const { success: existingSuccess, contacts: existingContacts } = await getImportedContacts();
-                const existing = existingSuccess ? existingContacts : [];
-                const existingIds = new Set(existing.map(c => c.id));
-                const newContacts = enriched.filter(c => !existingIds.has(c.id));
-                const merged = [...existing, ...newContacts];
-                
-                await saveImportedContacts(merged);
+                try {
+                  const { success: existingSuccess, contacts: existingContacts } = await getImportedContacts();
+                  const existing = existingSuccess ? existingContacts : [];
+                  const existingIds = new Set(existing.map(c => c.id));
+                  const newContacts = enriched.filter(c => !existingIds.has(c.id));
+                  const merged = [...existing, ...newContacts];
 
-                if (isAddContacts) {
-                  // Adding contacts - go back to contacts list
-                  Alert.alert('Success', `Added ${newContacts.length} new contacts!`);
-                  navigation.goBack();
-                } else {
-                  // Initial import - go to confirmation screen
-                  navigation.navigate('ImportConfirmation', { contacts: enriched });
+                  await saveImportedContacts(merged);
+
+                  setIsImporting(false);
+                  if (isAddContacts) {
+                    // Adding contacts - go back to contacts list
+                    Alert.alert('Success', `Added ${newContacts.length} new contacts!`);
+                    navigation.goBack();
+                  } else {
+                    // Initial import - go to confirmation screen
+                    navigation.navigate('ImportConfirmation', { contacts: enriched });
+                  }
+                } catch (saveError) {
+                  setIsImporting(false);
+                  console.error('Error saving/navigating:', saveError);
+                  Alert.alert('Error', 'Failed to save contacts. Please try again.');
                 }
               } else {
                 // Creating a circle - go to name/visualize screen
+                setIsImporting(false);
                 navigation.navigate('VisualizeCircle', { contacts: selected, isFirstCircle, existingCircles });
               }
             }}
           >
-            <Text style={styles.importButtonText}>
-              {isInitialImport ? 'import selected' : 'continue'}
-            </Text>
+            {isImporting ? (
+              <ActivityIndicator size="small" color="#1a1a1a" />
+            ) : (
+              <Text style={styles.importButtonText}>
+                {isInitialImport ? 'import selected' : 'continue'}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -339,11 +359,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#ffffff',
   },
-  doneButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  doneText: {
+  selectedCount: {
     color: '#a8e6cf',
     fontSize: 16,
     fontWeight: '600',

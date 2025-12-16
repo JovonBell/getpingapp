@@ -9,6 +9,7 @@ import {
   TextInput,
   FlatList,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
@@ -22,6 +23,7 @@ export default function VisualizeCircleScreen({ navigation, route }) {
   const isFirstCircle = route?.params?.isFirstCircle ?? true;
   const existingCircles = route?.params?.existingCircles || [];
   const [circleName, setCircleName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
   // Track which contacts are selected - start with all selected
   const [selectedContactIds, setSelectedContactIds] = useState(
     allContacts.map(c => c.id)
@@ -110,6 +112,9 @@ export default function VisualizeCircleScreen({ navigation, route }) {
 
   const handleVisualize = () => {
     (async () => {
+      if (isCreating) return; // Prevent double-tap
+      setIsCreating(true);
+
       const finalName = circleName.trim() || (isFirstCircle ? 'My First Circle' : 'My Circle');
       const selectedContacts = allContacts.filter(c => selectedContactIds.includes(c.id));
 
@@ -133,6 +138,7 @@ export default function VisualizeCircleScreen({ navigation, route }) {
             savedToSupabase = true;
           } else {
             console.error('[VisualizeCircle] ❌ Failed to save circle to Supabase:', result.error);
+            setIsCreating(false);
             Alert.alert(
               'Save Error',
               `Failed to save circle: ${result.error || 'Unknown error'}\n\nPlease check:\n1. Internet connection\n2. Database tables exist\n3. You are signed in`,
@@ -142,6 +148,7 @@ export default function VisualizeCircleScreen({ navigation, route }) {
           }
         } else {
           console.error('[VisualizeCircle] ❌ No authenticated user, cannot save circle');
+          setIsCreating(false);
           Alert.alert(
             'Authentication Error',
             'You must be logged in to create circles.',
@@ -151,6 +158,7 @@ export default function VisualizeCircleScreen({ navigation, route }) {
         }
       } catch (e) {
         console.error('[VisualizeCircle] Exception saving circle:', e?.message || e);
+        setIsCreating(false);
         Alert.alert(
           'Error',
           'An error occurred while saving your circle. Please try again.',
@@ -161,6 +169,7 @@ export default function VisualizeCircleScreen({ navigation, route }) {
 
       if (!savedToSupabase) {
         console.error('[VisualizeCircle] Circle was not saved to Supabase, aborting navigation');
+        setIsCreating(false);
         return;
       }
 
@@ -342,11 +351,16 @@ export default function VisualizeCircleScreen({ navigation, route }) {
               ]}
             />
             <TouchableOpacity
-              style={styles.button}
+              style={[styles.button, isCreating && styles.buttonDisabled]}
               onPress={handleVisualize}
               activeOpacity={0.8}
+              disabled={isCreating}
             >
-              <Text style={styles.buttonText}>Create Circle →</Text>
+              {isCreating ? (
+                <ActivityIndicator size="small" color="#000000" />
+              ) : (
+                <Text style={styles.buttonText}>create circle →</Text>
+              )}
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -588,6 +602,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   buttonText: {
     fontSize: 18,
