@@ -1,5 +1,34 @@
 # ping! (iOS / Expo)
 
+## Changelog
+
+### December 16, 2025
+**UX Improvements & Bug Fixes**
+
+**circlesStorage.js:**
+- Fixed tier constraint error - tier now starts at 1 (was 0)
+- Added max 5 circles limit with friendly error message
+- Added specific error handling for database tier constraint violations
+
+**SelectContactsScreen.js:**
+- Removed non-functional "done" button, replaced with selected count display
+- Added loading spinner to "import selected" button
+- Button disabled during import to prevent double-taps
+- Added "No Contacts Selected" alert validation
+- Added error handling around save/navigate logic
+
+**VisualizeCircleScreen.js:**
+- Added loading spinner to "create circle" button
+- Button disabled during creation to prevent double-taps
+- Proper error state reset on all failure paths
+
+**HomeScreen.js:**
+- Added prominent "Create Your First Circle" button for new users
+- Only appears when user has no circles yet
+- Styled with glow effect matching app theme
+
+---
+
 ## Quick Start (No Setup Required!)
 The app is fully configured and ready to use:
 ```bash
