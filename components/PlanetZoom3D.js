@@ -7,6 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// Define colors outside component to prevent recreation on every render
+const CONTACT_COLORS = ['#4FFFB0', '#ffaa00', '#ff6b6b', '#4ecdc4'];
+
 export default function PlanetZoom3D({
   visible,
   onClose,
@@ -18,7 +21,7 @@ export default function PlanetZoom3D({
 }) {
   const normalizedItems = useMemo(() => {
     if (items && items.length > 0) return items;
-    return [{ id: 'nucleus', name: 'ping!', initials: 'P', color: '#4FFFB0' }];
+    return [{ id: 'nucleus', name: 'ping!', initials: 'P', color: CONTACT_COLORS[0] }];
   }, [items]);
 
   const [currentIndex, setCurrentIndex] = useState(Math.max(0, Math.min(initialIndex, normalizedItems.length - 1)));
@@ -59,14 +62,18 @@ export default function PlanetZoom3D({
       console.log('[PlanetZoom3D] Modal closing, cleaning up...');
       setShowMoreInfo(false);
       moreInfoAnim.setValue(0);
-      
-      // Small delay to ensure modal is fully dismissed before cleanup
-      const cleanupTimer = setTimeout(() => {
-        console.log('[PlanetZoom3D] Cleanup complete');
-      }, 100);
-      
-      return () => clearTimeout(cleanupTimer);
     }
+    
+    // Unconditional cleanup - runs on every effect cleanup
+    return () => {
+      if (!visible) {
+        console.log('[PlanetZoom3D] Effect cleanup - forcing gesture reset');
+        // Force reset all gesture states
+        if (stateRef.current) {
+          stateRef.current.targetZoom = 0;
+        }
+      }
+    };
   }, [visible, initialIndex, normalizedItems.length, moreInfoAnim]);
 
   useEffect(() => {
@@ -323,12 +330,13 @@ export default function PlanetZoom3D({
 
   return (
     <Modal 
+      key={`planet-modal-${visible ? 'open' : 'closed'}`}
       visible={visible} 
       transparent={false} 
       animationType="slide" 
       onRequestClose={requestClose}
       onDismiss={() => {
-        console.log('[PlanetZoom3D] Modal dismissed');
+        console.log('[PlanetZoom3D] Modal dismissed - all handlers released');
       }}
     >
       <View style={styles.container}>

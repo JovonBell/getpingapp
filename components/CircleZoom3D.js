@@ -7,6 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// Define colors outside component to prevent recreation on every render
+const CONTACT_COLORS = ['#4FFFB0', '#ffaa00', '#ff6b6b', '#4ecdc4'];
+
 export default function CircleZoom3D({
   visible,
   onClose,
@@ -15,13 +18,11 @@ export default function CircleZoom3D({
   onContactPress,
   onMessage,
 }) {
-  const colors = ['#4FFFB0', '#ffaa00', '#ff6b6b', '#4ecdc4'];
-  
   const normalizedContacts = useMemo(() => {
     if (contacts && contacts.length > 0) {
       return contacts.map((c, i) => ({
         ...c,
-        color: c.color || colors[i % colors.length],
+        color: c.color || CONTACT_COLORS[i % CONTACT_COLORS.length],
       }));
     }
     return [];
@@ -72,14 +73,22 @@ export default function CircleZoom3D({
       stateRef.current.isDragging = false;
       stateRef.current.isPinching = false;
       stateRef.current.lastDistance = 0;
-      
-      // Small delay to ensure modal is fully dismissed
-      const cleanupTimer = setTimeout(() => {
-        console.log('[CircleZoom3D] Cleanup complete');
-      }, 100);
-      
-      return () => clearTimeout(cleanupTimer);
     }
+    
+    // Unconditional cleanup - runs on every effect cleanup
+    return () => {
+      if (!visible) {
+        console.log('[CircleZoom3D] Effect cleanup - forcing complete reset');
+        // Force reset ALL gesture states to ensure no lingering handlers
+        if (stateRef.current) {
+          stateRef.current.isDragging = false;
+          stateRef.current.isPinching = false;
+          stateRef.current.lastDistance = 0;
+          stateRef.current.lastX = 0;
+          stateRef.current.totalMovement = 0;
+        }
+      }
+    };
   }, [visible]);
 
   useEffect(() => {
@@ -474,12 +483,13 @@ export default function CircleZoom3D({
 
   return (
     <Modal 
+      key={`circle-modal-${visible ? 'open' : 'closed'}`}
       visible={visible} 
       transparent={false} 
       animationType="slide" 
       onRequestClose={onClose}
       onDismiss={() => {
-        console.log('[CircleZoom3D] Modal dismissed');
+        console.log('[CircleZoom3D] Modal dismissed - all handlers released');
       }}
     >
       <View style={styles.container}>
