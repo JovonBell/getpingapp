@@ -260,13 +260,15 @@ export default function PlanetZoom3D({
   const panResponder = useMemo(() => {
     const SWIPE_THRESHOLD = 30;
     return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_evt, gesture) => Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
-      onMoveShouldSetPanResponderCapture: (_evt, gesture) => Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
+      onStartShouldSetPanResponder: () => visible, // Only capture when modal is visible
+      onMoveShouldSetPanResponder: (_evt, gesture) => visible && Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
+      onMoveShouldSetPanResponderCapture: (_evt, gesture) => visible && Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
       onPanResponderGrant: () => {
+        if (!visible) return;
         stateRef.current.gestureStartAngle = stateRef.current.targetAngle;
       },
       onPanResponderMove: (_evt, gesture) => {
+        if (!visible) return;
         const len = Math.max(1, normalizedItems.length);
         if (len <= 1) return;
         const step = (Math.PI * 2) / len;
@@ -275,6 +277,7 @@ export default function PlanetZoom3D({
         stateRef.current.targetAngle = stateRef.current.gestureStartAngle + delta;
       },
       onPanResponderRelease: (_evt, gesture) => {
+        if (!visible) return;
         const len = Math.max(1, normalizedItems.length);
         if (len <= 1) return;
 
@@ -288,8 +291,13 @@ export default function PlanetZoom3D({
         setCurrentIndex(finalIndex);
         stateRef.current.targetAngle = (TWO_PI * finalIndex) / len;
       },
+      onPanResponderTerminationRequest: () => true, // Allow termination
+      onPanResponderTerminate: () => {
+        // Forced termination - clean up
+        console.log('[PlanetZoom3D] PanResponder terminated');
+      },
     });
-  }, [normalizedItems.length, currentIndex]);
+  }, [normalizedItems.length, currentIndex, visible]);
 
   const activeItem = normalizedItems[displayIndex] || normalizedItems[0];
 
@@ -327,9 +335,13 @@ export default function PlanetZoom3D({
         {/* GLView can swallow touches; disable pointer events and handle gestures on an overlay */}
         <GLView style={styles.glFull} onContextCreate={onContextCreate} pointerEvents="none" />
 
-        {/* Gesture layer (always captures swipes) */}
+        {/* Gesture layer - only active when modal is visible */}
         <View style={styles.gestureLayer} pointerEvents="box-none">
-          <View style={styles.gestureHitbox} pointerEvents="auto" {...panResponder.panHandlers} />
+          <View 
+            style={styles.gestureHitbox} 
+            pointerEvents={visible ? "auto" : "none"} 
+            {...(visible ? panResponder.panHandlers : {})}
+          />
 
           {/* Info popup (top-right) */}
           <View style={styles.topRightCard} pointerEvents="auto">

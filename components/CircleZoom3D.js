@@ -386,8 +386,9 @@ export default function CircleZoom3D({
     return -1;
   };
 
-  // Touch handlers
+  // Touch handlers - only active when modal is visible
   const handleTouchStart = (event) => {
+    if (!visible) return;
     const touches = event.nativeEvent.touches;
     const s = stateRef.current;
 
@@ -412,6 +413,7 @@ export default function CircleZoom3D({
   };
 
   const handleTouchMove = (event) => {
+    if (!visible) return;
     const touches = event.nativeEvent.touches;
     const s = stateRef.current;
 
@@ -447,6 +449,7 @@ export default function CircleZoom3D({
   };
 
   const handleTouchEnd = (event) => {
+    if (!visible) return;
     const s = stateRef.current;
     const touchDuration = Date.now() - s.touchStartTime;
     const wasTap = touchDuration < 250 && s.totalMovement < 10;
@@ -482,12 +485,14 @@ export default function CircleZoom3D({
       <View style={styles.container}>
         <GLView style={styles.glFull} onContextCreate={onContextCreate} pointerEvents="none" />
 
-        {/* Gesture layer */}
+        {/* Gesture layer - only active when modal is visible */}
         <View
           style={styles.gestureLayer}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
+          {...(visible ? {
+            onTouchStart: handleTouchStart,
+            onTouchMove: handleTouchMove,
+            onTouchEnd: handleTouchEnd,
+          } : {})}
         >
           {/* Header */}
           <View style={styles.header} pointerEvents="box-none">
