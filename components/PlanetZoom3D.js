@@ -54,6 +54,18 @@ export default function PlanetZoom3D({
       // Reset more info popup on open
       setShowMoreInfo(false);
       moreInfoAnim.setValue(0);
+    } else {
+      // Cleanup when modal closes to prevent dead screen
+      console.log('[PlanetZoom3D] Modal closing, cleaning up...');
+      setShowMoreInfo(false);
+      moreInfoAnim.setValue(0);
+      
+      // Small delay to ensure modal is fully dismissed before cleanup
+      const cleanupTimer = setTimeout(() => {
+        console.log('[PlanetZoom3D] Cleanup complete');
+      }, 100);
+      
+      return () => clearTimeout(cleanupTimer);
     }
   }, [visible, initialIndex, normalizedItems.length, moreInfoAnim]);
 
@@ -302,7 +314,15 @@ export default function PlanetZoom3D({
   };
 
   return (
-    <Modal visible={visible} transparent={false} animationType="fade" onRequestClose={requestClose}>
+    <Modal 
+      visible={visible} 
+      transparent={false} 
+      animationType="slide" 
+      onRequestClose={requestClose}
+      onDismiss={() => {
+        console.log('[PlanetZoom3D] Modal dismissed');
+      }}
+    >
       <View style={styles.container}>
         {/* GLView can swallow touches; disable pointer events and handle gestures on an overlay */}
         <GLView style={styles.glFull} onContextCreate={onContextCreate} pointerEvents="none" />

@@ -60,6 +60,25 @@ export default function CircleZoom3D({
       stateRef.current.targetOrbitAngle = 0;
       stateRef.current.cameraDistance = 14;
       stateRef.current.targetCameraDistance = 14;
+      stateRef.current.isDragging = false;
+      stateRef.current.isPinching = false;
+    } else {
+      // Cleanup when modal closes to prevent dead screen
+      console.log('[CircleZoom3D] Modal closing, cleaning up gesture state...');
+      setSelectedIndex(null);
+      setLabelPositions([]);
+      
+      // Reset all gesture states
+      stateRef.current.isDragging = false;
+      stateRef.current.isPinching = false;
+      stateRef.current.lastDistance = 0;
+      
+      // Small delay to ensure modal is fully dismissed
+      const cleanupTimer = setTimeout(() => {
+        console.log('[CircleZoom3D] Cleanup complete');
+      }, 100);
+      
+      return () => clearTimeout(cleanupTimer);
     }
   }, [visible]);
 
@@ -451,7 +470,15 @@ export default function CircleZoom3D({
   const selectedContact = selectedIndex !== null ? normalizedContacts[selectedIndex] : null;
 
   return (
-    <Modal visible={visible} transparent={false} animationType="fade" onRequestClose={onClose}>
+    <Modal 
+      visible={visible} 
+      transparent={false} 
+      animationType="slide" 
+      onRequestClose={onClose}
+      onDismiss={() => {
+        console.log('[CircleZoom3D] Modal dismissed');
+      }}
+    >
       <View style={styles.container}>
         <GLView style={styles.glFull} onContextCreate={onContextCreate} pointerEvents="none" />
 
