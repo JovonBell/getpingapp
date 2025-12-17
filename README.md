@@ -1,8 +1,52 @@
 # ping! (iOS / Expo)
 
+A relationship management app that helps you stay connected with the people who matter most. Track your circles, maintain relationship health, and never forget to reach out.
+
+## Features
+
+- **Circles** - Organize contacts into customizable tiers (Inner Circle, Close Friends, etc.)
+- **3D Visualization** - Interactive planet/circle view of your network
+- **Relationship Health** - Track how well you're maintaining each relationship
+- **Reminders** - Set follow-up reminders for birthdays, check-ins, and more
+- **Gamification** - Earn streaks, achievements, and track your engagement
+- **Analytics Dashboard** - See your weekly activity and network health trends
+- **Push Notifications** - Get reminded to reach out to contacts
+- **Google OAuth** - Simple sign-in with your Google account
+
 ## Changelog
 
-### Joshua Bell - December 16, 2025
+### December 16, 2025 (Evening)
+**Analytics, Gamification & Notifications**
+
+New Features:
+- Analytics dashboard with activity tracking and health snapshots
+- Gamification system with streaks and achievements
+- Reminders system for follow-ups and birthdays
+- Notification preferences screen
+- Health scoring and relationship status tracking
+- Contact details with notes, tags, and custom dates
+
+New Screens:
+- `DashboardScreen.js` - Analytics overview
+- `GamificationScreen.js` - Streaks and achievements
+- `AchievementsScreen.js` - Achievement badges
+- `RemindersScreen.js` - Manage reminders
+
+New Components:
+- `HealthIndicator.js`, `NetworkHealthScore.js`, `CircleHealthBreakdown.js`
+- `StreakCard.js`, `AchievementCard.js`, `WeeklyActivityCard.js`
+- `ReminderCard.js`, `AddReminderModal.js`, `EditContactModal.js`
+- `CelebrationModal.js`, `Confetti.js`, `Skeleton.js`
+
+Database Migrations (Supabase):
+- Phase 3: `relationship_health`, `alerts`, `alert_history`
+- Phase 4: `activity_log`, `health_snapshots`, `contact_dates`, `reminders`
+- Phase 5: `user_streaks`, `user_achievements`
+- Phase 6: `notification_preferences`
+
+---
+
+### December 16, 2025 (Morning)
 **UX Improvements & Bug Fixes**
 
 **circlesStorage.js:**
