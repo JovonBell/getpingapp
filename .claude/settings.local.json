@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx expo start:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(tasklist:*)",
+      "Bash(cmd /c \"tasklist | findstr 35364\")",
+      "Bash(cmd /c \"taskkill /F /IM node.exe 2>nul || echo No node processes\")",
+      "Bash(cmd /c \"for /f \"\"tokens=5\"\" %a in (''netstat -ano ^| findstr :8081 ^| findstr LISTENING'') do taskkill /F /PID %a\")",
+      "Bash(cmd /c \"taskkill /F /PID 35364\")",
+      "Bash(ls:*)",
+      "Bash(node -c:*)",
+      "Bash(node -e \"\nconst files = [\n  ''screens/HomeScreen.js'',\n  ''screens/ContactsListScreen.js'', \n  ''screens/AlertsScreen.js'',\n  ''components/PlanetZoom3D.js'',\n  ''components/CircleZoom3D.js'',\n  ''components/HealthIndicator.js'',\n  ''utils/healthScoring.js'',\n  ''utils/alertsStorage.js'',\n  ''App.js''\n];\n\nlet allGood = true;\nfiles.forEach(f => {\n  try {\n    require(''fs'').readFileSync(f, ''utf8'');\n    // Basic syntax check via node\n    require(''child_process'').execSync(''node -c '' + f, {stdio: ''pipe''});\n    console.log(''✅ '' + f);\n  } catch(e) {\n    console.log(''❌ '' + f + '': '' + e.message);\n    allGood = false;\n  }\n});\n\nif (allGood) console.log(''\\n✅ All files pass syntax check!'');\n\")",
+      "mcp__ide__getDiagnostics",
+      "Bash(cat:*)",
+      "Bash(npm install:*)",
+      "WebSearch",
+      "Bash(curl:*)",
+      "Bash(npx expo install:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

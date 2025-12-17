@@ -1,13 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useEffect, useState, useRef } from 'react';
+import { ActivityIndicator, View, Text } from 'react-native';
+import { NavigationContainer, useNavigationState } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { CelebrationProvider } from './contexts/CelebrationContext';
 import { supabase } from './lib/supabase';
-import { registerForPushNotificationsAsync } from './utils/pushNotifications';
+import {
+  registerForPushNotificationsAsync,
+  scheduleDailyDigest,
+  scheduleStreakWarning,
+} from './utils/pushNotifications';
+import { getUnreadAlertCount } from './utils/alertsStorage';
+import { getStreak, isStreakActive } from './utils/streaksStorage';
 import WelcomeScreen from './screens/WelcomeScreen';
 import CreateAccountScreen from './screens/CreateAccountScreen';
 import WelcomeIntroScreen from './screens/WelcomeIntroScreen';
@@ -37,6 +45,10 @@ import ContactUsScreen from './screens/ContactUsScreen';
 import AboutScreen from './screens/AboutScreen';
 import AccountDeletionScreen from './screens/AccountDeletionScreen';
 import DiagnosticsScreen from './screens/DiagnosticsScreen';
+import DashboardScreen from './screens/DashboardScreen';
+import RemindersScreen from './screens/RemindersScreen';
+import GamificationScreen from './screens/GamificationScreen';
+import AchievementsScreen from './screens/AchievementsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -44,6 +56,28 @@ const Tab = createBottomTabNavigator();
 // Bottom Tab Navigator for main app screens
 function MainTabs() {
   const { theme } = useTheme();
+  const [unreadAlerts, setUnreadAlerts] = useState(0);
+
+  // Load unread alert count
+  useEffect(() => {
+    const loadUnreadCount = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const { success, count } = await getUnreadAlertCount(session.user.id);
+          if (success) setUnreadAlerts(count);
+        }
+      } catch (err) {
+        console.warn('[MainTabs] Error loading unread alerts:', err);
+      }
+    };
+
+    loadUnreadCount();
+
+    // Refresh count every 30 seconds
+    const interval = setInterval(loadUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <Tab.Navigator
@@ -84,7 +118,27 @@ function MainTabs() {
         options={{
           tabBarLabel: 'pings!',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="alert-circle-outline" size={size} color={color} />
+            <View>
+              <Ionicons name="alert-circle-outline" size={size} color={color} />
+              {unreadAlerts > 0 && (
+                <View style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -8,
+                  backgroundColor: '#FF6B6B',
+                  borderRadius: 8,
+                  minWidth: 16,
+                  height: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: 4,
+                }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                    {unreadAlerts > 99 ? '99+' : unreadAlerts}
+                  </Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />
@@ -116,6 +170,9 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const navigationRef = useRef(null);
+  const notificationListener = useRef();
+  const responseListener = useRef();
 
   useEffect(() => {
     let mounted = true;
@@ -173,10 +230,82 @@ export default function App() {
     registerForPushNotificationsAsync(userId).catch(() => {});
   }, [session?.user?.id]);
 
+  // Set up notification listeners
+  useEffect(() => {
+    // Listener for when a notification is received while app is foregrounded
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log('[App] Notification received:', notification.request.content.title);
+    });
+
+    // Listener for when user taps on a notification
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      console.log('[App] Notification tapped:', data);
+
+      // Navigate based on notification type
+      if (navigationRef.current) {
+        switch (data.type) {
+          case 'reminder':
+            navigationRef.current.navigate('Reminders');
+            break;
+          case 'birthday':
+          case 'daily_digest':
+            navigationRef.current.navigate('Home', { screen: 'AlertsTab' });
+            break;
+          case 'achievement':
+            navigationRef.current.navigate('Achievements');
+            break;
+          case 'streak_warning':
+            navigationRef.current.navigate('Gamification');
+            break;
+          default:
+            navigationRef.current.navigate('Home');
+        }
+      }
+    });
+
+    return () => {
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(notificationListener.current);
+      }
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
+    };
+  }, []);
+
+  // Schedule daily digest and check streak warnings
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    const setupNotifications = async () => {
+      try {
+        // Schedule daily digest at 9am
+        await scheduleDailyDigest(9, 0);
+
+        // Check if streak is at risk and schedule warning
+        const { success, streak } = await getStreak(userId);
+        if (success && streak?.currentStreak > 0) {
+          const today = new Date().toISOString().split('T')[0];
+          // If not active today, schedule a warning
+          if (streak.lastActivityDate !== today && isStreakActive(streak.lastActivityDate)) {
+            await scheduleStreakWarning(streak.currentStreak);
+          }
+        }
+      } catch (err) {
+        console.warn('[App] Failed to setup notifications:', err);
+      }
+    };
+
+    setupNotifications();
+  }, [session?.user?.id]);
+
   return (
     <ThemeProvider>
       <LanguageProvider>
-        <NavigationContainer>
+        <CelebrationProvider>
+        <NavigationContainer ref={navigationRef}>
           {authLoading ? (
             <View style={{ flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' }}>
               <ActivityIndicator size="large" color="#4FFFB0" />
@@ -234,6 +363,10 @@ export default function App() {
                   <Stack.Screen name="About" component={AboutScreen} />
                   <Stack.Screen name="AccountDeletion" component={AccountDeletionScreen} />
                   <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} />
+                  <Stack.Screen name="Dashboard" component={DashboardScreen} />
+                  <Stack.Screen name="Reminders" component={RemindersScreen} />
+                  <Stack.Screen name="Gamification" component={GamificationScreen} />
+                  <Stack.Screen name="Achievements" component={AchievementsScreen} />
                   <Stack.Screen name="Messages" component={MessagesScreen} />
                   <Stack.Screen name="Chat" component={ChatScreen} />
                 </>
@@ -241,6 +374,7 @@ export default function App() {
             </Stack.Navigator>
           )}
         </NavigationContainer>
+        </CelebrationProvider>
       </LanguageProvider>
     </ThemeProvider>
   );

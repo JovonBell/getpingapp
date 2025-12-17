@@ -4,6 +4,7 @@ import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import { Ionicons } from '@expo/vector-icons';
+import { HealthBadge } from './HealthIndicator';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -11,13 +12,13 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CONTACT_COLORS = ['#4FFFB0', '#ffaa00', '#ff6b6b', '#4ecdc4'];
 
 export default function CircleZoom3D({
-  visible,
   onClose,
   circleName = 'Circle',
   contacts = [],
   onContactPress,
   onMessage,
 }) {
+  // Note: Parent controls visibility by conditionally rendering this component
   const normalizedContacts = useMemo(() => {
     if (contacts && contacts.length > 0) {
       return contacts.map((c, i) => ({
@@ -45,6 +46,7 @@ export default function CircleZoom3D({
     touchStartTime: 0,
     touchStartPos: { x: 0, y: 0 },
     totalMovement: 0,
+    frameCount: 0, // For throttling label updates
   });
 
   // Track if component is mounted - CRITICAL for preventing dead screen
@@ -321,8 +323,9 @@ export default function CircleZoom3D({
         };
       });
       
-      // Update label positions every few frames to avoid excessive re-renders
-      if (isMountedRef.current && Date.now() % 3 === 0) {
+      // Update label positions every 3 frames to avoid excessive re-renders
+      s.frameCount++;
+      if (isMountedRef.current && s.frameCount % 3 === 0) {
         setLabelPositions(newLabelPositions);
       }
 
@@ -548,6 +551,11 @@ export default function CircleZoom3D({
                   {selectedContact.phone && (
                     <Text style={styles.popupPhone}>{selectedContact.phone}</Text>
                   )}
+                  {selectedContact.healthScore !== undefined && (
+                    <View style={styles.popupHealthBadge}>
+                      <HealthBadge score={selectedContact.healthScore} status={selectedContact.healthStatus} />
+                    </View>
+                  )}
                 </View>
                 <TouchableOpacity
                   style={styles.popupClose}
@@ -689,6 +697,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999999',
     marginTop: 3,
+  },
+  popupHealthBadge: {
+    marginTop: 6,
   },
   popupClose: {
     width: 34,

@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, Modal, PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import { Ionicons } from '@expo/vector-icons';
+import { HealthBadge } from './HealthIndicator';
+import { getHealthColor } from '../utils/healthScoring';
+import { SwipeHint, useGestureHint } from './GestureHint';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -11,14 +15,19 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CONTACT_COLORS = ['#4FFFB0', '#ffaa00', '#ff6b6b', '#4ecdc4'];
 
 export default function PlanetZoom3D({
-  visible,
   onClose,
   // swipeable items (contacts). If omitted, we fall back to a single planet.
   items = [],
   initialIndex = 0,
   onMoreInfo,
   onMessage,
+  onHealthChange, // Callback when health is manually updated: (contact, newScore) => void
+  onSetReminder, // Callback when user wants to set a reminder for a contact: (contact) => void
+  onEditContact, // Callback when user wants to edit contact details: (contact) => void
+  onJustTalked, // Callback when user marks "Just Talked" - resets health to 100%
+  circleName, // Name of the circle for breadcrumb context
 }) {
+  // Note: Parent controls visibility by conditionally rendering this component
   const normalizedItems = useMemo(() => {
     if (items && items.length > 0) return items;
     return [{ id: 'nucleus', name: 'ping!', initials: 'P', color: CONTACT_COLORS[0] }];
@@ -31,6 +40,14 @@ export default function PlanetZoom3D({
   // More info popup state
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const moreInfoAnim = useRef(new Animated.Value(0)).current;
+
+  // Health slider state - tracks the current slider value for the displayed contact
+  const [sliderValue, setSliderValue] = useState(100);
+  const [isSliding, setIsSliding] = useState(false);
+  const sliderValueRef = useRef(100); // Ref for 3D render loop to access current slider value
+
+  // Gesture hint for first-time users
+  const { shouldShowHint: showSwipeHint, markHintSeen: dismissSwipeHint } = useGestureHint('planet_swipe');
 
   const stateRef = useRef({
     raf: null,
@@ -89,6 +106,19 @@ export default function PlanetZoom3D({
     setDisplayIndex(currentIndex);
     displayIndexRef.current = currentIndex;
   }, [currentIndex, normalizedItems.length]);
+
+  // Sync slider value when displayed contact changes
+  useEffect(() => {
+    if (!isMountedRef.current) return;
+    const item = normalizedItems[displayIndex];
+    if (item && item.healthScore !== undefined) {
+      setSliderValue(item.healthScore);
+      sliderValueRef.current = item.healthScore;
+    } else {
+      setSliderValue(100); // Default to healthy
+      sliderValueRef.current = 100;
+    }
+  }, [displayIndex, normalizedItems]);
 
   const onContextCreate = async (gl) => {
     const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
@@ -220,15 +250,25 @@ export default function PlanetZoom3D({
         Math.sin(angle) * ORBIT_RADIUS
       );
 
-      // Update color from currently displayed item (mirrors swipe)
+      // Update color from currently displayed item's HEALTH (uses ref for real-time slider updates)
       const item = normalizedItems[displayIndexRef.current] || normalizedItems[0];
-      const color = item?.color || '#4FFFB0';
+      // Use sliderValueRef for real-time color updates when sliding
+      const healthScore = sliderValueRef.current ?? item?.healthScore ?? 100;
+      const healthStatus = healthScore >= 80 ? 'healthy' : healthScore >= 60 ? 'cooling' : healthScore >= 40 ? 'at_risk' : 'cold';
+      const color = getHealthColor(healthStatus);
       heroMat.color.set(new THREE.Color(color));
       heroGlowMat.color.set(new THREE.Color(color));
       orbitRingMat.color.set(new THREE.Color(color));
 
+      // Add subtle floating animation for more "3D-ish" feel
+      const floatTime = Date.now() * 0.001;
+      const floatY = Math.sin(floatTime * 0.5) * 0.08;
+      const floatX = Math.cos(floatTime * 0.3) * 0.04;
+
       hero.position.copy(targetPos);
-      heroGlow.position.copy(targetPos);
+      hero.position.y += floatY;
+      hero.position.x += floatX;
+      heroGlow.position.copy(hero.position);
 
       // Keep full sphere visible and move camera with the swipe
       const dist = distanceToFitSphere(HERO_RADIUS);
@@ -316,6 +356,38 @@ export default function PlanetZoom3D({
 
   const activeItem = normalizedItems[displayIndex] || normalizedItems[0];
 
+  // Calculate days since last contact
+  const getDaysSinceContact = (item) => {
+    if (!item?.lastInteractionDate) return null;
+    const lastDate = new Date(item.lastInteractionDate);
+    const today = new Date();
+    const diffTime = Math.abs(today - lastDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const daysSinceContact = getDaysSinceContact(activeItem);
+
+  // Get health status label
+  const getHealthStatusLabel = (score) => {
+    if (score >= 80) return 'Healthy';
+    if (score >= 60) return 'Cooling';
+    if (score >= 40) return 'At Risk';
+    return 'Cold';
+  };
+
+  // Handle "Just Talked" action - resets health to 100%
+  const handleJustTalked = () => {
+    if (activeItem && onHealthChange) {
+      onHealthChange(activeItem, 100);
+      setSliderValue(100);
+    }
+    // Also call onJustTalked callback if provided (for logging interaction)
+    if (onJustTalked && activeItem) {
+      onJustTalked(activeItem);
+    }
+  };
+
   const handleMoreInfoPress = () => {
     if (showMoreInfo) {
       // Close the popup
@@ -348,36 +420,95 @@ export default function PlanetZoom3D({
 
         {/* Gesture layer */}
         <View style={styles.gestureLayer} pointerEvents="box-none">
-          <View 
-            style={styles.gestureHitbox} 
-            pointerEvents="auto" 
+          <View
+            style={styles.gestureHitbox}
+            pointerEvents="auto"
             {...panResponder.panHandlers}
           />
 
-          {/* Info popup (top-right) */}
+          {/* First-time user gesture hint */}
+          {normalizedItems.length > 1 && (
+            <SwipeHint visible={showSwipeHint} onDismiss={dismissSwipeHint} />
+          )}
+
+          {/* Info popup (top-right) - Enhanced with surfaced health controls */}
           <View style={styles.topRightCard} pointerEvents="auto">
+            {/* Breadcrumb navigation context */}
+            {circleName && (
+              <View style={styles.breadcrumb}>
+                <Text style={styles.breadcrumbText}>Circles</Text>
+                <Ionicons name="chevron-forward" size={12} color="#666" />
+                <Text style={styles.breadcrumbCircle}>{circleName}</Text>
+              </View>
+            )}
+
+            {/* Header: Avatar + Name + Close */}
             <View style={styles.cardHeaderRow}>
-              <View style={styles.avatarPlaceholder}>
+              <View style={[styles.avatarPlaceholder, { borderColor: activeItem?.color || '#4FFFB0' }]}>
                 {!!activeItem?.initials && <Text style={styles.avatarText}>{activeItem.initials}</Text>}
               </View>
               <View style={styles.cardHeaderText}>
                 <Text style={styles.title} numberOfLines={1}>{activeItem?.name || 'Contact'}</Text>
+                {activeItem?.jobTitle && (
+                  <Text style={styles.subtitle} numberOfLines={1}>{activeItem.jobTitle}</Text>
+                )}
               </View>
-            </View>
-
-            <Text style={styles.sub} numberOfLines={2}>
-              Swipe left/right to explore
-            </Text>
-
-            <View style={styles.cardActions}>
-              <TouchableOpacity style={styles.messageBtn} onPress={() => onMessage?.(activeItem)} activeOpacity={0.85}>
-                <Text style={styles.messageTxt}>Message</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.moreBtn} onPress={handleMoreInfoPress} activeOpacity={0.85}>
-                <Text style={styles.moreTxt}>More</Text>
-              </TouchableOpacity>
               <TouchableOpacity style={styles.closePill} onPress={requestClose} activeOpacity={0.85}>
                 <Text style={styles.closePillTxt}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Health Status Section - Surfaced from "More Info" */}
+            {activeItem?.healthScore !== undefined && (
+              <View style={styles.healthSection}>
+                <View style={styles.healthHeader}>
+                  <Text style={[styles.healthStatus, { color: getHealthColor(sliderValue >= 80 ? 'healthy' : sliderValue >= 60 ? 'cooling' : sliderValue >= 40 ? 'at_risk' : 'cold') }]}>
+                    {getHealthStatusLabel(sliderValue)}
+                  </Text>
+                  <Text style={styles.healthPercent}>{Math.round(sliderValue)}%</Text>
+                </View>
+                {/* Mini health bar */}
+                <View style={styles.healthBarContainer}>
+                  <View style={[styles.healthBarFill, {
+                    width: `${sliderValue}%`,
+                    backgroundColor: getHealthColor(sliderValue >= 80 ? 'healthy' : sliderValue >= 60 ? 'cooling' : sliderValue >= 40 ? 'at_risk' : 'cold')
+                  }]} />
+                </View>
+                {/* Last contact info */}
+                {daysSinceContact !== null && (
+                  <Text style={styles.lastContact}>
+                    Last contact {daysSinceContact === 0 ? 'today' : daysSinceContact === 1 ? 'yesterday' : `${daysSinceContact} days ago`}
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {/* Swipe hint */}
+            <Text style={styles.sub} numberOfLines={1}>
+              ← Swipe to explore →
+            </Text>
+
+            {/* Quick Actions Row */}
+            <View style={styles.cardActions}>
+              <TouchableOpacity style={styles.messageBtn} onPress={() => onMessage?.(activeItem)} activeOpacity={0.85}>
+                <Ionicons name="chatbubble" size={16} color="#000" style={{ marginRight: 4 }} />
+                <Text style={styles.messageTxt}>Message</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.justTalkedBtn} onPress={handleJustTalked} activeOpacity={0.85}>
+                <Ionicons name="checkmark-circle" size={16} color="#4FFFB0" style={{ marginRight: 4 }} />
+                <Text style={styles.justTalkedTxt}>Talked</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Secondary Actions Row */}
+            <View style={styles.cardActionsSecondary}>
+              <TouchableOpacity style={styles.secondaryBtn} onPress={() => onSetReminder?.(activeItem)} activeOpacity={0.85}>
+                <Ionicons name="alarm-outline" size={14} color="#4FFFB0" />
+                <Text style={styles.secondaryBtnTxt}>Remind</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.secondaryBtn} onPress={handleMoreInfoPress} activeOpacity={0.85}>
+                <Ionicons name="ellipsis-horizontal" size={14} color="#4FFFB0" />
+                <Text style={styles.secondaryBtnTxt}>More</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -405,32 +536,127 @@ export default function PlanetZoom3D({
               >
                 <Ionicons name="close" size={24} color="#ffffff" />
               </TouchableOpacity>
-              
+
               <Text style={styles.moreInfoName}>{activeItem?.name || 'Contact'}</Text>
-              
+
+              {/* Health Slider Section */}
+              <View style={styles.healthSliderSection}>
+                <View style={styles.healthSliderHeader}>
+                  <Ionicons name="heart" size={18} color={getHealthColor(sliderValue >= 80 ? 'healthy' : sliderValue >= 60 ? 'cooling' : sliderValue >= 40 ? 'at_risk' : 'cold')} />
+                  <Text style={styles.healthSliderLabel}>Relationship Health</Text>
+                  <Text style={[styles.healthSliderValue, { color: getHealthColor(sliderValue >= 80 ? 'healthy' : sliderValue >= 60 ? 'cooling' : sliderValue >= 40 ? 'at_risk' : 'cold') }]}>
+                    {Math.round(sliderValue)}%
+                  </Text>
+                </View>
+                <Slider
+                  style={styles.healthSlider}
+                  minimumValue={0}
+                  maximumValue={100}
+                  step={1}
+                  value={sliderValue}
+                  onValueChange={(val) => {
+                    setSliderValue(val);
+                    sliderValueRef.current = val; // Update ref for real-time 3D color
+                    setIsSliding(true);
+                  }}
+                  onSlidingComplete={(val) => {
+                    setIsSliding(false);
+                    setSliderValue(val);
+                    sliderValueRef.current = val; // Update ref for 3D color
+                    // Call the callback to update health in database
+                    if (onHealthChange && activeItem) {
+                      onHealthChange(activeItem, val);
+                    }
+                  }}
+                  minimumTrackTintColor={getHealthColor(sliderValue >= 80 ? 'healthy' : sliderValue >= 60 ? 'cooling' : sliderValue >= 40 ? 'at_risk' : 'cold')}
+                  maximumTrackTintColor="rgba(255,255,255,0.2)"
+                  thumbTintColor="#ffffff"
+                />
+                <View style={styles.healthSliderLabels}>
+                  <Text style={styles.healthSliderMinMax}>Cold</Text>
+                  <Text style={styles.healthSliderMinMax}>Healthy</Text>
+                </View>
+              </View>
+
               {activeItem?.jobTitle && (
                 <View style={styles.moreInfoRow}>
                   <Ionicons name="briefcase-outline" size={18} color="#4FFFB0" />
                   <Text style={styles.moreInfoText}>{activeItem.jobTitle}</Text>
                 </View>
               )}
-              
+
               {activeItem?.location && (
                 <View style={styles.moreInfoRow}>
                   <Ionicons name="location-outline" size={18} color="#4FFFB0" />
                   <Text style={styles.moreInfoText}>{activeItem.location}</Text>
                 </View>
               )}
-              
+
               {activeItem?.bio && (
                 <View style={styles.moreInfoRow}>
                   <Ionicons name="chatbox-outline" size={18} color="#4FFFB0" />
                   <Text style={styles.moreInfoText}>{activeItem.bio}</Text>
                 </View>
               )}
-              
-              {!activeItem?.jobTitle && !activeItem?.location && !activeItem?.bio && (
-                <Text style={styles.moreInfoEmpty}>No additional information available</Text>
+
+              {/* How We Met */}
+              {activeItem?.howWeMet && (
+                <View style={styles.moreInfoRow}>
+                  <Ionicons name="people-outline" size={18} color="#4FFFB0" />
+                  <Text style={styles.moreInfoText}>Met: {activeItem.howWeMet}</Text>
+                </View>
+              )}
+
+              {/* Tags */}
+              {activeItem?.tags && activeItem.tags.length > 0 && (
+                <View style={styles.tagsRow}>
+                  {activeItem.tags.slice(0, 4).map((tag, idx) => (
+                    <View key={idx} style={styles.tagBadge}>
+                      <Text style={styles.tagBadgeText}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Notes Preview */}
+              {activeItem?.notes && (
+                <View style={styles.notesPreview}>
+                  <Ionicons name="document-text-outline" size={14} color="#888888" />
+                  <Text style={styles.notesPreviewText} numberOfLines={2}>
+                    {activeItem.notes}
+                  </Text>
+                </View>
+              )}
+
+              {/* Action Buttons Row */}
+              {activeItem?.id && activeItem.id !== 'nucleus' && (
+                <View style={styles.actionButtonsRow}>
+                  {/* Set Reminder Button */}
+                  <TouchableOpacity
+                    style={styles.setReminderBtn}
+                    onPress={() => {
+                      handleMoreInfoPress(); // Close popup first
+                      onSetReminder?.(activeItem);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="calendar-outline" size={18} color="#000000" />
+                    <Text style={styles.setReminderTxt}>Reminder</Text>
+                  </TouchableOpacity>
+
+                  {/* Edit Contact Button */}
+                  <TouchableOpacity
+                    style={styles.editContactBtn}
+                    onPress={() => {
+                      handleMoreInfoPress(); // Close popup first
+                      onEditContact?.(activeItem);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="create-outline" size={18} color="#4FFFB0" />
+                    <Text style={styles.editContactTxt}>Edit</Text>
+                  </TouchableOpacity>
+                </View>
               )}
           </Animated.View>
         )}
@@ -458,7 +684,25 @@ const styles = StyleSheet.create({
     padding: 12,
     zIndex: 50,
   },
-  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+
+  // Breadcrumb styles
+  breadcrumb: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 4,
+  },
+  breadcrumbText: {
+    fontSize: 10,
+    color: '#666',
+    fontWeight: '500',
+  },
+  breadcrumbCircle: {
+    fontSize: 10,
+    color: '#4FFFB0',
+    fontWeight: '600',
+  },
+  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
   avatarPlaceholder: {
     width: 44,
     height: 44,
@@ -472,17 +716,99 @@ const styles = StyleSheet.create({
   avatarText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
   cardHeaderText: { flex: 1 },
   logoText: { color: '#ffffff', fontSize: 16, fontWeight: '900' },
-  title: { color: '#fff', fontSize: 13, fontWeight: '800', marginTop: 4 },
-  sub: { color: '#cfcfcf', fontSize: 12, lineHeight: 16, marginTop: 10 },
-  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
+  title: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  subtitle: { color: '#999', fontSize: 11, marginTop: 2 },
+  healthBadgeRow: { marginTop: 4 },
+  sub: { color: '#888', fontSize: 11, textAlign: 'center', marginTop: 6, marginBottom: 2 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+
+  // Health Section Styles (surfaced controls)
+  healthSection: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  healthHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  healthStatus: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  healthPercent: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  healthBarContainer: {
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  healthBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  lastContact: {
+    fontSize: 10,
+    color: '#888',
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+
+  // Just Talked Button
+  justTalkedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(79, 255, 176, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.5)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+  justTalkedTxt: {
+    color: '#4FFFB0',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+
+  // Secondary Actions Row
+  cardActionsSecondary: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 8,
+  },
+  secondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  secondaryBtnTxt: {
+    color: '#4FFFB0',
+    fontSize: 11,
+    fontWeight: '600',
+  },
   messageBtn: {
     flex: 1,
+    flexDirection: 'row',
     backgroundColor: '#4FFFB0',
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  messageTxt: { color: '#000', fontWeight: '900' },
+  messageTxt: { color: '#000', fontWeight: '700', fontSize: 12 },
   moreBtn: {
     width: 64,
     backgroundColor: 'rgba(79, 255, 176, 0.14)',
@@ -557,6 +883,130 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: 8,
+  },
+
+  // Health Slider Styles
+  healthSliderSection: {
+    marginBottom: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.2)',
+  },
+  healthSliderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  healthSliderLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  healthSliderValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  healthSlider: {
+    width: '100%',
+    height: 40,
+  },
+  healthSliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  healthSliderMinMax: {
+    fontSize: 11,
+    color: '#888888',
+  },
+
+  // Tags display
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  tagBadge: {
+    backgroundColor: 'rgba(79, 255, 176, 0.15)',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.3)',
+  },
+  tagBadgeText: {
+    fontSize: 11,
+    color: '#4FFFB0',
+    fontWeight: '500',
+  },
+
+  // Notes preview
+  notesPreview: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  notesPreviewText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#888888',
+    fontStyle: 'italic',
+    lineHeight: 16,
+  },
+
+  // Action Buttons Row
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+
+  // Set Reminder Button
+  setReminderBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#4FFFB0',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  setReminderTxt: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#000000',
+  },
+
+  // Edit Contact Button
+  editContactBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(79, 255, 176, 0.15)',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.4)',
+  },
+  editContactTxt: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4FFFB0',
   },
 });
 

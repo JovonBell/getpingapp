@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -13,14 +13,29 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Line, Text as SvgText, Rect, G } from 'react-native-svg';
+
+// Create animated SVG components
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedG = Animated.createAnimatedComponent(G);
 import { Ionicons } from '@expo/vector-icons';
 import PlanetZoom3D from '../components/PlanetZoom3D';
 import CircleZoom3D from '../components/CircleZoom3D';
+import AddReminderModal from '../components/AddReminderModal';
+import EditContactModal from '../components/EditContactModal';
 import { getImportedContacts as loadImportedContacts } from '../utils/contactsStorage';
 import { getCurrentUser } from '../utils/supabaseStorage';
 import { loadCirclesWithMembers, deleteCircle } from '../utils/circlesStorage';
 import { getUnreadMessageCount } from '../utils/messagesStorage';
+import { refreshHealthScores, logInteraction, getHealthScores, getHealthColor, updateHealthScore } from '../utils/healthScoring';
+import { createHealthSnapshot } from '../utils/analyticsCalculations';
+import { checkAndCreateHealthAlerts, getUnreadAlertCount } from '../utils/alertsStorage';
+import { HealthSummaryBar } from '../components/HealthIndicator';
+import { recordActivity, getStreak } from '../utils/streaksStorage';
+import { checkAndUnlockAchievements } from '../utils/achievementsStorage';
+import { useCelebration } from '../contexts/CelebrationContext';
+import { TapHint, useGestureHint } from '../components/GestureHint';
+import QuickActionMenu from '../components/QuickActionMenu';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -41,7 +56,9 @@ export default function HomeScreen({ navigation, route }) {
   // Helper to get first name from full name
   const getFirstName = (fullName) => fullName.split(' ')[0];
 
-  const [rotation, setRotation] = useState(0);
+  // Use ref for rotation to avoid state updates on every touch frame
+  const rotationRef = useRef(0);
+  const rotationAnimValue = useRef(new Animated.Value(0)).current;
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [circleCenterY, setCircleCenterY] = useState(250);
@@ -56,6 +73,7 @@ export default function HomeScreen({ navigation, route }) {
   const [planetOpen, setPlanetOpen] = useState(false);
   const [planetStartIndex, setPlanetStartIndex] = useState(0);
   const [activeCircleItems, setActiveCircleItems] = useState([]); // Contacts from the active circle only
+  const [activeCircleName, setActiveCircleName] = useState(null); // For breadcrumb context
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Delete circle states
@@ -66,6 +84,85 @@ export default function HomeScreen({ navigation, route }) {
   // Circle zoom 3D view state (when tapping on a ring)
   const [circleZoomOpen, setCircleZoomOpen] = useState(false);
   const [selectedCircleForZoom, setSelectedCircleForZoom] = useState(null);
+
+  // Health scores map (contactId -> health data)
+  const [healthMap, setHealthMap] = useState({});
+
+  // Reminder modal state
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [reminderContact, setReminderContact] = useState(null);
+  const [userId, setUserId] = useState(null);
+
+  // Edit contact modal state
+  const [showEditContactModal, setShowEditContactModal] = useState(false);
+  const [editContact, setEditContact] = useState(null);
+
+  // Celebration context for achievements and streak milestones
+  const { celebrateAchievement, celebrateStreak, celebrateNewAchievements } = useCelebration();
+
+  // Gesture hint for first-time users
+  const { shouldShowHint: showTapHint, markHintSeen: dismissTapHint } = useGestureHint('home_tap_contact');
+
+  // Quick action menu state (long-press on contacts)
+  const [quickActionMenu, setQuickActionMenu] = useState({
+    visible: false,
+    contact: null,
+    position: { x: 0, y: 0 },
+  });
+  const longPressTimer = useRef(null);
+
+  // Handler for showing quick action menu on long press
+  const handleContactLongPress = useCallback((contact, position) => {
+    if (showTapHint) {
+      dismissTapHint();
+    }
+    setQuickActionMenu({
+      visible: true,
+      contact,
+      position,
+    });
+  }, [showTapHint, dismissTapHint]);
+
+  // Handler to close quick action menu
+  const closeQuickActionMenu = useCallback(() => {
+    setQuickActionMenu({
+      visible: false,
+      contact: null,
+      position: { x: 0, y: 0 },
+    });
+  }, []);
+
+  // Handler for quick action: open message
+  const handleQuickMessage = useCallback(async (contact) => {
+    if (contact && contact.phone) {
+      const phoneNumber = contact.phone.replace(/[^0-9]/g, '');
+      const smsUrl = `sms:${phoneNumber}`;
+      try {
+        const canOpen = await Linking.canOpenURL(smsUrl);
+        if (canOpen) {
+          await Linking.openURL(smsUrl);
+          const { user } = await getCurrentUser();
+          if (user && contact.importedContactId) {
+            logInteraction(user.id, contact.importedContactId).catch(() => {});
+            recordActivity(user.id).catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.error('[HomeScreen] Quick message error:', err);
+      }
+    }
+  }, []);
+
+  // Handler for quick action: view details (open planet view)
+  const handleQuickViewDetails = useCallback((contact) => {
+    const index = ringedContacts.findIndex(entry => entry.contact?.id === contact?.id);
+    if (index >= 0) {
+      handlePerson3DPress(contact, index);
+    }
+  }, [ringedContacts]);
+
+  // Pulsing animation for cold/at-risk contacts
+  const pulseAnim = useRef(new Animated.Value(0)).current;
 
   // Load imported contacts from local storage (so the universe persists across restarts).
   useEffect(() => {
@@ -112,7 +209,9 @@ export default function HomeScreen({ navigation, route }) {
           }
           return;
         }
-        
+
+        if (mounted) setUserId(user.id);
+
         const res = await loadCirclesWithMembers(user.id);
         console.log('[HomeScreen] Circles loaded:', { success: res.success, count: res.circles?.length, error: res.error });
         
@@ -120,6 +219,30 @@ export default function HomeScreen({ navigation, route }) {
           if (res.success) {
             setCircles(res.circles || []);
             console.log('[HomeScreen] ✅ Circles set to state:', res.circles?.length || 0);
+
+            // Refresh health scores and check for alerts (non-blocking)
+            if (res.circles?.length > 0) {
+              refreshHealthScores(user.id).then(async () => {
+                console.log('[HomeScreen] ✅ Health scores refreshed');
+                // Load health scores into state
+                const { healthScores } = await getHealthScores(user.id);
+                if (healthScores && healthScores.length > 0) {
+                  const map = {};
+                  for (const h of healthScores) {
+                    map[h.imported_contact_id] = h;
+                  }
+                  if (mounted) setHealthMap(map);
+                }
+                // Create daily health snapshot for analytics
+                await createHealthSnapshot(user.id);
+                console.log('[HomeScreen] ✅ Health snapshot created');
+                return checkAndCreateHealthAlerts(user.id);
+              }).then((alertRes) => {
+                console.log('[HomeScreen] ✅ Alert check complete:', alertRes?.alertsCreated || 0, 'new alerts');
+              }).catch((err) => {
+                console.warn('[HomeScreen] Health/alerts error (non-fatal):', err?.message || err);
+              });
+            }
           } else {
             console.error('[HomeScreen] Failed to load circles:', res.error);
           }
@@ -208,12 +331,14 @@ export default function HomeScreen({ navigation, route }) {
   const allCircleContacts = circles.reduce((acc, c) => acc.concat(c?.contacts || []), []);
   const allSearchContacts = hasCircle ? allCircleContacts : importedContacts;
 
-  // Filter contacts based on search
-  const filteredContacts = searchQuery.length > 0
-    ? allSearchContacts.filter(contact =>
-        contact?.name?.toLowerCase?.().includes(searchQuery.toLowerCase())
-      )
-    : [];
+  // Filter contacts based on search (memoized to prevent recalc on every render)
+  const filteredContacts = useMemo(() => {
+    if (searchQuery.length === 0) return [];
+    const query = searchQuery.toLowerCase();
+    return allSearchContacts.filter(contact =>
+      contact?.name?.toLowerCase?.().includes(query)
+    );
+  }, [searchQuery, allSearchContacts]);
 
   // Colors for contacts
   const colors = ['#4FFFB0', '#ffaa00', '#ff6b6b', '#4ecdc4'];
@@ -233,22 +358,55 @@ export default function HomeScreen({ navigation, route }) {
   const getDottedRingRadius = () => BASE_RING_RADIUS + ringStep * circles.length;
 
   // Calculate positions for contacts - evenly distributed on their ring
-  // arrayIndex is the index in ringedContacts/planetItems for reliable color mapping
+  // Now uses health status to determine node color (green/yellow/orange/red)
+  // Size varies based on urgency: cold = 1.5x larger, at_risk = 1.25x larger
   // Offset each ring by half the angle step to create a staggered/scattered effect
-  const getContactPosition = (indexOnRing, totalOnRing, ringIndex, arrayIndex) => {
+  // NOTE: Rotation is applied as a transform on the SVG group, not here (for performance)
+  const getContactPosition = useCallback((indexOnRing, totalOnRing, ringIndex, contact) => {
     const angleStep = 360 / Math.max(1, totalOnRing);
     const ringOffset = ringIndex % 2 === 0 ? 0 : angleStep / 2; // Stagger odd rings
     const angleOffset = (indexOnRing * angleStep + ringOffset) * (Math.PI / 180);
     const radius = getRingRadius(ringIndex);
 
+    // Get health-based color (defaults to green/healthy if no health data)
+    const health = healthMap[contact?.importedContactId];
+    const healthColor = health ? getHealthColor(health.status) : '#4FFFB0';
+    const healthScore = health?.health_score ?? 100;
+    const healthStatus = health?.status || 'healthy';
+
+    // Size variation based on urgency - cold contacts are larger (more visible)
+    // Base radius: 10px (increased from 8px for better touch targets)
+    // Cold: 1.5x = 15px, At Risk: 1.25x = 12.5px, Others: 10px
+    const BASE_NODE_RADIUS = 10;
+    let nodeRadius = BASE_NODE_RADIUS;
+    if (healthStatus === 'cold') {
+      nodeRadius = BASE_NODE_RADIUS * 1.5; // 15px - largest for most urgent
+    } else if (healthStatus === 'at_risk') {
+      nodeRadius = BASE_NODE_RADIUS * 1.25; // 12.5px - medium urgency
+    }
+
+    // Determine icon badge for accessibility
+    let badge = null;
+    if (healthStatus === 'cold') {
+      badge = '❄️'; // Snowflake for cold contacts
+    } else if (healthStatus === 'at_risk') {
+      badge = '⚠️'; // Warning for at-risk
+    } else if (healthStatus === 'healthy') {
+      badge = null; // No badge for healthy (clean look)
+    }
+
     return {
-      x: 200 + radius * Math.cos(angleOffset + rotation * (Math.PI / 180)),
-      y: 200 + radius * Math.sin(angleOffset + rotation * (Math.PI / 180)),
-      radius: 8,
-      color: colors[arrayIndex % colors.length],
+      x: 200 + radius * Math.cos(angleOffset),
+      y: 200 + radius * Math.sin(angleOffset),
+      radius: nodeRadius,
+      color: healthColor,
+      healthScore,
+      healthStatus,
       ring: ringIndex,
+      badge,
+      needsAttention: healthStatus === 'cold' || healthStatus === 'at_risk',
     };
-  };
+  }, [circles.length, healthMap]); // Recalculate when circles or health data changes
 
   const primaryCircleName = circles?.[0]?.name || routeCircleName;
 
@@ -271,13 +429,21 @@ export default function HomeScreen({ navigation, route }) {
   }, [circles]);
 
   // Items used by 3D planet view (index must align with handlePerson3DPress indices)
-  // Use array index as the source of truth for mapping
+  // Now uses health-based colors instead of fixed palette
+  // Includes lastInteractionDate for "last contact X days ago" display
   const planetItems = React.useMemo(() => {
-    return ringedContacts.map((entry, arrayIndex) => ({
-      ...entry.contact,
-      color: colors[arrayIndex % colors.length],
-    }));
-  }, [ringedContacts]);
+    return ringedContacts.map((entry) => {
+      const health = healthMap[entry.contact?.importedContactId];
+      const healthColor = health ? getHealthColor(health.status) : '#4FFFB0';
+      return {
+        ...entry.contact,
+        color: healthColor,
+        healthScore: health?.health_score,
+        healthStatus: health?.status,
+        lastInteractionDate: health?.last_interaction_date,
+      };
+    });
+  }, [ringedContacts, healthMap]);
 
   // Map contact ID to array index for reliable lookups
   const planetIndexById = React.useMemo(() => {
@@ -286,6 +452,19 @@ export default function HomeScreen({ navigation, route }) {
       return acc;
     }, {});
   }, [ringedContacts]);
+
+  // Health summary statistics for dashboard card
+  const healthStats = React.useMemo(() => {
+    const contacts = Object.values(healthMap);
+    return {
+      total: contacts.length,
+      healthy: contacts.filter(h => h.status === 'healthy').length,
+      cooling: contacts.filter(h => h.status === 'cooling').length,
+      atRisk: contacts.filter(h => h.status === 'at_risk').length,
+      cold: contacts.filter(h => h.status === 'cold').length,
+      needsAttention: contacts.filter(h => h.status !== 'healthy').length,
+    };
+  }, [healthMap]);
 
   const dottedRingRadius = hasCircle ? getDottedRingRadius() : SINGLE_DOTTED_RADIUS;
   const addCirclePlusX = 200 + dottedRingRadius;
@@ -297,7 +476,7 @@ export default function HomeScreen({ navigation, route }) {
       const star = starPositions[i];
       // Duration based on speed - slower speed = longer duration
       const duration = 8000 / star.speed; // 8-26 seconds per cycle
-      
+
       return Animated.loop(
         Animated.timing(anim, {
           toValue: 1,
@@ -312,6 +491,26 @@ export default function HomeScreen({ navigation, route }) {
 
     return () => animations.forEach(anim => anim.stop());
   }, []);
+
+  // Pulsing animation for cold/at-risk contacts
+  useEffect(() => {
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: false, // SVG opacity needs false
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 1200,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    pulseAnimation.start();
+    return () => pulseAnimation.stop();
+  }, [pulseAnim]);
 
   // Handle first circle congratulations popup
   useEffect(() => {
@@ -379,7 +578,28 @@ export default function HomeScreen({ navigation, route }) {
   // Center of the circle visualization
   const circleCenterX = SCREEN_WIDTH / 2;
 
-  const handleTouchStart = (event) => {
+  // Reset touch state - call when modals open/close to prevent stuck gestures
+  const resetTouchState = useCallback(() => {
+    isDragging.current = false;
+    lastDistance.current = 0;
+    lastScale.current = 1;
+    totalTouchMovement.current = 0;
+  }, []);
+
+  // Handler for when a ring (circle) is tapped - defined early for handleTouchEnd dependency
+  const handleRingPress = useCallback((ringIndex) => {
+    resetTouchState(); // Reset before opening modal
+    const circle = circles[ringIndex];
+    if (circle) {
+      setSelectedCircleForZoom(circle);
+      setCircleZoomOpen(true);
+    }
+  }, [circles, resetTouchState]);
+
+  const handleTouchStart = useCallback((event) => {
+    // Skip if modal is open to prevent gesture conflicts
+    if (planetOpen || circleZoomOpen) return;
+
     if (event.nativeEvent.touches.length === 2) {
       // Two finger pinch
       isDragging.current = false;
@@ -398,9 +618,11 @@ export default function HomeScreen({ navigation, route }) {
       touchStartPos.current = { x: touch.pageX, y: touch.pageY };
       totalTouchMovement.current = 0;
     }
-  };
+  }, [planetOpen, circleZoomOpen]);
 
-  const handleTouchMove = (event) => {
+  const handleTouchMove = useCallback((event) => {
+    // Skip if modal is open to prevent gesture conflicts
+    if (planetOpen || circleZoomOpen) return;
     if (event.nativeEvent.touches.length === 2) {
       // Pinch to zoom
       isDragging.current = false;
@@ -431,7 +653,7 @@ export default function HomeScreen({ navigation, route }) {
       // Movement since last frame
       const deltaX = currentX - lastTouchPos.current.x;
       const deltaY = currentY - lastTouchPos.current.y;
-      
+
       // Track total movement to distinguish tap from drag
       totalTouchMovement.current += Math.abs(deltaX) + Math.abs(deltaY);
 
@@ -450,27 +672,32 @@ export default function HomeScreen({ navigation, route }) {
         const rotationSpeed = 150;
         const rotationDelta = (crossProduct / distanceSquared) * rotationSpeed;
 
-        setRotation(prev => prev + rotationDelta);
+        // Update ref (no re-render) and animated value (for smooth transform)
+        rotationRef.current += rotationDelta;
+        rotationAnimValue.setValue(rotationRef.current);
       }
 
       // Update last position
       lastTouchPos.current = { x: currentX, y: currentY };
     }
-  };
+  }, [circleCenterY, rotationAnimValue, zoomScale, planetOpen, circleZoomOpen]);
 
-  const handleTouchEnd = (event) => {
+  const handleTouchEnd = useCallback((event) => {
+    // Skip if modal is open to prevent gesture conflicts
+    if (planetOpen || circleZoomOpen) return;
+
     const touchDuration = Date.now() - touchStartTime.current;
     const wasTap = touchDuration < 300 && totalTouchMovement.current < 15;
-    
+
     if (wasTap && hasCircle) {
       // Check if tap was on a ring
       // We need to convert the tap position to SVG coordinates
       // The SVG is centered and has viewBox="0 0 400 400" displayed in width=SCREEN_WIDTH
-      
+
       // Get the tap position relative to the SVG center
       const tapX = touchStartPos.current.x;
       const tapY = touchStartPos.current.y;
-      
+
       // SVG center in screen coordinates - the SVG is centered horizontally
       // and the networkView is flex:1 centered
       // SVG viewBox is 400x400, center is at 200,200 in SVG coords
@@ -478,17 +705,17 @@ export default function HomeScreen({ navigation, route }) {
       const svgScale = SCREEN_WIDTH / 400;
       const svgCenterScreenX = SCREEN_WIDTH / 2;
       const svgCenterScreenY = circleCenterY; // This is calculated from the view layout
-      
+
       // Convert tap to SVG coordinates
       const svgX = 200 + (tapX - svgCenterScreenX) / svgScale;
       const svgY = 200 + (tapY - svgCenterScreenY) / svgScale;
-      
+
       // Calculate distance from center (200, 200) in SVG coords
       const distFromCenter = Math.sqrt(Math.pow(svgX - 200, 2) + Math.pow(svgY - 200, 2));
-      
+
       // Check if tap is on any ring (within tolerance)
       const ringTolerance = 15; // pixels in SVG coords
-      
+
       for (let ringIndex = 0; ringIndex < circles.length; ringIndex++) {
         const ringRadius = getRingRadius(ringIndex);
         if (Math.abs(distFromCenter - ringRadius) < ringTolerance) {
@@ -498,10 +725,10 @@ export default function HomeScreen({ navigation, route }) {
         }
       }
     }
-    
+
     lastDistance.current = 0;
     isDragging.current = false;
-  };
+  }, [hasCircle, circles, circleCenterY, handleRingPress, planetOpen, circleZoomOpen]);
 
   const handleCenterPress = () => {
     console.log('Center pressed!');
@@ -590,6 +817,13 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const handlePerson3DPress = (contact, index) => {
+    resetTouchState(); // Reset before opening modal to prevent stuck gestures
+
+    // Dismiss gesture hint on first tap
+    if (showTapHint) {
+      dismissTapHint();
+    }
+
     // Find which circle this contact belongs to using the ringedContacts entry
     const entry = ringedContacts[index];
     if (!entry) {
@@ -607,16 +841,23 @@ export default function HomeScreen({ navigation, route }) {
       return;
     }
     
-    // Get only the contacts from this circle
-    const circleContacts = circle.contacts.map((c, idx) => ({
-      ...c,
-      color: colors[idx % colors.length],
-    }));
+    // Get only the contacts from this circle, with health data
+    const circleContacts = circle.contacts.map((c, idx) => {
+      const health = healthMap[c.importedContactId];
+      return {
+        ...c,
+        color: colors[idx % colors.length],
+        healthScore: health?.health_score,
+        healthStatus: health?.status,
+        lastInteractionDate: health?.last_interaction_date,
+      };
+    });
     
     // Find the index of the selected contact within this circle
     const indexInCircle = circle.contacts.findIndex(c => c.id === contact.id);
-    
+
     setActiveCircleItems(circleContacts);
+    setActiveCircleName(circle.name); // Set circle name for breadcrumb
     setPlanetStartIndex(Math.max(0, indexInCircle));
     setPlanetOpen(true);
   };
@@ -625,28 +866,140 @@ export default function HomeScreen({ navigation, route }) {
     // handled inside PlanetZoom3D via callback
   };
 
-  // Handler for when a ring (circle) is tapped
-  const handleRingPress = (ringIndex) => {
-    const circle = circles[ringIndex];
-    if (circle) {
-      setSelectedCircleForZoom(circle);
-      setCircleZoomOpen(true);
+  // Handler for when health is manually changed via slider
+  const handleHealthChange = useCallback(async (contact, newScore) => {
+    console.log('[HomeScreen] Health change requested:', contact?.name, newScore);
+
+    try {
+      const { success, user } = await getCurrentUser();
+      if (!success || !user) {
+        console.warn('[HomeScreen] No user for health update');
+        return;
+      }
+
+      const contactId = contact?.importedContactId;
+      if (!contactId) {
+        console.warn('[HomeScreen] No importedContactId for health update');
+        return;
+      }
+
+      // Update in database
+      const result = await updateHealthScore(user.id, contactId, newScore);
+      if (!result.success) {
+        console.error('[HomeScreen] Failed to update health:', result.error);
+        return;
+      }
+
+      // Update local healthMap state immediately for instant UI feedback
+      setHealthMap(prev => {
+        const status = newScore >= 80 ? 'healthy' : newScore >= 60 ? 'cooling' : newScore >= 40 ? 'at_risk' : 'cold';
+        return {
+          ...prev,
+          [contactId]: {
+            ...prev[contactId],
+            health_score: newScore,
+            status: status,
+            imported_contact_id: contactId,
+          },
+        };
+      });
+
+      console.log('[HomeScreen] ✅ Health updated successfully');
+    } catch (err) {
+      console.error('[HomeScreen] Health update error:', err);
     }
-  };
+  }, []);
+
+  // Handler for setting a reminder from PlanetZoom3D
+  const handleSetReminder = useCallback((contact) => {
+    if (!contact) return;
+    // Map the contact to the format expected by the modal
+    setReminderContact({
+      id: contact.importedContactId || contact.id,
+      name: contact.name,
+      display_name: contact.name,
+      phone: contact.phone,
+    });
+    setShowReminderModal(true);
+  }, []);
+
+  // Handler for editing contact details from PlanetZoom3D
+  const handleEditContact = useCallback((contact) => {
+    if (!contact) return;
+    setEditContact(contact);
+    setShowEditContactModal(true);
+  }, []);
+
+  // Handler for "Just Talked" quick action - logs interaction and records activity
+  const handleJustTalked = useCallback(async (contact) => {
+    console.log('[HomeScreen] Just Talked pressed:', contact?.name);
+    try {
+      const { success, user } = await getCurrentUser();
+      if (!success || !user) return;
+
+      const contactId = contact?.importedContactId;
+      if (!contactId) return;
+
+      // Log interaction to reset health score
+      await logInteraction(user.id, contactId);
+      console.log('[HomeScreen] ✅ Interaction logged for Just Talked');
+
+      // Update local health map immediately
+      setHealthMap(prev => ({
+        ...prev,
+        [contactId]: {
+          ...prev[contactId],
+          health_score: 100,
+          status: 'healthy',
+          last_interaction_date: new Date().toISOString(),
+        },
+      }));
+
+      // Record activity for streak tracking
+      const result = await recordActivity(user.id);
+      if (result.success && result.isNewDay) {
+        const streakResult = await getStreak(user.id);
+        if (streakResult.success && streakResult.streak) {
+          celebrateStreak(streakResult.streak.currentStreak);
+        }
+      }
+
+      // Check for new achievements
+      const unlockResult = await checkAndUnlockAchievements(user.id);
+      if (unlockResult.success && unlockResult.newlyUnlocked?.length > 0) {
+        celebrateNewAchievements(unlockResult.newlyUnlocked);
+      }
+    } catch (err) {
+      console.error('[HomeScreen] Just Talked error:', err);
+    }
+  }, [celebrateStreak, celebrateNewAchievements]);
+
+  // Handler when contact details are saved
+  const handleContactDetailsSaved = useCallback((details) => {
+    // Optionally refresh data after saving
+    console.log('[HomeScreen] Contact details saved:', details);
+  }, []);
 
   // Handler when contact is pressed from CircleZoom3D (opens PlanetZoom3D focused view)
   const handleCircleZoomContactPress = (contact) => {
     if (!selectedCircleForZoom) return;
-    
+
     const circleContacts = selectedCircleForZoom.contacts || [];
-    const circleItems = circleContacts.map((c, idx) => ({
-      ...c,
-      color: colors[idx % colors.length],
-    }));
+    const circleItems = circleContacts.map((c, idx) => {
+      const health = healthMap[c.importedContactId];
+      return {
+        ...c,
+        color: colors[idx % colors.length],
+        healthScore: health?.health_score,
+        healthStatus: health?.status,
+        lastInteractionDate: health?.last_interaction_date,
+      };
+    });
     const indexInCircle = circleContacts.findIndex(c => c.id === contact.id);
-    
+
     setCircleZoomOpen(false);
     setActiveCircleItems(circleItems);
+    setActiveCircleName(selectedCircleForZoom?.name || null); // Set circle name for breadcrumb
     setPlanetStartIndex(Math.max(0, indexInCircle));
     setPlanetOpen(true);
   };
@@ -669,6 +1022,12 @@ export default function HomeScreen({ navigation, route }) {
         <View style={styles.header}>
           <Text style={styles.logo}>ping!</Text>
           <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.dashboardButton}
+              onPress={() => navigation.navigate('Dashboard')}
+            >
+              <Ionicons name="stats-chart" size={22} color="#4FFFB0" />
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.messageButton}
               onPress={() => navigation.navigate('Messages')}
@@ -715,28 +1074,63 @@ export default function HomeScreen({ navigation, route }) {
                     <FlatList
                       data={filteredContacts}
                       keyExtractor={(item) => item.id}
-                      renderItem={({ item, index }) => (
-                        <TouchableOpacity
-                          style={styles.searchResultItem}
-                          onPress={() => {
-                            // Find the contact in ringedContacts to get their circle info
-                            const ringedIndex = ringedContacts.findIndex(entry => entry.contact?.id === item?.id);
-                            if (ringedIndex >= 0) {
-                              handlePerson3DPress(item, ringedIndex);
-                              setSearchQuery('');
-                              setShowSearchResults(false);
-                            }
-                          }}
-                        >
-                          <View style={[styles.resultAvatar, { backgroundColor: colors[index % colors.length] }]}>
-                            <Text style={styles.resultAvatarText}>{item.initials}</Text>
-                          </View>
-                          <View style={styles.resultInfo}>
-                            <Text style={styles.resultName}>{item.name}</Text>
-                            <Text style={styles.resultPhone}>{item.phone}</Text>
-                          </View>
-                        </TouchableOpacity>
-                      )}
+                      renderItem={({ item, index }) => {
+                        // Find the contact's circle and health info
+                        const ringedEntry = ringedContacts.find(entry => entry.contact?.id === item?.id);
+                        const circleName = ringedEntry ? circles[ringedEntry.ringIndex]?.name : null;
+                        const health = healthMap[item?.importedContactId];
+                        const healthColor = health ? getHealthColor(health.status) : '#4FFFB0';
+                        const healthScore = health?.health_score ?? 100;
+                        const healthStatus = health?.status || 'healthy';
+                        const needsAttention = healthStatus === 'cold' || healthStatus === 'at_risk';
+
+                        return (
+                          <TouchableOpacity
+                            style={styles.searchResultItem}
+                            onPress={() => {
+                              const ringedIndex = ringedContacts.findIndex(entry => entry.contact?.id === item?.id);
+                              if (ringedIndex >= 0) {
+                                handlePerson3DPress(item, ringedIndex);
+                                setSearchQuery('');
+                                setShowSearchResults(false);
+                              }
+                            }}
+                          >
+                            {/* Avatar with health-colored border */}
+                            <View style={[
+                              styles.resultAvatar,
+                              { backgroundColor: healthColor + '20', borderWidth: 2, borderColor: healthColor }
+                            ]}>
+                              <Text style={styles.resultAvatarText}>{item.initials}</Text>
+                            </View>
+                            <View style={styles.resultInfo}>
+                              <Text style={styles.resultName}>{item.name}</Text>
+                              {/* Circle and health info row */}
+                              <View style={styles.resultMetaRow}>
+                                {circleName && (
+                                  <View style={styles.resultCircleBadge}>
+                                    <Text style={styles.resultCircleText}>{circleName}</Text>
+                                  </View>
+                                )}
+                                <View style={[styles.resultHealthBadge, { backgroundColor: healthColor + '25' }]}>
+                                  <View style={[styles.resultHealthDot, { backgroundColor: healthColor }]} />
+                                  <Text style={[styles.resultHealthText, { color: healthColor }]}>
+                                    {healthStatus === 'healthy' ? 'Healthy' :
+                                     healthStatus === 'cooling' ? 'Cooling' :
+                                     healthStatus === 'at_risk' ? 'At Risk' : 'Cold'}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                            {/* Attention indicator */}
+                            {needsAttention && (
+                              <Text style={styles.resultAttentionBadge}>
+                                {healthStatus === 'cold' ? '❄️' : '⚠️'}
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      }}
                       style={styles.searchResultsList}
                     />
                   ) : (
@@ -750,6 +1144,24 @@ export default function HomeScreen({ navigation, route }) {
               <Text style={styles.circleNameLabel}>current circle</Text>
               <Text style={styles.circleNameValue}>{primaryCircleName}</Text>
             </View>
+
+            {/* Health Dashboard Summary Card */}
+            {healthStats.needsAttention > 0 && (
+              <TouchableOpacity
+                style={styles.healthSummaryCard}
+                onPress={() => navigation.navigate('AlertsTab')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.healthSummaryRow}>
+                  <Ionicons name="alert-circle" size={20} color="#FF8C42" />
+                  <Text style={styles.healthSummaryText}>
+                    {healthStats.needsAttention} contact{healthStats.needsAttention > 1 ? 's' : ''} need{healthStats.needsAttention === 1 ? 's' : ''} attention
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color="#666" />
+                </View>
+                <HealthSummaryBar stats={healthStats} />
+              </TouchableOpacity>
+            )}
           </>
         )}
 
@@ -805,7 +1217,7 @@ export default function HomeScreen({ navigation, route }) {
               </View>
             )}
 
-            <Animated.View style={[styles.svgContainer, { transform: [{ scale: zoomScale }] }]}>
+            <Animated.View style={[styles.svgContainer, { transform: [{ scale: zoomScale }, { rotate: rotationAnimValue.interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] }) }] }]}>
               <Svg height="400" width={SCREEN_WIDTH} viewBox="0 0 400 400">
                   {/* Center glow / nucleus */}
                   <Circle cx="200" cy="200" r="40" fill="#4FFFB0" opacity="0.3" />
@@ -885,7 +1297,7 @@ export default function HomeScreen({ navigation, route }) {
 
                   {/* Lines connecting contacts to center */}
                   {ringedContacts.map((entry, arrayIndex) => {
-                    const pos = getContactPosition(entry.indexOnRing, entry.totalOnRing, entry.ringIndex, arrayIndex);
+                    const pos = getContactPosition(entry.indexOnRing, entry.totalOnRing, entry.ringIndex, entry.contact);
                     return (
                       <React.Fragment key={`lines-${entry.ringIndex}-${entry.indexOnRing}-${entry.contact.id}`}>
                         <Line
@@ -901,39 +1313,138 @@ export default function HomeScreen({ navigation, route }) {
                     );
                   })}
 
-                  {/* Contact nodes */}
+                  {/* Contact nodes with improved UX */}
                   {ringedContacts.map((entry, arrayIndex) => {
-                    const pos = getContactPosition(entry.indexOnRing, entry.totalOnRing, entry.ringIndex, arrayIndex);
+                    const pos = getContactPosition(entry.indexOnRing, entry.totalOnRing, entry.ringIndex, entry.contact);
+                    const circumference = 2 * Math.PI * (pos.radius + 3);
+                    // Calculate label offset based on node size
+                    const labelOffset = pos.radius + 12;
+                    // Calculate pulsing opacity for cold/at-risk contacts
+                    const pulseOpacity = pos.needsAttention
+                      ? pulseAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.15, 0.4],
+                        })
+                      : 0;
+                    const pulseRadius = pos.needsAttention
+                      ? pulseAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [pos.radius + 12, pos.radius + 20],
+                        })
+                      : pos.radius + 12;
+
                     return (
                       <React.Fragment key={`contact-${entry.ringIndex}-${entry.indexOnRing}-${entry.contact.id}`}>
-                        {/* Contact glow */}
+                        {/* Animated pulsing glow for cold/at_risk contacts */}
+                        {pos.needsAttention && (
+                          <AnimatedCircle
+                            cx={pos.x}
+                            cy={pos.y}
+                            r={pulseRadius}
+                            fill={pos.color}
+                            opacity={pulseOpacity}
+                          />
+                        )}
+                        {/* Static outer glow (stronger for urgent contacts) */}
                         <Circle
                           cx={pos.x}
                           cy={pos.y}
-                          r={pos.radius + 4}
+                          r={pos.radius + 6}
                           fill={pos.color}
-                          opacity="0.2"
+                          opacity={pos.needsAttention ? 0.25 : 0.15}
                         />
-                        {/* Contact node */}
+                        {/* Health ring (shows percentage) */}
+                        <Circle
+                          cx={pos.x}
+                          cy={pos.y}
+                          r={pos.radius + 3}
+                          stroke={pos.color}
+                          strokeWidth={pos.needsAttention ? 2.5 : 2}
+                          strokeDasharray={`${(pos.healthScore / 100) * circumference} ${circumference}`}
+                          strokeDashoffset={circumference * 0.25}
+                          fill="none"
+                          opacity="0.8"
+                          rotation="-90"
+                          origin={`${pos.x}, ${pos.y}`}
+                        />
+                        {/* Invisible larger touch target (44x44 minimum for WCAG) */}
+                        {/* Supports tap (view contact) and long-press (quick actions menu) */}
+                        <Circle
+                          cx={pos.x}
+                          cy={pos.y}
+                          r={22}
+                          fill="transparent"
+                          onPressIn={() => {
+                            // Start long-press timer
+                            longPressTimer.current = setTimeout(() => {
+                              // Calculate screen position from SVG coordinates
+                              const screenX = (pos.x / 400) * SCREEN_WIDTH;
+                              const screenY = (pos.y / 400) * SCREEN_HEIGHT * 0.5 + 150;
+                              handleContactLongPress(entry.contact, { x: screenX, y: screenY });
+                            }, 500); // 500ms for long press
+                          }}
+                          onPressOut={() => {
+                            // Cancel long-press timer if released early
+                            if (longPressTimer.current) {
+                              clearTimeout(longPressTimer.current);
+                              longPressTimer.current = null;
+                            }
+                          }}
+                          onPress={() => {
+                            // Only trigger tap if not showing quick action menu
+                            if (!quickActionMenu.visible) {
+                              handlePerson3DPress(entry.contact, arrayIndex);
+                            }
+                          }}
+                        />
+                        {/* Contact node (visible) */}
                         <Circle
                           cx={pos.x}
                           cy={pos.y}
                           r={pos.radius}
                           fill={pos.color}
-                          opacity="0.9"
-                          onPress={() => handlePerson3DPress(entry.contact, arrayIndex)}
+                          opacity="0.95"
                         />
+                        {/* Icon badge for accessibility (cold/at-risk) */}
+                        {pos.badge && (
+                          <SvgText
+                            x={pos.x + pos.radius - 2}
+                            y={pos.y - pos.radius + 4}
+                            fontSize="10"
+                            textAnchor="middle"
+                          >
+                            {pos.badge}
+                          </SvgText>
+                        )}
                         {/* Contact first name */}
                         <SvgText
                           x={pos.x}
-                          y={pos.y + 20}
+                          y={pos.y + labelOffset}
                           fill="#ffffff"
-                          fontSize="10"
+                          fontSize={pos.needsAttention ? "11" : "10"}
+                          fontWeight={pos.needsAttention ? "600" : "400"}
                           textAnchor="middle"
-                          opacity="0.8"
+                          opacity="0.9"
                         >
                           {getFirstName(entry.contact.name)}
                         </SvgText>
+                        {/* Health bar below name */}
+                        <Rect
+                          x={pos.x - 14}
+                          y={pos.y + labelOffset + 4}
+                          width={28}
+                          height={3}
+                          fill="rgba(255,255,255,0.15)"
+                          rx={1.5}
+                        />
+                        <Rect
+                          x={pos.x - 14}
+                          y={pos.y + labelOffset + 4}
+                          width={28 * (pos.healthScore / 100)}
+                          height={3}
+                          fill={pos.color}
+                          rx={1.5}
+                        />
                       </React.Fragment>
                     );
                   })}
@@ -963,6 +1474,15 @@ export default function HomeScreen({ navigation, route }) {
               : 'tap the center to create your first Circle • drag to rotate • pinch to zoom'}
           </Text>
         </View>
+
+        {/* First-time user tap hint */}
+        {hasCircle && ringedContacts.length > 0 && (
+          <TapHint
+            visible={showTapHint}
+            onDismiss={dismissTapHint}
+            message="Tap a contact to view their profile"
+          />
+        )}
 
         {/* Prominent CTA when no circles exist */}
         {!hasCircle && !circlesLoading && (
@@ -1020,26 +1540,59 @@ export default function HomeScreen({ navigation, route }) {
 
         {planetOpen && (
           <PlanetZoom3D
-            visible={true}
             onClose={() => {
               setPlanetOpen(false);
+              setActiveCircleName(null); // Clear breadcrumb context
+              resetTouchState(); // Reset touch state on modal close
             }}
             items={activeCircleItems}
             initialIndex={planetStartIndex}
+            circleName={activeCircleName}
             onMoreInfo={() => {
               // More info is now handled inside PlanetZoom3D component
             }}
+            onHealthChange={handleHealthChange}
+            onSetReminder={handleSetReminder}
+            onEditContact={handleEditContact}
+            onJustTalked={handleJustTalked}
             onMessage={async (contact) => {
               setPlanetOpen(false);
               if (contact && contact.phone) {
                 // Open native iMessage with the contact's phone number
                 const phoneNumber = contact.phone.replace(/[^0-9]/g, ''); // Remove non-numeric characters
                 const smsUrl = `sms:${phoneNumber}`;
-                
+
                 try {
                   const canOpen = await Linking.canOpenURL(smsUrl);
                   if (canOpen) {
                     await Linking.openURL(smsUrl);
+                    // Log interaction to reset health score
+                    const { user } = await getCurrentUser();
+                    if (user && contact.importedContactId) {
+                      logInteraction(user.id, contact.importedContactId).catch(err => {
+                        console.warn('[HomeScreen] Failed to log interaction:', err);
+                      });
+                      // Record activity for streak tracking
+                      recordActivity(user.id).then(async (result) => {
+                        console.log('[HomeScreen] ✅ Activity recorded for streak');
+
+                        // Check for streak milestone celebration
+                        if (result.success && result.isNewDay) {
+                          const streakResult = await getStreak(user.id);
+                          if (streakResult.success && streakResult.streak) {
+                            celebrateStreak(streakResult.streak.currentStreak);
+                          }
+                        }
+
+                        // Check for new achievements
+                        const unlockResult = await checkAndUnlockAchievements(user.id);
+                        if (unlockResult.success && unlockResult.newlyUnlocked?.length > 0) {
+                          celebrateNewAchievements(unlockResult.newlyUnlocked);
+                        }
+                      }).catch(err => {
+                        console.warn('[HomeScreen] Failed to record activity:', err);
+                      });
+                    }
                   } else {
                     Alert.alert('Unable to open Messages', 'Could not open the Messages app.');
                   }
@@ -1056,24 +1609,58 @@ export default function HomeScreen({ navigation, route }) {
         {/* Circle Zoom 3D View - shows when tapping on a ring */}
         {circleZoomOpen && (
           <CircleZoom3D
-            visible={true}
             onClose={() => {
               setCircleZoomOpen(false);
               setSelectedCircleForZoom(null);
+              resetTouchState(); // Reset touch state on modal close
             }}
             circleName={selectedCircleForZoom?.name || 'Circle'}
-            contacts={selectedCircleForZoom?.contacts || []}
+            contacts={(selectedCircleForZoom?.contacts || []).map(c => {
+              const health = healthMap[c.importedContactId];
+              return {
+                ...c,
+                healthScore: health?.health_score,
+                healthStatus: health?.status,
+              };
+            })}
             onContactPress={handleCircleZoomContactPress}
             onMessage={async (contact) => {
               setCircleZoomOpen(false);
               if (contact && contact.phone) {
                 const phoneNumber = contact.phone.replace(/[^0-9]/g, '');
                 const smsUrl = `sms:${phoneNumber}`;
-                
+
                 try {
                   const canOpen = await Linking.canOpenURL(smsUrl);
                   if (canOpen) {
                     await Linking.openURL(smsUrl);
+                    // Log interaction to reset health score
+                    const { user } = await getCurrentUser();
+                    if (user && contact.importedContactId) {
+                      logInteraction(user.id, contact.importedContactId).catch(err => {
+                        console.warn('[HomeScreen] Failed to log interaction:', err);
+                      });
+                      // Record activity for streak tracking
+                      recordActivity(user.id).then(async (result) => {
+                        console.log('[HomeScreen] ✅ Activity recorded for streak');
+
+                        // Check for streak milestone celebration
+                        if (result.success && result.isNewDay) {
+                          const streakResult = await getStreak(user.id);
+                          if (streakResult.success && streakResult.streak) {
+                            celebrateStreak(streakResult.streak.currentStreak);
+                          }
+                        }
+
+                        // Check for new achievements
+                        const unlockResult = await checkAndUnlockAchievements(user.id);
+                        if (unlockResult.success && unlockResult.newlyUnlocked?.length > 0) {
+                          celebrateNewAchievements(unlockResult.newlyUnlocked);
+                        }
+                      }).catch(err => {
+                        console.warn('[HomeScreen] Failed to record activity:', err);
+                      });
+                    }
                   } else {
                     Alert.alert('Unable to open Messages', 'Could not open the Messages app.');
                   }
@@ -1154,6 +1741,44 @@ export default function HomeScreen({ navigation, route }) {
             </View>
           </View>
         </Modal>
+
+        {/* Add Reminder Modal */}
+        <AddReminderModal
+          visible={showReminderModal}
+          onClose={() => {
+            setShowReminderModal(false);
+            setReminderContact(null);
+          }}
+          onSave={() => {
+            setShowReminderModal(false);
+            setReminderContact(null);
+          }}
+          userId={userId}
+          contact={reminderContact}
+        />
+
+        {/* Edit Contact Modal */}
+        <EditContactModal
+          visible={showEditContactModal}
+          onClose={() => {
+            setShowEditContactModal(false);
+            setEditContact(null);
+          }}
+          onSave={handleContactDetailsSaved}
+          contact={editContact}
+        />
+
+        {/* Quick Action Menu (long-press on contacts) */}
+        <QuickActionMenu
+          visible={quickActionMenu.visible}
+          contact={quickActionMenu.contact}
+          position={quickActionMenu.position}
+          onClose={closeQuickActionMenu}
+          onMessage={handleQuickMessage}
+          onJustTalked={handleJustTalked}
+          onSetReminder={handleSetReminder}
+          onViewDetails={handleQuickViewDetails}
+        />
       </LinearGradient>
     </View>
   );
@@ -1182,7 +1807,17 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
+  },
+  dashboardButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(79, 255, 176, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   messageButton: {
     position: 'relative',
@@ -1282,13 +1917,51 @@ const styles = StyleSheet.create({
   },
   resultName: {
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 2,
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   resultPhone: {
     color: '#999',
     fontSize: 14,
+  },
+  resultMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  resultCircleBadge: {
+    backgroundColor: 'rgba(79, 255, 176, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  resultCircleText: {
+    color: '#4FFFB0',
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  resultHealthBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 4,
+  },
+  resultHealthDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  resultHealthText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  resultAttentionBadge: {
+    fontSize: 14,
+    marginLeft: 8,
   },
   noResults: {
     color: '#999',
@@ -1381,6 +2054,27 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 20,
     fontWeight: '600',
+  },
+  healthSummaryCard: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: 'rgba(255, 140, 66, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 140, 66, 0.3)',
+  },
+  healthSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  healthSummaryText: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
   },
   popupOverlay: {
     position: 'absolute',

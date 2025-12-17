@@ -104,6 +104,7 @@ CREATE POLICY "Anyone can view avatars"
 3. `supabase_migration_phase2_circles.sql` (imported_contacts + circles + circle_members)
 4. `supabase_migration_phase2_contact_matches.sql` (optional: imported_contacts.matched_user_id)
 5. `supabase_migration_phase2_push.sql` (device_tokens for Expo push)
+6. `supabase_migration_phase3_health_alerts.sql` (relationship_health + alerts + alert_history)
 
 ### B) Enable Sign in with Apple in Supabase Auth
 In Supabase Dashboard:

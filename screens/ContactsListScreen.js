@@ -13,17 +13,38 @@ import { Ionicons } from '@expo/vector-icons';
 import { getImportedContacts } from '../utils/contactsStorage';
 import { getCurrentUser } from '../utils/supabaseStorage';
 import { getUnreadMessageCount } from '../utils/messagesStorage';
+import { getHealthScores } from '../utils/healthScoring';
+import { HealthDot } from '../components/HealthIndicator';
 
 export default function ContactsListScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [healthMap, setHealthMap] = useState({}); // Maps contact ID to health data
 
   const loadContacts = async () => {
     setLoading(true);
     const { contacts: stored } = await getImportedContacts();
     setContacts(stored || []);
+
+    // Load health scores - map by contact_id (device ID) for matching with AsyncStorage contacts
+    const { success, user } = await getCurrentUser();
+    if (success && user) {
+      const { healthScores } = await getHealthScores(user.id);
+      if (healthScores && healthScores.length > 0) {
+        const map = {};
+        for (const h of healthScores) {
+          // Use contact_id (device ID) as key since AsyncStorage contacts use device IDs
+          const deviceId = h.contact?.contact_id;
+          if (deviceId) {
+            map[deviceId] = h;
+          }
+        }
+        setHealthMap(map);
+      }
+    }
+
     setLoading(false);
   };
 
@@ -50,20 +71,28 @@ export default function ContactsListScreen({ navigation }) {
     (contact?.phone || '').includes(searchQuery)
   );
 
-  const renderContact = ({ item }) => (
-    <TouchableOpacity style={styles.contactItem}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{item.initials}</Text>
-      </View>
-      <View style={styles.contactInfo}>
-        <Text style={styles.contactName}>{item.name}</Text>
-        <Text style={styles.contactPhone}>{item.phone}</Text>
-      </View>
-      <TouchableOpacity style={styles.callButton}>
-        <Ionicons name="call-outline" size={20} color="#00ff88" />
+  const renderContact = ({ item }) => {
+    const health = healthMap[item.id];
+    return (
+      <TouchableOpacity style={styles.contactItem}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{item.initials}</Text>
+          {health && (
+            <View style={styles.healthDotContainer}>
+              <HealthDot status={health.status} size={12} />
+            </View>
+          )}
+        </View>
+        <View style={styles.contactInfo}>
+          <Text style={styles.contactName}>{item.name}</Text>
+          <Text style={styles.contactPhone}>{item.phone}</Text>
+        </View>
+        <TouchableOpacity style={styles.callButton}>
+          <Ionicons name="call-outline" size={20} color="#00ff88" />
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -232,6 +261,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    position: 'relative',
+  },
+  healthDotContainer: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#05140a',
+    borderRadius: 8,
+    padding: 2,
   },
   avatarText: {
     color: '#ffffff',

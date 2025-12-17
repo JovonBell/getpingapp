@@ -188,16 +188,33 @@ export async function loadCirclesWithMembers(userId) {
     if (mErr) throw mErr;
 
     const contactIds = Array.from(new Set((members || []).map((m) => m.imported_contact_id).filter(Boolean)));
+
+    // If no contacts in any circle, return circles with empty contacts arrays
+    if (contactIds.length === 0) {
+      const result = (circles || []).map((c) => ({
+        id: c.id,
+        name: c.name,
+        tier: c.tier,
+        contacts: [],
+      }));
+      console.log('[LOAD CIRCLES] ✅ Returning', result.length, 'circles (no members)');
+      return { success: true, circles: result };
+    }
+
+    // Query imported contacts - use base columns only
     const { data: imported, error: iErr } = await supabase
       .from('imported_contacts')
-      .select('id,contact_id,name,initials,email,phone')
+      .select('id,contact_id,name,initials,email,phone,matched_user_id')
       .in('id', contactIds);
 
-    if (iErr) throw iErr;
+    if (iErr) {
+      throw iErr;
+    }
 
     const importedById = (imported || []).reduce((acc, c) => {
       acc[c.id] = {
         id: String(c.contact_id),
+        importedContactId: c.id, // Preserve the imported_contacts.id for health lookups
         name: c.name,
         initials: c.initials || '',
         email: c.email || '',
