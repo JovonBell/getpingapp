@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { ActivityIndicator, View, Text } from 'react-native';
+import { ActivityIndicator, View, Text, Linking } from 'react-native';
 import { NavigationContainer, useNavigationState } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -238,15 +238,85 @@ export default function App() {
     });
 
     // Listener for when user taps on a notification
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(async (response) => {
       const data = response.notification.request.content.data;
       console.log('[App] Notification tapped:', data);
 
       // Navigate based on notification type
       if (navigationRef.current) {
         switch (data.type) {
-          case 'reminder':
+          case 'reminder_confirmation':
+            // Just navigate to reminders screen for confirmation notifications
             navigationRef.current.navigate('Reminders');
+            break;
+          case 'reminder':
+            // Handle reminder notification - open iMessage with the contact
+            if (data.contactId) {
+              try {
+                // Fetch reminder and contact details from database
+                const { data: reminderData, error: reminderError } = await supabase
+                  .from('reminders')
+                  .select('reminder_type')
+                  .eq('id', data.reminderId)
+                  .single();
+
+                const { data: contactData, error: contactError } = await supabase
+                  .from('imported_contacts')
+                  .select('name, phone')
+                  .eq('id', data.contactId)
+                  .single();
+
+                if (!contactError && contactData && contactData.phone) {
+                  console.log('[App] Opening iMessage with contact:', contactData.name);
+                  const phoneNumber = contactData.phone.replace(/[^0-9]/g, ''); // Remove non-numeric characters
+                  const contactName = contactData.name || 'there';
+                  
+                  // Generate pre-populated message based on reminder type
+                  let message = '';
+                  if (!reminderError && reminderData) {
+                    switch (reminderData.reminder_type) {
+                      case 'birthday':
+                        message = 'Happy Birthday!! 🎂🎉🎈';
+                        break;
+                      case 'anniversary':
+                        message = 'Happy Anniversary!! 💝🎉✨';
+                        break;
+                      case 'follow_up':
+                      case 'reconnect':
+                        message = `Hey ${contactName}, how's everything been?`;
+                        break;
+                      default:
+                        message = `Hey ${contactName}, hope you're doing well!`;
+                    }
+                  } else {
+                    message = `Hey ${contactName}, hope you're doing well!`;
+                  }
+                  
+                  const encodedMessage = encodeURIComponent(message);
+                  const smsUrl = `sms:${phoneNumber}&body=${encodedMessage}`;
+                  
+                  const canOpen = await Linking.canOpenURL(smsUrl);
+                  if (canOpen) {
+                    await Linking.openURL(smsUrl);
+                  } else {
+                    console.warn('[App] Cannot open iMessage URL');
+                    // Fallback to reminders screen if can't open iMessage
+                    navigationRef.current.navigate('Reminders');
+                  }
+                } else {
+                  console.warn('[App] No phone number found for contact:', error);
+                  // Fallback to reminders screen if no phone number
+                  navigationRef.current.navigate('Reminders');
+                }
+              } catch (err) {
+                console.error('[App] Error opening iMessage:', err);
+                // Fallback to reminders screen on error
+                navigationRef.current.navigate('Reminders');
+              }
+            } else {
+              // No contact ID, just open reminders screen
+              navigationRef.current.navigate('Reminders');
+            }
             break;
           case 'birthday':
           case 'daily_digest':

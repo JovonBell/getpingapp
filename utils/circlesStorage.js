@@ -302,3 +302,53 @@ export async function deleteCircle(circleId) {
   }
 }
 
+export async function addContactsToCircle(userId, circleId, contacts) {
+  try {
+    console.log('[ADD CONTACTS TO CIRCLE] Starting:', { userId, circleId, contactCount: contacts?.length });
+    
+    if (!userId) return { success: false, error: 'Missing userId' };
+    if (!circleId) return { success: false, error: 'Missing circleId' };
+    if (!contacts || contacts.length === 0) return { success: true, message: 'No contacts to add' };
+
+    // Ensure imported contacts exist in DB and get their UUIDs
+    const upserted = await upsertImportedContacts(userId, contacts);
+    const byContactId = (upserted.rows || []).reduce((acc, r) => {
+      const key = typeof r.contact_id === 'object' ? JSON.stringify(r.contact_id) : String(r.contact_id);
+      acc[key] = r.id;
+      return acc;
+    }, {});
+
+    console.log('[ADD CONTACTS TO CIRCLE] Contacts upserted, mapping:', Object.keys(byContactId).length);
+
+    // Insert members
+    const memberRows = contacts
+      .map((c) => {
+        const key = typeof c.id === 'object' ? JSON.stringify(c.id) : String(c.id);
+        return byContactId[key];
+      })
+      .filter(Boolean)
+      .map((imported_contact_id) => ({
+        circle_id: circleId,
+        imported_contact_id,
+      }));
+
+    console.log('[ADD CONTACTS TO CIRCLE] Member rows to insert:', memberRows.length);
+
+    if (memberRows.length > 0) {
+      const { error: memErr } = await supabase
+        .from('circle_members')
+        .insert(memberRows);
+      if (memErr) {
+        console.error('[ADD CONTACTS TO CIRCLE] Member insert error:', memErr);
+        throw memErr;
+      }
+    }
+
+    console.log('[ADD CONTACTS TO CIRCLE] ✅ Success!');
+    return { success: true };
+  } catch (error) {
+    console.error('[ADD CONTACTS TO CIRCLE] ❌ Failed:', error?.message || error);
+    return { success: false, error: error?.message || String(error) };
+  }
+}
+

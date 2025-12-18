@@ -316,9 +316,16 @@ export default function PlanetZoom3D({
   const panResponder = useMemo(() => {
     const SWIPE_THRESHOLD = 30;
     return PanResponder.create({
+      // CRITICAL: Do NOT use capture - it blocks all other touch handlers
+      // Only become responder through normal negotiation
       onStartShouldSetPanResponder: () => isMountedRef.current,
-      onMoveShouldSetPanResponder: (_evt, gesture) => isMountedRef.current && Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
-      onMoveShouldSetPanResponderCapture: (_evt, gesture) => isMountedRef.current && Math.abs(gesture.dx) > 2 && Math.abs(gesture.dy) < 40,
+      onMoveShouldSetPanResponder: (_evt, gesture) => {
+        // Only claim horizontal swipes, let vertical gestures through
+        if (!isMountedRef.current) return false;
+        const isHorizontalSwipe = Math.abs(gesture.dx) > 8 && Math.abs(gesture.dy) < 30;
+        return isHorizontalSwipe;
+      },
+      // REMOVED: onMoveShouldSetPanResponderCapture - this was blocking ALL touches
       onPanResponderGrant: () => {
         if (!isMountedRef.current) return;
         stateRef.current.gestureStartAngle = stateRef.current.targetAngle;
@@ -348,8 +355,13 @@ export default function PlanetZoom3D({
         stateRef.current.targetAngle = (TWO_PI * finalIndex) / len;
       },
       onPanResponderTerminate: () => {
-        // Released responder - good, this allows other touches to work
-        console.log('[PlanetZoom3D] PanResponder terminated');
+        // Responder was taken away - reset any gesture state
+        console.log('[PlanetZoom3D] PanResponder terminated - resetting state');
+        if (isMountedRef.current) {
+          // Snap back to current index on termination
+          const len = Math.max(1, normalizedItems.length);
+          stateRef.current.targetAngle = (Math.PI * 2 * currentIndex) / len;
+        }
       },
     });
   }, [normalizedItems.length, currentIndex]);
@@ -444,15 +456,23 @@ export default function PlanetZoom3D({
 
             {/* Header: Avatar + Name + Close */}
             <View style={styles.cardHeaderRow}>
-              <View style={[styles.avatarPlaceholder, { borderColor: activeItem?.color || '#4FFFB0' }]}>
+              <TouchableOpacity
+                style={[styles.avatarPlaceholder, { borderColor: activeItem?.color || '#4FFFB0' }]}
+                onPress={handleMoreInfoPress}
+                activeOpacity={0.7}
+              >
                 {!!activeItem?.initials && <Text style={styles.avatarText}>{activeItem.initials}</Text>}
-              </View>
-              <View style={styles.cardHeaderText}>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cardHeaderText}
+                onPress={handleMoreInfoPress}
+                activeOpacity={0.7}
+              >
                 <Text style={styles.title} numberOfLines={1}>{activeItem?.name || 'Contact'}</Text>
                 {activeItem?.jobTitle && (
                   <Text style={styles.subtitle} numberOfLines={1}>{activeItem.jobTitle}</Text>
                 )}
-              </View>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.closePill} onPress={requestClose} activeOpacity={0.85}>
                 <Text style={styles.closePillTxt}>✕</Text>
               </TouchableOpacity>
@@ -488,29 +508,32 @@ export default function PlanetZoom3D({
               ← Swipe to explore →
             </Text>
 
-            {/* Quick Actions Row */}
-            <View style={styles.cardActions}>
-              <TouchableOpacity style={styles.messageBtn} onPress={() => onMessage?.(activeItem)} activeOpacity={0.85}>
-                <Ionicons name="chatbubble" size={16} color="#000" style={{ marginRight: 4 }} />
-                <Text style={styles.messageTxt}>Message</Text>
+            {/* Action Buttons Row - Message, More */}
+            <View style={styles.cardActionsRow}>
+              <TouchableOpacity style={styles.actionBtnPrimary} onPress={() => onMessage?.(activeItem)} activeOpacity={0.85}>
+                <Ionicons name="chatbubble" size={16} color="#000" />
+                <Text style={styles.actionBtnPrimaryTxt}>Message</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.justTalkedBtn} onPress={handleJustTalked} activeOpacity={0.85}>
-                <Ionicons name="checkmark-circle" size={16} color="#4FFFB0" style={{ marginRight: 4 }} />
-                <Text style={styles.justTalkedTxt}>Talked</Text>
+              <TouchableOpacity style={styles.actionBtnSecondary} onPress={handleMoreInfoPress} activeOpacity={0.85}>
+                <Ionicons name="ellipsis-horizontal" size={16} color="#4FFFB0" />
+                <Text style={styles.actionBtnSecondaryTxt}>More</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Secondary Actions Row */}
-            <View style={styles.cardActionsSecondary}>
-              <TouchableOpacity style={styles.secondaryBtn} onPress={() => onSetReminder?.(activeItem)} activeOpacity={0.85}>
-                <Ionicons name="alarm-outline" size={14} color="#4FFFB0" />
-                <Text style={styles.secondaryBtnTxt}>Remind</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryBtn} onPress={handleMoreInfoPress} activeOpacity={0.85}>
-                <Ionicons name="ellipsis-horizontal" size={14} color="#4FFFB0" />
-                <Text style={styles.secondaryBtnTxt}>More</Text>
-              </TouchableOpacity>
-            </View>
+            {/* Remind Button - Full width below */}
+            <TouchableOpacity 
+              style={styles.remindBtnFull} 
+              onPress={() => {
+                console.log('[PlanetZoom3D] Remind button pressed for:', activeItem?.name);
+                if (onSetReminder && activeItem) {
+                  onSetReminder(activeItem);
+                }
+              }} 
+              activeOpacity={0.85}
+            >
+              <Ionicons name="alarm-outline" size={16} color="#4FFFB0" />
+              <Text style={styles.remindBtnFullTxt}>Set Reminder</Text>
+            </TouchableOpacity>
           </View>
 
           {/* More Info Popup - wide rectangle at bottom */}
@@ -721,6 +744,64 @@ const styles = StyleSheet.create({
   healthBadgeRow: { marginTop: 4 },
   sub: { color: '#888', fontSize: 11, textAlign: 'center', marginTop: 6, marginBottom: 2 },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+
+  // Action Buttons Row - Message, More, Remind
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+  },
+  actionBtnPrimary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#4FFFB0',
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  actionBtnPrimaryTxt: {
+    color: '#000',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  actionBtnSecondary: {
+    flex: 0.7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(79, 255, 176, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.4)',
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  actionBtnSecondaryTxt: {
+    color: '#4FFFB0',
+    fontWeight: '600',
+    fontSize: 11,
+  },
+  // Full-width Remind button below Message/More row
+  remindBtnFull: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(79, 255, 176, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.3)',
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  remindBtnFullTxt: {
+    color: '#4FFFB0',
+    fontWeight: '600',
+    fontSize: 12,
+  },
 
   // Health Section Styles (surfaced controls)
   healthSection: {

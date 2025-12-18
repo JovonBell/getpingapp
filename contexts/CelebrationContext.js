@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import {
   AchievementCelebration,
   StreakCelebration,
@@ -26,6 +26,18 @@ export function CelebrationProvider({ children }) {
 
   // Queue for multiple celebrations
   const [celebrationQueue, setCelebrationQueue] = useState([]);
+
+  // CRITICAL: Track timeout IDs to prevent memory leaks and ghost celebrations
+  const timeoutIdsRef = useRef([]);
+
+  // Cleanup all pending timeouts on unmount
+  useEffect(() => {
+    return () => {
+      console.log('[CelebrationContext] Cleaning up', timeoutIdsRef.current.length, 'pending timeouts');
+      timeoutIdsRef.current.forEach(id => clearTimeout(id));
+      timeoutIdsRef.current = [];
+    };
+  }, []);
 
   /**
    * Show achievement celebration
@@ -86,8 +98,11 @@ export function CelebrationProvider({ children }) {
     const [next, ...rest] = celebrationQueue;
     setCelebrationQueue(rest);
 
-    // Small delay before showing next celebration
-    setTimeout(() => {
+    // Small delay before showing next celebration - track the timeout
+    const timeoutId = setTimeout(() => {
+      // Remove this timeout from tracking
+      timeoutIdsRef.current = timeoutIdsRef.current.filter(id => id !== timeoutId);
+      
       switch (next.type) {
         case 'achievement':
           setCurrentAchievement(next.data);
@@ -103,6 +118,9 @@ export function CelebrationProvider({ children }) {
           break;
       }
     }, 500);
+    
+    // Track this timeout for cleanup
+    timeoutIdsRef.current.push(timeoutId);
   }, [celebrationQueue]);
 
   /**
@@ -139,10 +157,15 @@ export function CelebrationProvider({ children }) {
     if (!achievements || achievements.length === 0) return;
 
     achievements.forEach((achievement, index) => {
-      // Stagger celebrations
-      setTimeout(() => {
+      // Stagger celebrations - track the timeout for cleanup
+      const timeoutId = setTimeout(() => {
+        // Remove this timeout from tracking
+        timeoutIdsRef.current = timeoutIdsRef.current.filter(id => id !== timeoutId);
         celebrateAchievement(achievement);
       }, index * 3500); // 3.5 seconds between each
+      
+      // Track this timeout for cleanup
+      timeoutIdsRef.current.push(timeoutId);
     });
   }, [celebrateAchievement]);
 

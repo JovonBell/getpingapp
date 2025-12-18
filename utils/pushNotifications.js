@@ -127,40 +127,59 @@ export async function sendExpoPush(tokens, { title, body, data }) {
 export async function scheduleReminderNotification(reminder) {
   try {
     if (!reminder || !reminder.due_date) {
+      console.error('[Notifications] ❌ Invalid reminder - missing due_date');
       return { success: false, error: 'Invalid reminder' };
     }
 
     const dueDate = new Date(reminder.due_date);
     const now = new Date();
 
+    console.log('[Notifications] 📅 Scheduling reminder for:', dueDate.toLocaleString());
+    console.log('[Notifications] ⏰ Current time:', now.toLocaleString());
+
     // Don't schedule if in the past
     if (dueDate <= now) {
-      console.log('[Notifications] Reminder is in the past, skipping schedule');
+      console.log('[Notifications] ⚠️ Reminder is in the past, skipping schedule');
       return { success: true, notificationId: null, skipped: true };
     }
 
     // Calculate seconds until due
     const secondsUntilDue = Math.floor((dueDate.getTime() - now.getTime()) / 1000);
+    const minutesUntilDue = Math.round(secondsUntilDue / 60);
+    const hoursUntilDue = Math.round(secondsUntilDue / 3600);
+
+    console.log('[Notifications] ⏳ Time until reminder:', {
+      seconds: secondsUntilDue,
+      minutes: minutesUntilDue,
+      hours: hoursUntilDue,
+    });
+
+    const notificationContent = {
+      title: getReminderTitle(reminder),
+      body: reminder.title || 'Time to reach out!',
+      data: {
+        type: 'reminder',
+        reminderId: reminder.id,
+        contactId: reminder.imported_contact_id,
+        contactName: reminder.contact_name,
+      },
+      sound: 'default',
+      ...(Platform.OS === 'android' && { channelId: 'reminders' }),
+    };
+
+    console.log('[Notifications] 📤 Scheduling with content:', notificationContent.title);
 
     const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: getReminderTitle(reminder),
-        body: reminder.title || 'Time to reach out!',
-        data: {
-          type: 'reminder',
-          reminderId: reminder.id,
-          contactId: reminder.imported_contact_id,
-          contactName: reminder.contact_name,
-        },
-        sound: 'default',
-        ...(Platform.OS === 'android' && { channelId: 'reminders' }),
-      },
+      content: notificationContent,
       trigger: {
+        type: 'timeInterval',
         seconds: secondsUntilDue,
+        repeats: false,
       },
     });
 
-    console.log('[Notifications] Scheduled reminder:', notificationId, 'in', secondsUntilDue, 'seconds');
+    console.log('[Notifications] ✅ Successfully scheduled! ID:', notificationId);
+    console.log('[Notifications] 🔔 You will be notified in', minutesUntilDue, 'minutes');
 
     // Store notification ID in database for later cancellation
     await supabase
@@ -168,9 +187,14 @@ export async function scheduleReminderNotification(reminder) {
       .update({ notification_id: notificationId })
       .eq('id', reminder.id);
 
-    return { success: true, notificationId };
+    return { success: true, notificationId, secondsUntilDue, dueDate: dueDate.toISOString() };
   } catch (error) {
-    console.error('[Notifications] Failed to schedule reminder:', error);
+    console.error('[Notifications] ❌ Failed to schedule reminder:', error);
+    console.error('[Notifications] Error details:', {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack?.slice(0, 200),
+    });
     return { success: false, error: error?.message || String(error) };
   }
 }
@@ -283,7 +307,9 @@ export async function scheduleBirthdayNotification(contact, birthdayDate) {
         ...(Platform.OS === 'android' && { channelId: 'reminders' }),
       },
       trigger: {
+        type: 'timeInterval',
         seconds: secondsUntil,
+        repeats: false,
       },
     });
 
@@ -334,7 +360,9 @@ export async function scheduleStreakWarning(currentStreak) {
         ...(Platform.OS === 'android' && { channelId: 'reminders' }),
       },
       trigger: {
+        type: 'timeInterval',
         seconds: secondsUntil,
+        repeats: false,
       },
     });
 
@@ -423,6 +451,76 @@ export async function setBadgeCount(count) {
     return { success: true };
   } catch (error) {
     return { success: false, error: error?.message || String(error) };
+  }
+}
+
+/**
+ * Schedule an immediate notification (appears instantly)
+ * @param {string} title - Notification title
+ * @param {string} body - Notification body
+ * @param {object} data - Optional data payload
+ * @returns {object} - { success, notificationId, error }
+ */
+export async function scheduleImmediateNotification(title, body, data = {}) {
+  try {
+    // Ensure notification permissions are granted
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
+      console.log('[Notifications] Requesting notification permissions...');
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    
+    if (finalStatus !== 'granted') {
+      console.warn('[Notifications] Notification permissions not granted.');
+      return { success: false, error: 'Notification permissions not granted.' };
+    }
+
+    console.log('[Notifications] Scheduling immediate notification with title:', title);
+    
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        data,
+        sound: 'default',
+        ...(Platform.OS === 'android' && { channelId: 'reminders' }),
+      },
+      trigger: null, // null trigger means immediate notification
+    });
+    
+    console.log('[Notifications] ✅ Scheduled immediate notification:', notificationId);
+    return { success: true, notificationId };
+  } catch (error) {
+    console.error('[Notifications] ❌ Failed to schedule immediate notification:', error);
+    return { success: false, error: error?.message || String(error) };
+  }
+}
+
+/**
+ * Debug: Get all scheduled notifications
+ * Useful for verifying that reminders were actually scheduled
+ */
+export async function getAllScheduledNotifications() {
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    console.log('[Notifications] 📋 Total scheduled notifications:', scheduled.length);
+    
+    scheduled.forEach((notif, index) => {
+      console.log(`[Notifications] ${index + 1}.`, {
+        id: notif.identifier,
+        title: notif.content.title,
+        trigger: notif.trigger,
+        type: notif.content.data?.type,
+      });
+    });
+    
+    return { success: true, scheduled, count: scheduled.length };
+  } catch (error) {
+    console.error('[Notifications] Failed to get scheduled notifications:', error);
+    return { success: false, error: error?.message || String(error), scheduled: [] };
   }
 }
 

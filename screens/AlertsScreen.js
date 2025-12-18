@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../lib/supabase';
 import { getCurrentUser } from '../utils/supabaseStorage';
 import { getUnreadMessageCount } from '../utils/messagesStorage';
 import { getAlerts, markAlertRead, markAllAlertsRead, getUnreadAlertCount } from '../utils/alertsStorage';
@@ -69,6 +70,21 @@ function formatRelativeTime(dateString) {
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
   return date.toLocaleDateString();
+}
+
+// Generate pre-populated message based on reminder type
+function getPrePopulatedMessage(reminderType, contactName) {
+  switch (reminderType) {
+    case 'birthday':
+      return `Happy Birthday!! 🎂🎉🎈`;
+    case 'anniversary':
+      return `Happy Anniversary!! 💝🎉✨`;
+    case 'follow_up':
+    case 'reconnect':
+      return `Hey ${contactName}, how's everything been?`;
+    default:
+      return `Hey ${contactName}, hope you're doing well!`;
+  }
 }
 
 export default function AlertsScreen({ navigation }) {
@@ -182,12 +198,109 @@ export default function AlertsScreen({ navigation }) {
     }
   };
 
-  // Handle date message
-  const handleDateMessage = (dateInfo) => {
-    const phone = dateInfo.imported_contacts?.phone;
-    if (phone) {
-      const phoneNumber = phone.replace(/[^0-9]/g, '');
-      Linking.openURL(`sms:${phoneNumber}`);
+  // Handle reminder message - USING EXACT NOTIFICATION LOGIC
+  const handleReminderMessage = async (reminder) => {
+    console.log('[AlertsScreen] 📱 handleReminderMessage called for:', reminder.title);
+    console.log('[AlertsScreen] Contact ID:', reminder.imported_contact_id);
+    
+    if (!reminder.imported_contact_id) {
+      console.warn('[AlertsScreen] ⚠️ No contact linked to this reminder');
+      return;
+    }
+    
+    try {
+      // Fetch contact directly from database - SAME AS NOTIFICATION HANDLER
+      const { data: contactData, error: contactError } = await supabase
+        .from('imported_contacts')
+        .select('name, phone')
+        .eq('id', reminder.imported_contact_id)
+        .single();
+
+      if (contactError) {
+        console.error('[AlertsScreen] ❌ Failed to fetch contact:', contactError);
+        return;
+      }
+
+      if (!contactData || !contactData.phone) {
+        console.warn('[AlertsScreen] ⚠️ Contact has no phone number');
+        return;
+      }
+
+      console.log('[AlertsScreen] ✅ Contact loaded:', contactData.name);
+      console.log('[AlertsScreen] ✅ Phone:', contactData.phone);
+
+      const phoneNumber = contactData.phone.replace(/[^0-9]/g, '');
+      const contactName = contactData.name || 'there';
+      
+      // Generate pre-populated message based on reminder type
+      const message = getPrePopulatedMessage(reminder.reminder_type, contactName);
+      const encodedMessage = encodeURIComponent(message);
+      const smsUrl = `sms:${phoneNumber}&body=${encodedMessage}`;
+      
+      console.log('[AlertsScreen] 🚀 Opening iMessage with URL:', smsUrl);
+      
+      try {
+        await Linking.openURL(smsUrl);
+        console.log('[AlertsScreen] ✅ iMessage opened successfully!');
+      } catch (openError) {
+        // This is expected - iOS sometimes throws an error even when it works
+        console.log('[AlertsScreen] ℹ️ SMS URL triggered (error is normal):', openError.message);
+      }
+    } catch (err) {
+      console.error('[AlertsScreen] ❌ Error in handleReminderMessage:', err);
+    }
+  };
+
+  // Handle date message - USING EXACT NOTIFICATION LOGIC
+  const handleDateMessage = async (dateInfo) => {
+    console.log('[AlertsScreen] 🎂 handleDateMessage called for:', dateInfo.date_type);
+    console.log('[AlertsScreen] Contact ID:', dateInfo.imported_contact_id);
+    
+    if (!dateInfo.imported_contact_id) {
+      console.warn('[AlertsScreen] ⚠️ No contact linked to this date');
+      return;
+    }
+    
+    try {
+      // Fetch contact directly from database - SAME AS NOTIFICATION HANDLER
+      const { data: contactData, error: contactError } = await supabase
+        .from('imported_contacts')
+        .select('name, phone')
+        .eq('id', dateInfo.imported_contact_id)
+        .single();
+
+      if (contactError) {
+        console.error('[AlertsScreen] ❌ Failed to fetch contact for date:', contactError);
+        return;
+      }
+
+      if (!contactData || !contactData.phone) {
+        console.warn('[AlertsScreen] ⚠️ Contact has no phone number');
+        return;
+      }
+
+      console.log('[AlertsScreen] ✅ Contact loaded:', contactData.name);
+      console.log('[AlertsScreen] ✅ Phone:', contactData.phone);
+
+      const phoneNumber = contactData.phone.replace(/[^0-9]/g, '');
+      const contactName = contactData.name || 'there';
+      
+      // Generate pre-populated message based on date type
+      const message = getPrePopulatedMessage(dateInfo.date_type, contactName);
+      const encodedMessage = encodeURIComponent(message);
+      const smsUrl = `sms:${phoneNumber}&body=${encodedMessage}`;
+      
+      console.log('[AlertsScreen] 🚀 Opening iMessage for date with URL:', smsUrl);
+      
+      try {
+        await Linking.openURL(smsUrl);
+        console.log('[AlertsScreen] ✅ iMessage opened successfully!');
+      } catch (openError) {
+        // This is expected - iOS sometimes throws an error even when it works
+        console.log('[AlertsScreen] ℹ️ SMS URL triggered (error is normal):', openError.message);
+      }
+    } catch (err) {
+      console.error('[AlertsScreen] ❌ Error in handleDateMessage:', err);
     }
   };
 
@@ -256,49 +369,112 @@ export default function AlertsScreen({ navigation }) {
     );
   };
 
-  // Render a reminder item
+  // Render a reminder item - REBUILT FOR RELIABILITY
   const renderReminderItem = (reminder, isOverdue = false) => {
     const dueInfo = formatDueDate(reminder.due_date);
     const icon = getReminderIcon(reminder.reminder_type);
     const color = isOverdue ? '#FF6B6B' : getReminderColor(reminder);
-    const contactName = reminder.imported_contacts?.name || reminder.imported_contacts?.display_name;
+    const contactName = reminder.imported_contacts?.name || reminder.contact_name || 'Contact';
+    const hasContactId = !!reminder.imported_contact_id;
+
+    // Handler for icon press - Fetches contact on demand
+    const handleIconPress = () => {
+      console.log('='.repeat(50));
+      console.log('[AlertsScreen] 🔵 BLUE ICON PRESSED!');
+      console.log('[AlertsScreen] Reminder:', reminder.title);
+      console.log('[AlertsScreen] Type:', reminder.reminder_type);
+      console.log('[AlertsScreen] Contact ID:', reminder.imported_contact_id);
+      console.log('='.repeat(50));
+      
+      // Call the message handler which fetches contact directly
+      handleReminderMessage(reminder);
+    };
 
     return (
-      <View key={reminder.id} style={styles.reminderItem}>
-        <View style={[styles.reminderIcon, { backgroundColor: `${color}20` }]}>
-          <Ionicons name={icon} size={18} color={color} />
-        </View>
-        <View style={styles.reminderContent}>
+      <View key={reminder.id} style={styles.reminderItem} pointerEvents="box-none">
+        {/* BLUE ICON - ALWAYS TAPPABLE IF HAS CONTACT ID */}
+        {hasContactId ? (
+          <TouchableOpacity
+            style={[styles.reminderIconButton, { backgroundColor: `${color}20` }]}
+            onPress={handleIconPress}
+            activeOpacity={0.5}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          >
+            <Ionicons name={icon} size={20} color={color} />
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.reminderIconButton, { backgroundColor: `${color}20`, opacity: 0.5 }]}>
+            <Ionicons name={icon} size={20} color={color} />
+          </View>
+        )}
+
+        {/* TEXT CONTENT */}
+        <View style={styles.reminderContent} pointerEvents="none">
           <Text style={styles.reminderTitle} numberOfLines={1}>{reminder.title}</Text>
           <Text style={[styles.reminderDue, isOverdue && styles.reminderDueOverdue]}>
             {dueInfo.label}
             {contactName && ` • ${contactName}`}
           </Text>
         </View>
+
+        {/* CHECKMARK BUTTON */}
         <TouchableOpacity
-          style={styles.reminderAction}
-          onPress={() => handleReminderComplete(reminder)}
+          style={styles.reminderCheckButton}
+          onPress={() => {
+            console.log('[AlertsScreen] ✅ Checkmark pressed for:', reminder.title);
+            handleReminderComplete(reminder);
+          }}
+          activeOpacity={0.5}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="checkmark-circle-outline" size={22} color="#4FFFB0" />
+          <Ionicons name="checkmark-circle-outline" size={24} color="#4FFFB0" />
         </TouchableOpacity>
       </View>
     );
   };
 
-  // Render a date item (birthday/anniversary)
+  // Render a date item (birthday/anniversary) - REBUILT FOR RELIABILITY
   const renderDateItem = (dateInfo) => {
     const isBirthday = dateInfo.date_type === 'birthday';
     const icon = isBirthday ? 'gift-outline' : 'heart-outline';
     const color = isBirthday ? '#FF6B6B' : '#FF8C42';
-    const contactName = dateInfo.imported_contacts?.name || dateInfo.imported_contacts?.display_name;
+    const contactName = dateInfo.imported_contacts?.name || dateInfo.contact_name || 'Contact';
     const dueLabel = getDaysUntilDate(dateInfo.date_value);
+    const hasContactId = !!dateInfo.imported_contact_id;
+
+    // Handler for icon press - Fetches contact on demand
+    const handleIconPress = () => {
+      console.log('='.repeat(50));
+      console.log(`[AlertsScreen] ${isBirthday ? '🎂' : '💝'} DATE ICON PRESSED!`);
+      console.log('[AlertsScreen] Contact:', contactName);
+      console.log('[AlertsScreen] Type:', dateInfo.date_type);
+      console.log('[AlertsScreen] Contact ID:', dateInfo.imported_contact_id);
+      console.log('='.repeat(50));
+      
+      // Call the date message handler which fetches contact directly
+      handleDateMessage(dateInfo);
+    };
 
     return (
-      <View key={dateInfo.id} style={styles.reminderItem}>
-        <View style={[styles.reminderIcon, { backgroundColor: `${color}20` }]}>
-          <Ionicons name={icon} size={18} color={color} />
-        </View>
-        <View style={styles.reminderContent}>
+      <View key={dateInfo.id} style={styles.reminderItem} pointerEvents="box-none">
+        {/* DATE ICON - ALWAYS TAPPABLE IF HAS CONTACT ID */}
+        {hasContactId ? (
+          <TouchableOpacity
+            style={[styles.reminderIconButton, { backgroundColor: `${color}20` }]}
+            onPress={handleIconPress}
+            activeOpacity={0.5}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          >
+            <Ionicons name={icon} size={20} color={color} />
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.reminderIconButton, { backgroundColor: `${color}20`, opacity: 0.5 }]}>
+            <Ionicons name={icon} size={20} color={color} />
+          </View>
+        )}
+
+        {/* TEXT CONTENT */}
+        <View style={styles.reminderContent} pointerEvents="none">
           <Text style={styles.reminderTitle} numberOfLines={1}>
             {contactName}'s {isBirthday ? 'Birthday' : 'Anniversary'}
           </Text>
@@ -306,12 +482,22 @@ export default function AlertsScreen({ navigation }) {
             {dueLabel}
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.reminderAction}
-          onPress={() => handleDateMessage(dateInfo)}
-        >
-          <Ionicons name="chatbubble-outline" size={20} color="#4FFFB0" />
-        </TouchableOpacity>
+
+        {/* MESSAGE BUTTON - ALWAYS TAPPABLE IF HAS CONTACT ID */}
+        {hasContactId ? (
+          <TouchableOpacity
+            style={styles.reminderCheckButton}
+            onPress={handleIconPress}
+            activeOpacity={0.5}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="chatbubble-outline" size={22} color="#4FFFB0" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.reminderCheckButton}>
+            <Ionicons name="chatbubble-outline" size={22} color="#666666" />
+          </View>
+        )}
       </View>
     );
   };
@@ -654,19 +840,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderRadius: 12,
-    padding: 12,
+    padding: 8,
     marginBottom: 8,
   },
-  reminderIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  reminderIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   reminderContent: {
     flex: 1,
+    paddingVertical: 4,
   },
   reminderTitle: {
     fontSize: 14,
@@ -681,6 +868,18 @@ const styles = StyleSheet.create({
   reminderDueOverdue: {
     color: '#FF6B6B',
     fontWeight: '500',
+  },
+  reminderCheckButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  reminderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   reminderAction: {
     padding: 4,

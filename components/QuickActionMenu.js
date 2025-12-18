@@ -5,6 +5,9 @@ import { Ionicons } from '@expo/vector-icons';
 /**
  * Quick action menu for long-press on contacts
  * Shows a floating menu with quick actions
+ * 
+ * CRITICAL: This component must NEVER block touches permanently.
+ * Safety timeout auto-closes after 10 seconds as a failsafe.
  */
 export function QuickActionMenu({
   visible,
@@ -18,6 +21,7 @@ export function QuickActionMenu({
 }) {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
+  const safetyTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (visible) {
@@ -25,6 +29,12 @@ export function QuickActionMenu({
       if (Platform.OS === 'ios') {
         Vibration.vibrate(10);
       }
+
+      // CRITICAL: Safety timeout - auto-close after 10 seconds to prevent dead screen
+      safetyTimeoutRef.current = setTimeout(() => {
+        console.log('[QuickActionMenu] Safety timeout triggered - auto-closing');
+        onClose?.();
+      }, 10000);
 
       // Animate in
       Animated.parallel([
@@ -41,6 +51,12 @@ export function QuickActionMenu({
         }),
       ]).start();
     } else {
+      // Clear safety timeout when closing
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+        safetyTimeoutRef.current = null;
+      }
+
       // Animate out
       Animated.parallel([
         Animated.timing(scaleAnim, {
@@ -55,7 +71,15 @@ export function QuickActionMenu({
         }),
       ]).start();
     }
-  }, [visible]);
+
+    // Cleanup on unmount
+    return () => {
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+        safetyTimeoutRef.current = null;
+      }
+    };
+  }, [visible, onClose]);
 
   if (!visible) return null;
 

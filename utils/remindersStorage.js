@@ -1,8 +1,10 @@
 import { supabase } from '../lib/supabase';
+import * as Notifications from 'expo-notifications';
 import {
   scheduleReminderNotification,
   cancelScheduledNotification,
   scheduleBirthdayNotification,
+  scheduleImmediateNotification,
 } from './pushNotifications';
 
 /**
@@ -50,11 +52,53 @@ export async function createReminder(userId, {
     console.log('[REMINDERS] ✅ Reminder created:', data.id);
 
     // Schedule push notification for this reminder
+    let scheduledSuccessfully = false;
     try {
-      await scheduleReminderNotification(data);
+      const scheduleResult = await scheduleReminderNotification(data);
+      scheduledSuccessfully = scheduleResult.success;
+      
+      if (scheduleResult.success) {
+        console.log('[REMINDERS] ✅ Scheduled notification for:', new Date(dueDate).toLocaleString());
+      } else {
+        console.warn('[REMINDERS] ⚠️ Failed to schedule notification:', scheduleResult.error);
+      }
     } catch (notifError) {
-      console.warn('[REMINDERS] Failed to schedule notification:', notifError);
-      // Don't fail the whole operation if notification fails
+      console.warn('[REMINDERS] ⚠️ Notification error:', notifError);
+    }
+
+    // Show immediate confirmation notification
+    try {
+      const dueDateTime = new Date(dueDate);
+      const now = new Date();
+      const hoursUntil = Math.round((dueDateTime - now) / (1000 * 60 * 60));
+      const minutesUntil = Math.round((dueDateTime - now) / (1000 * 60));
+      
+      let timeText = '';
+      if (minutesUntil < 60) {
+        timeText = `in ${minutesUntil} minute${minutesUntil !== 1 ? 's' : ''}`;
+      } else if (hoursUntil < 24) {
+        timeText = `in ${hoursUntil} hour${hoursUntil !== 1 ? 's' : ''}`;
+      } else {
+        const days = Math.round(hoursUntil / 24);
+        timeText = `in ${days} day${days !== 1 ? 's' : ''}`;
+      }
+      
+      const confirmResult = await scheduleImmediateNotification(
+        "Reminder Set! ✓",
+        scheduledSuccessfully 
+          ? `You'll be reminded ${timeText}: ${title}` 
+          : `Reminder saved: ${title}`,
+        { type: 'reminder_confirmation' }
+      );
+      
+      if (confirmResult.success) {
+        console.log('[REMINDERS] ✅ Immediate confirmation notification sent');
+      } else {
+        console.warn('[REMINDERS] ⚠️ Failed to send confirmation:', confirmResult.error);
+      }
+    } catch (confirmError) {
+      console.warn('[REMINDERS] ⚠️ Failed to send confirmation:', confirmError);
+      // Don't fail the operation if confirmation fails
     }
 
     return { success: true, reminder: data };
@@ -133,23 +177,81 @@ export async function getUpcomingReminders(userId, daysAhead = 7) {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + daysAhead);
 
-    const { data, error } = await supabase
+    // Try to load with contact data first
+    let { data, error } = await supabase
       .from('reminders')
-      .select('*')
+      .select(`
+        *,
+        imported_contacts (
+          id,
+          name,
+          phone,
+          email
+        )
+      `)
       .eq('user_id', userId)
       .eq('is_completed', false)
       .eq('is_dismissed', false)
       .lte('due_date', futureDate.toISOString())
       .order('due_date', { ascending: true });
 
+    // If the join fails, fall back to basic query and manually fetch contacts
     if (error) {
-      const errMsg = error.message?.toLowerCase() || '';
-      if (error.code === '42P01' || errMsg.includes('does not exist')) {
-        return { success: true, reminders: [] };
+      console.warn('[REMINDERS] Contact join failed, falling back to basic query:', error.message);
+      const fallback = await supabase
+        .from('reminders')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_completed', false)
+        .eq('is_dismissed', false)
+        .lte('due_date', futureDate.toISOString())
+        .order('due_date', { ascending: true });
+      
+      if (fallback.error) {
+        const errMsg = fallback.error.message?.toLowerCase() || '';
+        if (fallback.error.code === '42P01' || errMsg.includes('does not exist')) {
+          return { success: true, reminders: [] };
+        }
+        throw fallback.error;
       }
-      throw error;
+      
+      data = fallback.data;
+      
+      // Manually fetch contact data for each reminder
+      if (data && data.length > 0) {
+        console.log('[REMINDERS] Manually fetching contact data for', data.length, 'reminders');
+        const contactIds = data.map(r => r.imported_contact_id).filter(Boolean);
+        
+        if (contactIds.length > 0) {
+          const { data: contacts } = await supabase
+            .from('imported_contacts')
+            .select('id, name, phone, email')
+            .in('id', contactIds);
+          
+          // Map contacts back to reminders
+          if (contacts) {
+            data = data.map(reminder => {
+              const contact = contacts.find(c => c.id === reminder.imported_contact_id);
+              return {
+                ...reminder,
+                imported_contacts: contact || null,
+              };
+            });
+          }
+        }
+      }
     }
 
+    console.log('[REMINDERS] ✅ Loaded', data?.length || 0, 'upcoming reminders');
+    if (data && data.length > 0) {
+      console.log('[REMINDERS] Sample reminder:', {
+        id: data[0].id,
+        title: data[0].title,
+        contactId: data[0].imported_contact_id,
+        hasContact: !!data[0].imported_contacts,
+        contactPhone: data[0].imported_contacts?.phone,
+      });
+    }
     return { success: true, reminders: data || [] };
   } catch (error) {
     console.error('[REMINDERS] ❌ Failed to get upcoming reminders:', error);
@@ -170,23 +272,72 @@ export async function getOverdueReminders(userId) {
 
     const now = new Date().toISOString();
 
-    const { data, error } = await supabase
+    // Try to load with contact data first
+    let { data, error } = await supabase
       .from('reminders')
-      .select('*')
+      .select(`
+        *,
+        imported_contacts (
+          id,
+          name,
+          phone,
+          email
+        )
+      `)
       .eq('user_id', userId)
       .eq('is_completed', false)
       .eq('is_dismissed', false)
       .lt('due_date', now)
-      .order('due_date', { ascending: true });
+      .order('due_date', { ascending: true});
 
+    // If the join fails, fall back to basic query and manually fetch contacts
     if (error) {
-      const errMsg = error.message?.toLowerCase() || '';
-      if (error.code === '42P01' || errMsg.includes('does not exist')) {
-        return { success: true, reminders: [] };
+      console.warn('[REMINDERS] Contact join failed for overdue, falling back:', error.message);
+      const fallback = await supabase
+        .from('reminders')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_completed', false)
+        .eq('is_dismissed', false)
+        .lt('due_date', now)
+        .order('due_date', { ascending: true });
+      
+      if (fallback.error) {
+        const errMsg = fallback.error.message?.toLowerCase() || '';
+        if (fallback.error.code === '42P01' || errMsg.includes('does not exist')) {
+          return { success: true, reminders: [] };
+        }
+        throw fallback.error;
       }
-      throw error;
+      
+      data = fallback.data;
+      
+      // Manually fetch contact data for each reminder
+      if (data && data.length > 0) {
+        console.log('[REMINDERS] Manually fetching contact data for', data.length, 'overdue reminders');
+        const contactIds = data.map(r => r.imported_contact_id).filter(Boolean);
+        
+        if (contactIds.length > 0) {
+          const { data: contacts } = await supabase
+            .from('imported_contacts')
+            .select('id, name, phone, email')
+            .in('id', contactIds);
+          
+          // Map contacts back to reminders
+          if (contacts) {
+            data = data.map(reminder => {
+              const contact = contacts.find(c => c.id === reminder.imported_contact_id);
+              return {
+                ...reminder,
+                imported_contacts: contact || null,
+              };
+            });
+          }
+        }
+      }
     }
 
+    console.log('[REMINDERS] ✅ Loaded', data?.length || 0, 'overdue reminders');
     return { success: true, reminders: data || [] };
   } catch (error) {
     console.error('[REMINDERS] ❌ Failed to get overdue reminders:', error);
@@ -447,18 +598,37 @@ export async function getUpcomingDates(userId, daysAhead = 30) {
     const todayMonth = today.getMonth() + 1;
     const todayDay = today.getDate();
 
-    // Get all contact dates for this user
-    const { data, error } = await supabase
+    // Get all contact dates for this user with contact info
+    let { data, error } = await supabase
       .from('contact_dates')
-      .select('*')
+      .select(`
+        *,
+        imported_contacts (
+          id,
+          name,
+          phone,
+          email
+        )
+      `)
       .eq('user_id', userId);
 
+    // If the join fails, fall back to basic query
     if (error) {
-      const errMsg = error.message?.toLowerCase() || '';
-      if (error.code === '42P01' || errMsg.includes('does not exist')) {
-        return { success: true, dates: [] };
+      console.warn('[REMINDERS] Contact join failed for dates, falling back:', error.message);
+      const fallback = await supabase
+        .from('contact_dates')
+        .select('*')
+        .eq('user_id', userId);
+      
+      if (fallback.error) {
+        const errMsg = fallback.error.message?.toLowerCase() || '';
+        if (fallback.error.code === '42P01' || errMsg.includes('does not exist')) {
+          return { success: true, dates: [] };
+        }
+        throw fallback.error;
       }
-      throw error;
+      
+      data = fallback.data;
     }
 
     // Filter to upcoming dates (considering year wrap-around for birthdays)
@@ -501,6 +671,7 @@ export async function getUpcomingDates(userId, daysAhead = 30) {
       };
     }).sort((a, b) => a.daysUntil - b.daysUntil);
 
+    console.log('[REMINDERS] ✅ Loaded', upcoming.length, 'upcoming dates with contact data');
     return { success: true, dates: upcoming };
   } catch (error) {
     console.error('[REMINDERS] ❌ Failed to get upcoming dates:', error);

@@ -9,6 +9,7 @@ import { formatDueDate, getReminderIcon, getReminderColor } from '../utils/remin
  * @param {function} onPress - Press handler
  * @param {function} onComplete - Complete/check off handler
  * @param {function} onDismiss - Dismiss handler
+ * @param {function} onMessage - Message handler
  * @param {boolean} showContact - Whether to show contact name
  */
 export default function ReminderCard({
@@ -16,6 +17,7 @@ export default function ReminderCard({
   onPress,
   onComplete,
   onDismiss,
+  onMessage,
   showContact = true,
 }) {
   if (!reminder) return null;
@@ -25,14 +27,15 @@ export default function ReminderCard({
   const color = getReminderColor(reminder);
   const isOverdue = dueInfo.isOverdue;
   const contactName = reminder.imported_contacts?.name || reminder.imported_contacts?.display_name;
+  const hasPhone = reminder.imported_contacts?.phone;
 
   return (
-    <TouchableOpacity
-      style={[styles.container, isOverdue && styles.containerOverdue]}
-      onPress={() => onPress?.(reminder)}
-      activeOpacity={0.8}
-    >
-      <View style={styles.content}>
+    <View style={[styles.container, isOverdue && styles.containerOverdue]}>
+      <TouchableOpacity
+        style={styles.content}
+        onPress={() => onPress?.(reminder)}
+        activeOpacity={0.8}
+      >
         {/* Icon */}
         <View style={[styles.iconContainer, { backgroundColor: `${color}20` }]}>
           <Ionicons name={icon} size={22} color={color} />
@@ -83,10 +86,22 @@ export default function ReminderCard({
             </Text>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* Action buttons */}
       <View style={styles.actions}>
+        {hasPhone && (
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              console.log('[ReminderCard] Message button pressed for:', reminder.title);
+              onMessage?.(reminder);
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="chatbubble-outline" size={22} color="#4FFFB0" />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => onComplete?.(reminder)}
@@ -102,7 +117,7 @@ export default function ReminderCard({
           <Ionicons name="close-circle-outline" size={24} color="#666666" />
         </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -205,7 +220,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderRadius: 16,
-    padding: 14,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
@@ -217,6 +231,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
+    padding: 14,
   },
   iconContainer: {
     width: 44,
@@ -286,7 +301,8 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'column',
     gap: 4,
-    marginLeft: 8,
+    paddingRight: 14,
+    paddingVertical: 14,
   },
   actionButton: {
     padding: 4,

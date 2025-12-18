@@ -53,7 +53,7 @@ export function SwipeHint({ visible, onDismiss }) {
   if (!visible) return null;
 
   return (
-    <Animated.View style={[styles.hintContainer, { opacity }]}>
+    <Animated.View style={[styles.hintContainer, { opacity }]} pointerEvents="box-none">
       <TouchableOpacity style={styles.hintBox} onPress={onDismiss} activeOpacity={0.9}>
         <Animated.View style={{ transform: [{ translateX }] }}>
           <Ionicons name="hand-left" size={32} color="#4FFFB0" />
@@ -113,7 +113,7 @@ export function PinchHint({ visible, onDismiss }) {
   if (!visible) return null;
 
   return (
-    <Animated.View style={[styles.hintContainer, { opacity }]}>
+    <Animated.View style={[styles.hintContainer, { opacity }]} pointerEvents="box-none">
       <TouchableOpacity style={styles.hintBox} onPress={onDismiss} activeOpacity={0.9}>
         <Animated.View style={[styles.pinchHands, { transform: [{ scale }] }]}>
           <Ionicons name="finger-print" size={28} color="#4FFFB0" />
@@ -173,7 +173,7 @@ export function TapHint({ visible, onDismiss, message = 'Tap a contact to view d
   if (!visible) return null;
 
   return (
-    <Animated.View style={[styles.hintContainerBottom, { opacity }]}>
+    <Animated.View style={[styles.hintContainerBottom, { opacity }]} pointerEvents="box-none">
       <TouchableOpacity style={styles.hintBoxSmall} onPress={onDismiss} activeOpacity={0.9}>
         <Animated.View style={{ transform: [{ scale }] }}>
           <Ionicons name="finger-print" size={24} color="#4FFFB0" />

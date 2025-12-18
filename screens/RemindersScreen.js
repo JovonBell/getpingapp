@@ -126,11 +126,50 @@ export default function RemindersScreen({ navigation }) {
     }
   };
 
-  const handleDateMessage = (dateInfo) => {
-    const phone = dateInfo.imported_contacts?.phone;
+  // Generate pre-populated message based on reminder type
+  const getPrePopulatedMessage = (reminderType, contactName) => {
+    switch (reminderType) {
+      case 'birthday':
+        return `Happy Birthday!! 🎂🎉🎈`;
+      case 'anniversary':
+        return `Happy Anniversary!! 💝🎉✨`;
+      case 'follow_up':
+      case 'reconnect':
+        return `Hey ${contactName}, how's everything been?`;
+      default:
+        return `Hey ${contactName}, hope you're doing well!`;
+    }
+  };
+
+  // Handle reminder message
+  const handleReminderMessage = (reminder) => {
+    console.log('[RemindersScreen] handleReminderMessage called for:', reminder.title);
+    const phone = reminder.imported_contacts?.phone;
+    const contactName = reminder.imported_contacts?.name || reminder.imported_contacts?.display_name || 'there';
+    console.log('[RemindersScreen] Contact phone:', phone, 'name:', contactName);
     if (phone) {
       const phoneNumber = phone.replace(/[^0-9]/g, '');
-      Linking.openURL(`sms:${phoneNumber}`);
+      const message = getPrePopulatedMessage(reminder.reminder_type, contactName);
+      const encodedMessage = encodeURIComponent(message);
+      const smsUrl = `sms:${phoneNumber}&body=${encodedMessage}`;
+      console.log('[RemindersScreen] Opening SMS URL:', smsUrl);
+      Linking.openURL(smsUrl).catch(err => {
+        console.error('[RemindersScreen] Failed to open SMS:', err);
+      });
+    } else {
+      console.warn('[RemindersScreen] No phone number available for reminder');
+    }
+  };
+
+  // Handle date message
+  const handleDateMessage = (dateInfo) => {
+    const phone = dateInfo.imported_contacts?.phone;
+    const contactName = dateInfo.imported_contacts?.name || dateInfo.imported_contacts?.display_name || 'there';
+    if (phone) {
+      const phoneNumber = phone.replace(/[^0-9]/g, '');
+      const message = getPrePopulatedMessage(dateInfo.date_type, contactName);
+      const encodedMessage = encodeURIComponent(message);
+      Linking.openURL(`sms:${phoneNumber}&body=${encodedMessage}`);
     }
   };
 
@@ -261,6 +300,7 @@ export default function RemindersScreen({ navigation }) {
                         onPress={handleReminderPress}
                         onComplete={handleComplete}
                         onDismiss={handleDismiss}
+                        onMessage={handleReminderMessage}
                       />
                     ))}
                   </View>
@@ -279,6 +319,7 @@ export default function RemindersScreen({ navigation }) {
                         onPress={handleReminderPress}
                         onComplete={handleComplete}
                         onDismiss={handleDismiss}
+                        onMessage={handleReminderMessage}
                       />
                     ))}
                   </View>

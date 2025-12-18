@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import { Ionicons } from '@expo/vector-icons';
 import { HealthBadge } from './HealthIndicator';
+import AddContactModal from './AddContactModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -17,6 +18,8 @@ export default function CircleZoom3D({
   contacts = [],
   onContactPress,
   onMessage,
+  onAddContact, // NEW: Handler for adding a contact to this circle (async function that accepts contacts array)
+  circleId, // NEW: Circle ID for adding contacts
 }) {
   // Note: Parent controls visibility by conditionally rendering this component
   const normalizedContacts = useMemo(() => {
@@ -31,6 +34,30 @@ export default function CircleZoom3D({
 
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [labelPositions, setLabelPositions] = useState([]);
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
+
+  // Memoize callbacks to prevent re-renders
+  const handleOpenModal = useCallback(() => {
+    setShowAddContactModal(true);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setShowAddContactModal(false);
+  }, []);
+
+  const handleSaveContacts = useCallback(async (selectedContacts) => {
+    try {
+      await onAddContact(selectedContacts);
+      setShowAddContactModal(false);
+    } catch (error) {
+      console.error('[CircleZoom3D] Failed to add contacts:', error);
+    }
+  }, [onAddContact]);
+
+  const existingContactIds = useMemo(() => 
+    normalizedContacts.map(c => c.id), 
+    [normalizedContacts]
+  );
 
   const stateRef = useRef({
     raf: null,
@@ -41,8 +68,8 @@ export default function CircleZoom3D({
     isPinching: false,
     lastX: 0,
     lastDistance: 0,
-    cameraDistance: 14, // Start zoomed out to see full orbit
-    targetCameraDistance: 14,
+    cameraDistance: 20, // Increased to accommodate much larger orbit radius (8.0)
+    targetCameraDistance: 20,
     touchStartTime: 0,
     touchStartPos: { x: 0, y: 0 },
     totalMovement: 0,
@@ -67,7 +94,7 @@ export default function CircleZoom3D({
     stateRef.current.orbitAngle = 0;
     stateRef.current.targetOrbitAngle = 0;
     stateRef.current.cameraDistance = 14;
-    stateRef.current.targetCameraDistance = 14;
+    stateRef.current.targetCameraDistance = 20;
     stateRef.current.isDragging = false;
     stateRef.current.isPinching = false;
     
@@ -87,6 +114,9 @@ export default function CircleZoom3D({
   }, []);
 
   const onContextCreate = async (gl) => {
+    console.log('[CircleZoom3D] 🚀 GL Context created!');
+    console.log('[CircleZoom3D] Contacts:', normalizedContacts.length);
+    
     glRef.current = gl;
     const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
 
@@ -100,7 +130,7 @@ export default function CircleZoom3D({
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
-    camera.position.set(0, 5, 14); // Start zoomed out
+    camera.position.set(0, 6, 20); // Start zoomed out to see much larger orbit
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
@@ -155,9 +185,9 @@ export default function CircleZoom3D({
     const nucleusGlow = new THREE.Mesh(nucleusGlowGeo, nucleusGlowMat);
     scene.add(nucleusGlow);
 
-    // Orbit ring - main
-    const ORBIT_RADIUS = 4.5;
-    const orbitRingGeo = new THREE.RingGeometry(ORBIT_RADIUS - 0.03, ORBIT_RADIUS + 0.03, 128);
+    // Orbit ring - main (increased radius for more spacious feel)
+    const ORBIT_RADIUS = 8.0; // Increased from 6.0 to 8.0 for much more spacing
+    const orbitRingGeo = new THREE.RingGeometry(ORBIT_RADIUS - 0.05, ORBIT_RADIUS + 0.05, 128);
     const orbitRingMat = new THREE.MeshBasicMaterial({
       color: new THREE.Color('#4FFFB0'),
       transparent: true,
@@ -196,7 +226,7 @@ export default function CircleZoom3D({
 
     // Create planet meshes for each contact
     const planetMeshes = [];
-    const PLANET_RADIUS = 0.45;
+    const PLANET_RADIUS = 0.5; // Slightly larger for better visibility
 
     normalizedContacts.forEach((contact, i) => {
       const planetGeo = new THREE.SphereGeometry(PLANET_RADIUS, 48, 48);
@@ -235,6 +265,10 @@ export default function CircleZoom3D({
     });
 
     planetMeshesRef.current = planetMeshes;
+
+    console.log('[CircleZoom3D] 🎬 Scene initialized! Stars:', starCount, 'Planets:', planetMeshes.length);
+    console.log('[CircleZoom3D] Camera position:', camera.position.x, camera.position.y, camera.position.z);
+    console.log('[CircleZoom3D] Starting animation loop...');
 
     const tick = () => {
       // CRITICAL: Stop animation loop if component unmounted
@@ -320,6 +354,7 @@ export default function CircleZoom3D({
           visible: !isBehindCamera,
           name: item.contact?.name || 'Contact',
           color: item.contact?.color || '#4FFFB0',
+          rotation: 0, // Labels rotate with the view naturally
         };
       });
       
@@ -338,9 +373,16 @@ export default function CircleZoom3D({
       }
     };
 
-    tick();
+    // Start animation loop
+    try {
+      tick();
+      console.log('[CircleZoom3D] ✅ Animation loop started successfully!');
+    } catch (error) {
+      console.error('[CircleZoom3D] ❌ Failed to start animation loop:', error);
+    }
 
     stateRef.current.cleanup = () => {
+      console.log('[CircleZoom3D] 🧹 Cleaning up scene...');
       if (stateRef.current.raf) cancelAnimationFrame(stateRef.current.raf);
       nucleusGeo.dispose();
       nucleusMat.dispose();
@@ -441,7 +483,7 @@ export default function CircleZoom3D({
         const newDistance = s.targetCameraDistance * scale;
         
         // Clamp zoom between 6 and 25
-        s.targetCameraDistance = Math.max(6, Math.min(25, newDistance));
+        s.targetCameraDistance = Math.max(8, Math.min(40, newDistance)); // Allow much more zoom out
       }
 
       s.lastDistance = distance;
@@ -458,6 +500,16 @@ export default function CircleZoom3D({
       s.targetOrbitAngle -= deltaX * sensitivity;
     }
   };
+
+  // CRITICAL: Reset all gesture state to prevent stuck gestures
+  const resetGestureState = useCallback(() => {
+    const s = stateRef.current;
+    s.isDragging = false;
+    s.isPinching = false;
+    s.lastDistance = 0;
+    s.totalMovement = 0;
+    s.touchStartTime = 0;
+  }, []);
 
   const handleTouchEnd = (event) => {
     if (!isMountedRef.current) return;
@@ -477,9 +529,15 @@ export default function CircleZoom3D({
       }
     }
 
-    s.isDragging = false;
-    s.isPinching = false;
-    s.lastDistance = 0;
+    // CRITICAL: Always reset gesture state on touch end
+    resetGestureState();
+  };
+
+  // CRITICAL: Handle touch cancel - this fires when gesture is interrupted
+  // (e.g., by system alert, incoming call, app backgrounding)
+  const handleTouchCancel = (event) => {
+    console.log('[CircleZoom3D] Touch cancelled - resetting gesture state');
+    resetGestureState();
   };
 
   const selectedContact = selectedIndex !== null ? normalizedContacts[selectedIndex] : null;
@@ -500,6 +558,7 @@ export default function CircleZoom3D({
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchCancel}
         >
           {/* Header */}
           <View style={styles.header} pointerEvents="box-none">
@@ -510,9 +569,19 @@ export default function CircleZoom3D({
               <Text style={styles.circleName}>{circleName}</Text>
               <Text style={styles.contactCount}>{normalizedContacts.length} people</Text>
             </View>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Ionicons name="close" size={24} color="#ffffff" />
-            </TouchableOpacity>
+            <View style={styles.headerRight}>
+              {onAddContact && (
+                <TouchableOpacity 
+                  style={styles.addButton} 
+                  onPress={handleOpenModal}
+                >
+                  <Ionicons name="person-add" size={22} color="#4FFFB0" />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                <Ionicons name="close" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Name labels orbiting with planets */}
@@ -528,6 +597,7 @@ export default function CircleZoom3D({
                     left: label.x - 40, // Center the label (assuming ~80px width)
                     top: label.y,
                     borderColor: label.color,
+                    transform: [{ rotate: `${label.rotation}deg` }], // Keep text upright
                   },
                 ]}
                 pointerEvents="none"
@@ -591,10 +661,20 @@ export default function CircleZoom3D({
           <View style={styles.instructions} pointerEvents="none">
             <Text style={styles.instructionText}>
               {selectedContact ? 'Tap elsewhere to deselect' : 'Tap a planet • Drag to rotate • Pinch to zoom'}
-          </Text>
+            </Text>
+          </View>
         </View>
       </View>
-    </View>
+
+      {/* Add Contact Modal - Rendered outside animation loop */}
+      {onAddContact && (
+        <AddContactModal
+          visible={showAddContactModal}
+          onClose={handleCloseModal}
+          onSave={handleSaveContacts}
+          existingContactIds={existingContactIds}
+        />
+      )}
     </Modal>
   );
 }
@@ -637,6 +717,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4FFFB0',
     marginTop: 2,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  addButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(79, 255, 176, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.6)',
   },
   closeButton: {
     width: 44,
