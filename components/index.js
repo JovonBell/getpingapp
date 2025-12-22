@@ -10,6 +10,15 @@ export { default as PlanetZoom3D } from './contacts/PlanetZoom3D';
 export { default as HealthIndicator } from './contacts/HealthIndicator';
 export { default as CircleHealthBreakdown } from './contacts/CircleHealthBreakdown';
 
+// 3D Components
+export { default as SolarSystemView } from './3d/SolarSystemView';
+export { TouchController, GESTURE_STATE } from './3d/TouchController';
+export { CameraController, animateCameraTo, TRANSITIONS } from './3d/CameraController';
+export { createBackgroundLayers, createSimpleStarField } from './3d/StarField';
+
+// Communication Components
+export { default as AISuggestionCard } from './communication/AISuggestionCard';
+
 // Modal Components
 export { default as AddContactModal } from './modals/AddContactModal';
 export { default as EditContactModal } from './modals/EditContactModal';
