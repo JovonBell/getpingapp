@@ -15,6 +15,42 @@ A relationship management app that helps you stay connected with the people who 
 
 ## Changelog
 
+### December 21, 2025
+**Major Codebase Restructure & 3D Features** (Spencer Karns + Joshua Bell)
+
+**Codebase Reorganization:**
+- Restructured entire codebase into organized folders:
+  - `screens/main/`, `screens/settings/`, `screens/onboarding/`, `screens/analytics/`, `screens/contacts/`
+  - `components/3d/`, `components/modals/`, `components/common/`, `components/contacts/`, `components/home/`
+  - `utils/storage/`, `utils/scoring/`, `utils/notifications/`, `utils/api/`
+  - `docs/` for all documentation, `supabase/migrations/` for SQL files
+- Added barrel exports (`components/index.js`, `screens/index.js`) for cleaner imports
+- Fixed 16+ broken import paths after restructure
+
+**New 3D Features:**
+- `SolarSystemView.js` - Multi-ring 3D visualization of all circles as orbiting planets
+- `PersonSphereView.js` - 3D contact focus view with photo-mapped sphere and data orbs
+- `PathAnimation.js` - Animated "6 degrees of connection" path visualization
+- `StarField.js` - Parallax star background with depth layers
+- `TouchController.js` & `CameraController.js` - Smooth gesture handling and camera transitions
+
+**New Components:**
+- `GoalInputModal.js` - Goal planning (Job, Cofounder, Mentor, Dating)
+- `AISuggestionCard.js` - AI-powered conversation starters
+- `SearchBar.js` - Contact search functionality
+- `HomeHeader.js`, `HealthSummaryCard.js`, `DeleteCircleModals.js`
+
+**New Integrations (Scaffolded):**
+- `lib/exa.js` - Exa AI people search integration
+- `utils/api/pingAI.js` - AI conversation suggestions via Supabase edge functions
+
+**Documentation:**
+- Added product vision docs in `docs/vision/`
+- Added implementation plans in `plans/`
+- Added Jest testing setup with unit tests
+
+---
+
 ### December 16, 2025 (Evening)
 **Analytics, Gamification & Notifications**
 
