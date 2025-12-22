@@ -12,12 +12,17 @@ export { default as CircleHealthBreakdown } from './contacts/CircleHealthBreakdo
 
 // 3D Components
 export { default as SolarSystemView } from './3d/SolarSystemView';
+export { default as PersonSphereView } from './3d/PersonSphereView';
 export { TouchController, GESTURE_STATE } from './3d/TouchController';
 export { CameraController, animateCameraTo, TRANSITIONS } from './3d/CameraController';
 export { createBackgroundLayers, createSimpleStarField } from './3d/StarField';
+export { createPathAnimation, createMessageBubble } from './3d/PathAnimation';
 
 // Communication Components
 export { default as AISuggestionCard } from './communication/AISuggestionCard';
+
+// Goal Components
+export { default as GoalInputModal } from './goals/GoalInputModal';
 
 // Modal Components
 export { default as AddContactModal } from './modals/AddContactModal';
