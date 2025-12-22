@@ -1,11 +1,11 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import * as Notifications from 'expo-notifications';
 import {
   scheduleReminderNotification,
   cancelScheduledNotification,
   scheduleBirthdayNotification,
   scheduleImmediateNotification,
-} from './pushNotifications';
+} from '../notifications/pushNotifications';
 
 /**
  * Create a new reminder

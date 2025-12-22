@@ -10,7 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Confetti, { ConfettiBurst, Sparkles } from './Confetti';
+import Confetti, { ConfettiBurst, Sparkles } from '../common/Confetti';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

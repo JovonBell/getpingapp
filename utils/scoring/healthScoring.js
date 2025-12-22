@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 
 // Tier target days - how often you expect to contact people in each tier
 const TIER_TARGET_DAYS = {

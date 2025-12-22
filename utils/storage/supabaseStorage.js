@@ -1,9 +1,9 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { normalizeEmail, normalizePhone, sha256 } from './contactsImport';
+import { normalizeEmail, normalizePhone, sha256 } from '../contactsImport';
 import { upsertUserIdentities } from './identitiesStorage';
 
 // Tell the browser to dismiss when auth is complete
