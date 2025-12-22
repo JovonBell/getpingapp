@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { getHealthColor } from '../utils/healthScoring';
+import { getHealthColor } from '../utils/scoring/healthScoring';
 
 /**
  * Horizontal bar chart showing distribution of contact health statuses

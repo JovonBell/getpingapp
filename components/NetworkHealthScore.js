@@ -2,8 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
-import { getHealthColor } from '../utils/healthScoring';
-import { getNetworkStatusLabel } from '../utils/analyticsCalculations';
+import { getHealthColor } from '../utils/scoring/healthScoring';
+import { getNetworkStatusLabel } from '../utils/scoring/analyticsCalculations';
 
 /**
  * Circular gauge showing overall network health score

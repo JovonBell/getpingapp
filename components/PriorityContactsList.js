@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getHealthColor } from '../utils/healthScoring';
+import { getHealthColor } from '../utils/scoring/healthScoring';
 
 /**
  * List of contacts that need attention (sorted by health score ascending)

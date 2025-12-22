@@ -13,42 +13,52 @@ import {
   registerForPushNotificationsAsync,
   scheduleDailyDigest,
   scheduleStreakWarning,
-} from './utils/pushNotifications';
-import { getUnreadAlertCount } from './utils/alertsStorage';
+} from './utils/notifications/pushNotifications';
+import { getUnreadAlertCount } from './utils/storage/alertsStorage';
 import { getStreak, isStreakActive } from './utils/streaksStorage';
-import WelcomeScreen from './screens/WelcomeScreen';
-import CreateAccountScreen from './screens/CreateAccountScreen';
-import WelcomeIntroScreen from './screens/WelcomeIntroScreen';
-import CirclesExplainerScreen from './screens/CirclesExplainerScreen';
-import BuildUniverseScreen from './screens/BuildUniverseScreen';
-import ImportContactsScreen from './screens/ImportContactsScreen';
-import SelectContactsScreen from './screens/SelectContactsScreen';
-import VisualizeCircleScreen from './screens/VisualizeCircleScreen';
-import ImportConfirmationScreen from './screens/ImportConfirmationScreen';
-import FirstCircleCelebrationScreen from './screens/FirstCircleCelebrationScreen';
-import HomeScreen from './screens/HomeScreen';
-import AddContactScreen from './screens/AddContactScreen';
-import AlertsScreen from './screens/AlertsScreen';
-import ContactsListScreen from './screens/ContactsListScreen';
-import SettingsScreen from './screens/SettingsScreen';
-import MessagesScreen from './screens/MessagesScreen';
-import ChatScreen from './screens/ChatScreen';
-import ProfileScreen from './screens/ProfileScreen';
-import ProfileEditScreen from './screens/ProfileEditScreen';
-import ProfileSettingsScreen from './screens/ProfileSettingsScreen';
-import PrivacySettingsScreen from './screens/PrivacySettingsScreen';
-import NotificationsSettingsScreen from './screens/NotificationsSettingsScreen';
-import LanguageSettingsScreen from './screens/LanguageSettingsScreen';
-import ThemeSettingsScreen from './screens/ThemeSettingsScreen';
-import HelpCenterScreen from './screens/HelpCenterScreen';
-import ContactUsScreen from './screens/ContactUsScreen';
-import AboutScreen from './screens/AboutScreen';
-import AccountDeletionScreen from './screens/AccountDeletionScreen';
-import DiagnosticsScreen from './screens/DiagnosticsScreen';
-import DashboardScreen from './screens/DashboardScreen';
-import RemindersScreen from './screens/RemindersScreen';
-import GamificationScreen from './screens/GamificationScreen';
-import AchievementsScreen from './screens/AchievementsScreen';
+
+// Screens - Onboarding
+import WelcomeScreen from './screens/onboarding/WelcomeScreen';
+import CreateAccountScreen from './screens/onboarding/CreateAccountScreen';
+import WelcomeIntroScreen from './screens/onboarding/WelcomeIntroScreen';
+import CirclesExplainerScreen from './screens/onboarding/CirclesExplainerScreen';
+import BuildUniverseScreen from './screens/onboarding/BuildUniverseScreen';
+import ImportContactsScreen from './screens/onboarding/ImportContactsScreen';
+import SelectContactsScreen from './screens/onboarding/SelectContactsScreen';
+import VisualizeCircleScreen from './screens/onboarding/VisualizeCircleScreen';
+import ImportConfirmationScreen from './screens/onboarding/ImportConfirmationScreen';
+import FirstCircleCelebrationScreen from './screens/onboarding/FirstCircleCelebrationScreen';
+
+// Screens - Main
+import HomeScreen from './screens/main/HomeScreen';
+import AlertsScreen from './screens/main/AlertsScreen';
+import MessagesScreen from './screens/main/MessagesScreen';
+import ChatScreen from './screens/main/ChatScreen';
+
+// Screens - Contacts
+import AddContactScreen from './screens/contacts/AddContactScreen';
+import ContactsListScreen from './screens/contacts/ContactsListScreen';
+
+// Screens - Settings
+import SettingsScreen from './screens/settings/SettingsScreen';
+import ProfileScreen from './screens/settings/ProfileScreen';
+import ProfileEditScreen from './screens/settings/ProfileEditScreen';
+import ProfileSettingsScreen from './screens/settings/ProfileSettingsScreen';
+import PrivacySettingsScreen from './screens/settings/PrivacySettingsScreen';
+import NotificationsSettingsScreen from './screens/settings/NotificationsSettingsScreen';
+import LanguageSettingsScreen from './screens/settings/LanguageSettingsScreen';
+import ThemeSettingsScreen from './screens/settings/ThemeSettingsScreen';
+import HelpCenterScreen from './screens/settings/HelpCenterScreen';
+import ContactUsScreen from './screens/settings/ContactUsScreen';
+import AboutScreen from './screens/settings/AboutScreen';
+import AccountDeletionScreen from './screens/settings/AccountDeletionScreen';
+import DiagnosticsScreen from './screens/settings/DiagnosticsScreen';
+
+// Screens - Analytics
+import DashboardScreen from './screens/analytics/DashboardScreen';
+import RemindersScreen from './screens/analytics/RemindersScreen';
+import GamificationScreen from './screens/analytics/GamificationScreen';
+import AchievementsScreen from './screens/analytics/AchievementsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();

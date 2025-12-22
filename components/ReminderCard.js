@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { formatDueDate, getReminderIcon, getReminderColor } from '../utils/remindersStorage';
+import { formatDueDate, getReminderIcon, getReminderColor } from '../utils/storage/remindersStorage';
 
 /**
  * Card component for displaying a single reminder
