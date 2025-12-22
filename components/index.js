@@ -24,6 +24,9 @@ export { default as AISuggestionCard } from './communication/AISuggestionCard';
 // Goal Components
 export { default as GoalInputModal } from './goals/GoalInputModal';
 
+// Search Components
+export { default as PeopleSearchResults } from './search/PeopleSearchResults';
+
 // Modal Components
 export { default as AddContactModal } from './modals/AddContactModal';
 export { default as EditContactModal } from './modals/EditContactModal';
