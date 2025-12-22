@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 
 // Upsert identity hashes for a user (so other people can match them).
 // Requires `user_identities` table (added in migration).

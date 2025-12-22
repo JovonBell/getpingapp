@@ -5,7 +5,7 @@ import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import { Ionicons } from '@expo/vector-icons';
 import { HealthBadge } from './HealthIndicator';
-import AddContactModal from './AddContactModal';
+import AddContactModal from '../modals/AddContactModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 

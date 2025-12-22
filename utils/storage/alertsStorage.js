@@ -1,5 +1,5 @@
-import { supabase } from '../lib/supabase';
-import { getHealthScores } from './healthScoring';
+import { supabase } from '../../lib/supabase';
+import { getHealthScores } from '../scoring/healthScoring';
 
 // Alert thresholds - only alert once per threshold crossing
 const HEALTH_THRESHOLDS = [80, 60, 40];

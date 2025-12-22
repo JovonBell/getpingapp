@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { Ionicons } from '@expo/vector-icons';
 import { HealthBadge } from './HealthIndicator';
 import { getHealthColor } from '../../utils/scoring/healthScoring';
-import { SwipeHint, useGestureHint } from './GestureHint';
+import { SwipeHint, useGestureHint } from '../common/GestureHint';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

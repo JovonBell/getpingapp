@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { HealthSummaryBar } from './HealthIndicator';
+import { HealthSummaryBar } from '../contacts/HealthIndicator';
 
 export default function HealthSummaryCard({ healthStats, onPress }) {
   if (!healthStats || healthStats.needsAttention <= 0) {

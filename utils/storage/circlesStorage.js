@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 
 async function upsertImportedContacts(userId, contacts) {
   console.log('[UPSERT CONTACTS] Starting with', contacts?.length || 0, 'contacts');

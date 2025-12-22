@@ -3,8 +3,8 @@ import {
   AchievementCelebration,
   StreakCelebration,
   WeeklyGoalCelebration,
-} from '../components/CelebrationModal';
-import { sendAchievementNotification } from '../utils/pushNotifications';
+} from '../components/modals/CelebrationModal';
+import { sendAchievementNotification } from '../utils/notifications/pushNotifications';
 
 const CelebrationContext = createContext(null);
 

@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({

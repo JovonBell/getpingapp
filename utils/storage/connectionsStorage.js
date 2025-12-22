@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 
 // Create/refresh connections between the current user and matched users.
 // Requires a UNIQUE index on (user_id, connected_user_id) for upsert to be idempotent.
