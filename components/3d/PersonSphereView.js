@@ -175,17 +175,22 @@ export default function PersonSphereView({
       side: THREE.FrontSide,
     });
     
-    // Try to load avatar texture
+    // Try to load avatar texture with timeout
     if (contact?.avatar) {
       try {
         const textureLoader = new TextureLoader();
-        const texture = await textureLoader.loadAsync(contact.avatar);
+        // Add 5-second timeout to prevent hanging on bad URLs
+        const texturePromise = textureLoader.loadAsync(contact.avatar);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Texture load timeout')), 5000)
+        );
+        const texture = await Promise.race([texturePromise, timeoutPromise]);
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
         sphereMat.map = texture;
         sphereMat.needsUpdate = true;
       } catch (err) {
-        console.warn('[PersonSphereView] Failed to load avatar texture:', err);
+        console.warn('[PersonSphereView] Failed to load avatar texture:', err?.message);
         // Use initials color instead
         sphereMat.color.set(contact?.color || 0x4FFFB0);
       }

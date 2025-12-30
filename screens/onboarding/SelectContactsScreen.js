@@ -30,48 +30,62 @@ export default function SelectContactsScreen({ navigation, route }) {
   const [selectedContactIds, setSelectedContactIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const [loadError, setLoadError] = useState(null);
 
-  useEffect(() => {
-    let mounted = true;
+  const loadContacts = async (mounted) => {
+    setLoadingContacts(true);
+    setLoadError(null);
 
-    const load = async () => {
-      setLoadingContacts(true);
-      try {
-        if (isInitialImport || isAddContacts) {
-          const { status } = await Contacts.requestPermissionsAsync();
-          if (status !== 'granted') {
-            Alert.alert(
-              'Contacts Permission',
-              'We need access to your contacts to import them into your universe.',
-              [{ text: 'OK', onPress: () => navigation.goBack() }]
-            );
-            if (mounted) setContacts([]);
-            return;
-          }
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Loading contacts timed out')), 15000)
+    );
 
-          const result = await Contacts.getContactsAsync({
+    try {
+      if (isInitialImport || isAddContacts) {
+        const { status } = await Contacts.requestPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Contacts Permission',
+            'We need access to your contacts to import them into your universe.',
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
+          );
+          if (mounted.current) setContacts([]);
+          return;
+        }
+
+        // Race between contact loading and timeout
+        const result = await Promise.race([
+          Contacts.getContactsAsync({
             fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
             pageSize: 1000,
             pageOffset: 0,
-          });
+          }),
+          timeoutPromise
+        ]);
 
-          const appContacts = expoContactsToAppContacts(result?.data || []);
-          if (mounted) setContacts(appContacts);
-        } else {
-          const { success, contacts: stored } = await getImportedContacts();
-          if (mounted) setContacts(success ? stored : []);
-        }
-      } catch (e) {
-        console.error('Failed loading contacts:', e);
-        if (mounted) setContacts([]);
-      } finally {
-        if (mounted) setLoadingContacts(false);
+        const appContacts = expoContactsToAppContacts(result?.data || []);
+        if (mounted.current) setContacts(appContacts);
+      } else {
+        const { success, contacts: stored } = await getImportedContacts();
+        if (mounted.current) setContacts(success ? stored : []);
       }
-    };
+    } catch (e) {
+      console.error('Failed loading contacts:', e);
+      if (mounted.current) {
+        setContacts([]);
+        setLoadError(e.message || 'Failed to load contacts');
+      }
+    } finally {
+      if (mounted.current) setLoadingContacts(false);
+    }
+  };
 
-    load();
+  useEffect(() => {
+    const mounted = { current: true };
+    loadContacts(mounted);
     return () => {
-      mounted = false;
+      mounted.current = false;
     };
   }, [isInitialImport, navigation]);
 
@@ -108,15 +122,23 @@ export default function SelectContactsScreen({ navigation, route }) {
     );
   }, [contacts, searchQuery]);
 
-  // Group contacts by first letter
-  const groupedContacts = filteredContacts.reduce((acc, contact) => {
-    const firstLetter = contact.name[0].toUpperCase();
-    if (!acc[firstLetter]) {
-      acc[firstLetter] = [];
+  // Group contacts by first letter (with null safety)
+  const groupedContacts = useMemo(() => {
+    try {
+      return filteredContacts.reduce((acc, contact) => {
+        const name = contact?.name || '';
+        const firstLetter = name.length > 0 ? name[0].toUpperCase() : '#';
+        if (!acc[firstLetter]) {
+          acc[firstLetter] = [];
+        }
+        acc[firstLetter].push(contact);
+        return acc;
+      }, {});
+    } catch (err) {
+      console.warn('[SelectContactsScreen] Error grouping contacts:', err);
+      return {};
     }
-    acc[firstLetter].push(contact);
-    return acc;
-  }, {});
+  }, [filteredContacts]);
 
   const renderContact = ({ item }) => {
     const isSelected = selectedContactIds.includes(item.id);
@@ -223,6 +245,25 @@ export default function SelectContactsScreen({ navigation, route }) {
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator size="large" color="#4FFFB0" />
             <Text style={{ color: '#ffffff', opacity: 0.7, marginTop: 10 }}>Loading contacts…</Text>
+          </View>
+        ) : loadError ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }}>
+            <Ionicons name="alert-circle-outline" size={48} color="#ff6b6b" />
+            <Text style={{ color: '#ffffff', fontSize: 16, marginTop: 16, textAlign: 'center' }}>
+              {loadError}
+            </Text>
+            <TouchableOpacity
+              style={{
+                marginTop: 20,
+                backgroundColor: '#4FFFB0',
+                paddingVertical: 12,
+                paddingHorizontal: 24,
+                borderRadius: 20,
+              }}
+              onPress={() => loadContacts({ current: true })}
+            >
+              <Text style={{ color: '#1a1a1a', fontSize: 16, fontWeight: '600' }}>Try Again</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <FlatList

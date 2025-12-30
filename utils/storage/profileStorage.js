@@ -10,7 +10,7 @@ export const saveProfile = async (profileData) => {
     return { success: true };
   } catch (error) {
     console.error('Error saving profile:', error);
-    return { success: false, error };
+    return { success: false, error: error?.message || String(error) };
   }
 };
 
@@ -38,7 +38,7 @@ export const updateProfile = async (updates) => {
     return { success: true, profile: updatedProfile };
   } catch (error) {
     console.error('Error updating profile:', error);
-    return { success: false, error };
+    return { success: false, error: error?.message || String(error) };
   }
 };
 
@@ -49,6 +49,6 @@ export const clearProfile = async () => {
     return { success: true };
   } catch (error) {
     console.error('Error clearing profile:', error);
-    return { success: false, error };
+    return { success: false, error: error?.message || String(error) };
   }
 };

@@ -154,6 +154,9 @@ export async function scheduleReminderNotification(reminder) {
       hours: hoursUntilDue,
     });
 
+    // Use contact_name if available, otherwise fallback to 'a contact'
+    const contactName = reminder.contact_name || reminder.contactName || 'a contact';
+
     const notificationContent = {
       title: getReminderTitle(reminder),
       body: reminder.title || 'Time to reach out!',
@@ -161,7 +164,7 @@ export async function scheduleReminderNotification(reminder) {
         type: 'reminder',
         reminderId: reminder.id,
         contactId: reminder.imported_contact_id,
-        contactName: reminder.contact_name,
+        contactName,
       },
       sound: 'default',
       ...(Platform.OS === 'android' && { channelId: 'reminders' }),
@@ -181,11 +184,21 @@ export async function scheduleReminderNotification(reminder) {
     console.log('[Notifications] ✅ Successfully scheduled! ID:', notificationId);
     console.log('[Notifications] 🔔 You will be notified in', minutesUntilDue, 'minutes');
 
-    // Store notification ID in database for later cancellation
-    await supabase
-      .from('reminders')
-      .update({ notification_id: notificationId })
-      .eq('id', reminder.id);
+    // Store notification ID in database for later cancellation (best-effort)
+    try {
+      const { error: updateError } = await supabase
+        .from('reminders')
+        .update({ notification_id: notificationId })
+        .eq('id', reminder.id);
+
+      if (updateError) {
+        console.warn('[Notifications] Failed to store notification_id in database:', updateError.message);
+        // Continue anyway - notification is already scheduled
+      }
+    } catch (dbError) {
+      console.warn('[Notifications] Exception storing notification_id:', dbError?.message);
+      // Continue anyway - notification is already scheduled
+    }
 
     return { success: true, notificationId, secondsUntilDue, dueDate: dueDate.toISOString() };
   } catch (error) {

@@ -11,6 +11,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   Keyboard,
@@ -116,18 +117,13 @@ export default function GoalInputModal({
   };
 
   const handleVoiceRecord = () => {
-    // In production, integrate with expo-speech or react-native-voice
-    setIsRecording(!isRecording);
-    
-    if (isRecording) {
-      // Stop recording and transcribe
-      // For now, just simulate
-      setTimeout(() => {
-        setGoalText('I want to connect with investors in AI');
-        setIsRecording(false);
-        setIsVoiceMode(false);
-      }, 1000);
-    }
+    // Voice recording not yet implemented - show coming soon message
+    // TODO: Integrate with expo-speech or react-native-voice in future
+    Alert.alert(
+      'Coming Soon',
+      'Voice input will be available in a future update. Please use text input for now.',
+      [{ text: 'OK', onPress: () => setIsVoiceMode(false) }]
+    );
   };
 
   if (!visible) return null;

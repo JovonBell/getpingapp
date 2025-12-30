@@ -371,11 +371,11 @@ export default function HomeScreen({ navigation, route }) {
     const angleOffset = (indexOnRing * angleStep + ringOffset) * (Math.PI / 180);
     const radius = getRingRadius(ringIndex);
 
-    // Get health-based color (defaults to green/healthy if no health data)
+    // Get health-based color (show gray for unknown if no health data)
     const health = healthMap[contact?.importedContactId];
-    const healthColor = health ? getHealthColor(health.status) : '#4FFFB0';
-    const healthScore = health?.health_score ?? 100;
-    const healthStatus = health?.status || 'healthy';
+    const healthStatus = health?.status || 'unknown';
+    const healthColor = getHealthColor(healthStatus);
+    const healthScore = health?.health_score ?? null;
 
     // Size variation based on urgency - cold contacts are larger (more visible)
     // Base radius: 10px (increased from 8px for better touch targets)
@@ -876,13 +876,13 @@ export default function HomeScreen({ navigation, route }) {
     
     // BLOCK RELOADS
     setJustDeleted(true);
-    
+
     // FORCE DELETE FROM LOCAL STATE - calculate new array directly
     const remaining = circles.filter(c => c.id !== circleId);
     console.log('[HOME] Setting circles from', circles.length, 'to', remaining.length);
     setCircles(remaining);
-    
-    // Delete from Supabase in background
+
+    // Delete from Supabase in background - wait for confirmation before allowing reloads
     (async () => {
       try {
         const { user } = await getCurrentUser();
@@ -892,8 +892,11 @@ export default function HomeScreen({ navigation, route }) {
         }
       } catch (e) {
         console.error('[HOME] Supabase delete error:', e);
+      } finally {
+        // Allow reloads after Supabase operation completes (success or fail)
+        // Small delay to prevent immediate re-fetch from showing deleted circle
+        setTimeout(() => setJustDeleted(false), 500);
       }
-      setTimeout(() => setJustDeleted(false), 3000);
     })();
   };
 

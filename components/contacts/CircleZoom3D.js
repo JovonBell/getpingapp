@@ -74,6 +74,7 @@ export default function CircleZoom3D({
     touchStartPos: { x: 0, y: 0 },
     totalMovement: 0,
     frameCount: 0, // For throttling label updates
+    gestureTimeoutId: null, // Safety timeout for stuck gestures
   });
 
   // Track if component is mounted - CRITICAL for preventing dead screen
@@ -107,6 +108,11 @@ export default function CircleZoom3D({
       if (stateRef.current.raf) {
         cancelAnimationFrame(stateRef.current.raf);
         stateRef.current.raf = null;
+      }
+      // Clear gesture safety timeout
+      if (stateRef.current.gestureTimeoutId) {
+        clearTimeout(stateRef.current.gestureTimeoutId);
+        stateRef.current.gestureTimeoutId = null;
       }
       stateRef.current.cleanup?.();
       stateRef.current.cleanup = null;
@@ -440,9 +446,12 @@ export default function CircleZoom3D({
   // Touch handlers - check isMountedRef to prevent dead screen bug
   const handleTouchStart = (event) => {
     if (!isMountedRef.current) return;
-    
+
     const touches = event.nativeEvent.touches;
     const s = stateRef.current;
+
+    // Start safety timeout to auto-reset stuck gestures
+    startGestureSafetyTimeout();
 
     if (touches.length === 2) {
       // Pinch start
@@ -509,7 +518,31 @@ export default function CircleZoom3D({
     s.lastDistance = 0;
     s.totalMovement = 0;
     s.touchStartTime = 0;
+
+    // Clear any pending safety timeout
+    if (s.gestureTimeoutId) {
+      clearTimeout(s.gestureTimeoutId);
+      s.gestureTimeoutId = null;
+    }
   }, []);
+
+  // Start a safety timeout that auto-resets gesture state after 10 seconds
+  const startGestureSafetyTimeout = useCallback(() => {
+    const s = stateRef.current;
+
+    // Clear any existing timeout
+    if (s.gestureTimeoutId) {
+      clearTimeout(s.gestureTimeoutId);
+    }
+
+    // Set new timeout - if gesture is active for > 10 seconds, reset it
+    s.gestureTimeoutId = setTimeout(() => {
+      if (isMountedRef.current && (s.isDragging || s.isPinching)) {
+        console.log('[CircleZoom3D] Safety timeout - resetting stuck gesture state');
+        resetGestureState();
+      }
+    }, 10000);
+  }, [resetGestureState]);
 
   const handleTouchEnd = (event) => {
     if (!isMountedRef.current) return;

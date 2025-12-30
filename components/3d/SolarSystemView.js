@@ -350,7 +350,8 @@ export default function SolarSystemView({
       }
       
       // Project contact positions to 2D for labels
-      if (s.time % 3 < 0.02) { // Update labels every ~50ms
+      // Reduce update frequency to ~200ms (5fps) for better performance
+      if (s.time % 12 < 0.02) {
         updateLabelPositions(camera, gl);
       }
       
