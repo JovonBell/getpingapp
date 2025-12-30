@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { HealthBadge } from './HealthIndicator';
 import { getHealthColor } from '../../utils/scoring/healthScoring';
 import { SwipeHint, useGestureHint } from '../common/GestureHint';
+import Haptic from '../../utils/haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -351,6 +352,11 @@ export default function PlanetZoom3D({
         const nearest = Math.round((angleNorm / TWO_PI) * len) % len;
         const finalIndex = moved ? nearest : currentIndex;
 
+        // HAPTIC: Light tick when swiping to a new contact
+        if (finalIndex !== currentIndex) {
+          Haptic.mediumImpact();
+        }
+
         setCurrentIndex(finalIndex);
         stateRef.current.targetAngle = (TWO_PI * finalIndex) / len;
       },
@@ -390,6 +396,9 @@ export default function PlanetZoom3D({
 
   // Handle "Just Talked" action - resets health to 100%
   const handleJustTalked = () => {
+    // HAPTIC: Success vibration - positive reinforcement!
+    Haptic.success();
+
     if (activeItem && onHealthChange) {
       onHealthChange(activeItem, 100);
       setSliderValue(100);

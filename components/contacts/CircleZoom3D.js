@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { Ionicons } from '@expo/vector-icons';
 import { HealthBadge } from './HealthIndicator';
 import AddContactModal from '../modals/AddContactModal';
+import Haptic from '../../utils/haptics';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -169,27 +170,37 @@ export default function CircleZoom3D({
     const stars = new THREE.Points(starGeo, starMat);
     scene.add(stars);
 
-    // Central glowing nucleus
+    // Central glowing nucleus - THE SUN (You)
     const nucleusGeo = new THREE.SphereGeometry(0.5, 64, 64);
     const nucleusMat = new THREE.MeshStandardMaterial({
       color: new THREE.Color('#ffffff'),
       emissive: new THREE.Color('#4FFFB0'),
-      emissiveIntensity: 0.6,
-      metalness: 0.3,
-      roughness: 0.2,
+      emissiveIntensity: 0.8, // Brighter core
+      metalness: 0.2,
+      roughness: 0.1, // Smoother, more radiant
     });
     const nucleus = new THREE.Mesh(nucleusGeo, nucleusMat);
     scene.add(nucleus);
 
-    // Nucleus glow
+    // Inner glow - close to surface
     const nucleusGlowGeo = new THREE.SphereGeometry(0.65, 32, 32);
     const nucleusGlowMat = new THREE.MeshBasicMaterial({
       color: new THREE.Color('#4FFFB0'),
       transparent: true,
-      opacity: 0.15,
+      opacity: 0.2,
     });
     const nucleusGlow = new THREE.Mesh(nucleusGlowGeo, nucleusGlowMat);
     scene.add(nucleusGlow);
+
+    // Solar corona - outer glow that pulses differently
+    const coronaGeo = new THREE.SphereGeometry(0.9, 32, 32);
+    const coronaMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color('#4FFFB0'),
+      transparent: true,
+      opacity: 0.08,
+    });
+    const corona = new THREE.Mesh(coronaGeo, coronaMat);
+    scene.add(corona);
 
     // Orbit ring - main (increased radius for more spacious feel)
     const ORBIT_RADIUS = 8.0; // Increased from 6.0 to 8.0 for much more spacing
@@ -318,10 +329,22 @@ export default function CircleZoom3D({
         item.lineGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       });
 
-      // Nucleus pulse
-      const pulse = 1 + Math.sin(Date.now() * 0.002) * 0.05;
+      // Sun heartbeat pulse - THE SUN IS ALIVE
+      const time = Date.now() * 0.001;
+      // Primary heartbeat (slower, stronger)
+      const heartbeat = 1 + Math.sin(time * 1.5) * 0.08;
+      // Secondary breath (faster, subtler)
+      const breath = 1 + Math.sin(time * 3) * 0.03;
+      // Combined pulse
+      const pulse = heartbeat * breath;
+
       nucleus.scale.setScalar(pulse);
-      nucleusGlow.scale.setScalar(pulse * 1.2);
+      nucleusGlow.scale.setScalar(pulse * 1.25);
+
+      // Corona pulses out of phase for "breathing" effect
+      const coronaPulse = 1 + Math.sin(time * 1.2 + Math.PI / 2) * 0.15;
+      corona.scale.setScalar(coronaPulse);
+      coronaMat.opacity = 0.05 + Math.sin(time * 1.8) * 0.03;
 
       // Star drift
       stars.rotation.y += 0.0002;
@@ -394,6 +417,8 @@ export default function CircleZoom3D({
       nucleusMat.dispose();
       nucleusGlowGeo.dispose();
       nucleusGlowMat.dispose();
+      coronaGeo.dispose();
+      coronaMat.dispose();
       orbitRingGeo.dispose();
       orbitRingMat.dispose();
       orbitRing2Geo.dispose();
@@ -546,7 +571,7 @@ export default function CircleZoom3D({
 
   const handleTouchEnd = (event) => {
     if (!isMountedRef.current) return;
-    
+
     const s = stateRef.current;
     const touchDuration = Date.now() - s.touchStartTime;
     const wasTap = touchDuration < 250 && s.totalMovement < 10;
@@ -555,9 +580,12 @@ export default function CircleZoom3D({
       // Check if we tapped on a planet
       const tappedIndex = performRaycast(s.touchStartPos.x, s.touchStartPos.y);
       if (tappedIndex >= 0 && isMountedRef.current) {
+        // HAPTIC: Heavy impact when tapping a planet (feels solid)
+        Haptic.planetTap();
         setSelectedIndex(tappedIndex === selectedIndex ? null : tappedIndex);
       } else if (isMountedRef.current) {
-        // Tapped on empty space - deselect
+        // Tapped on empty space - deselect with light feedback
+        Haptic.lightTick();
         setSelectedIndex(null);
       }
     }

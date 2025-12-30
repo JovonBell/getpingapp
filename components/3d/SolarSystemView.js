@@ -14,6 +14,7 @@ import { TouchController, GESTURE_STATE } from './TouchController';
 import { CameraController } from './CameraController';
 import { createSimpleStarField } from './StarField';
 import { getHealthColor } from '../../utils/scoring/healthScoring';
+import Haptic from '../../utils/haptics';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -120,6 +121,8 @@ export default function SolarSystemView({
       onTap: (pos) => {
         const hitIndex = performRaycast(pos.x, pos.y);
         if (hitIndex >= 0) {
+          // HAPTIC: Heavy impact when tapping a planet
+          Haptic.planetTap();
           const contact = contactDataRef.current[hitIndex];
           if (contact?.isOverflow) {
             onRingTap?.(contact.circleId, contact.ringIndex);
@@ -128,6 +131,8 @@ export default function SolarSystemView({
             onContactTap?.(contact);
           }
         } else {
+          // HAPTIC: Light tick when tapping empty space
+          Haptic.lightTick();
           setSelectedContact(null);
           onBackgroundTap?.();
         }

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Line, Text as SvgText, Rect, G } from 'react-native-svg';
+import Haptic from '../../utils/haptics';
 
 // Create animated SVG components
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -906,6 +907,9 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const handlePerson3DPress = (contact, index) => {
+    // HAPTIC: Heavy impact when tapping a planet
+    Haptic.planetTap();
+
     resetTouchState(); // Reset before opening modal to prevent stuck gestures
 
     // Dismiss gesture hint on first tap
