@@ -168,6 +168,14 @@ export default function SelectContactsScreen({ navigation, route }) {
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
           <Text style={styles.selectedCount}>{selectedContactIds.length} selected</Text>
+          {isInitialImport && (
+            <TouchableOpacity
+              style={styles.skipButton}
+              onPress={() => navigation.navigate('Home')}
+            >
+              <Text style={styles.skipText}>skip</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Title */}
@@ -369,6 +377,16 @@ const styles = StyleSheet.create({
   backIcon: {
     fontSize: 24,
     color: '#ffffff',
+  },
+  skipButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#4a6b5a',
+    borderRadius: 20,
+  },
+  skipText: {
+    color: '#ffffff',
+    fontSize: 14,
   },
   selectedCount: {
     color: '#a8e6cf',

@@ -48,6 +48,12 @@
         "projectId": "f15c8ce6-81d5-41c9-ab51-a397fefa7c4c"
       }
     },
-    "owner": "ping-organization"
+    "owner": "ping-organization",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f15c8ce6-81d5-41c9-ab51-a397fefa7c4c"
+    }
   }
 }
