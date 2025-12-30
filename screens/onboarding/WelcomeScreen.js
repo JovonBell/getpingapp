@@ -1,7 +1,8 @@
 import React from 'react';
-import { Alert, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Alert, StyleSheet, Text, View, TouchableOpacity, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { signInWithGoogle } from '../../utils/storage/supabaseStorage';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { signInWithGoogle, signInWithApple } from '../../utils/storage/supabaseStorage';
 
 export default function WelcomeScreen({ navigation }) {
   const handleGoogleSignIn = async () => {
@@ -10,6 +11,20 @@ export default function WelcomeScreen({ navigation }) {
       if (!res.success) {
         // ignore cancel errors (user backed out)
         if (String(res.error).includes('canceled')) return;
+        Alert.alert('Sign in failed', res.error || 'Please try again.');
+      }
+      // On success: App.js auth gate will switch stacks automatically.
+    } catch (e) {
+      Alert.alert('Sign in failed', e?.message || 'Please try again.');
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      const res = await signInWithApple();
+      if (!res.success) {
+        // ignore cancel errors (user backed out)
+        if (String(res.error).includes('canceled') || String(res.error).includes('ERR_REQUEST_CANCELED')) return;
         Alert.alert('Sign in failed', res.error || 'Please try again.');
       }
       // On success: App.js auth gate will switch stacks automatically.
@@ -50,6 +65,17 @@ export default function WelcomeScreen({ navigation }) {
           </View>
           <Text style={styles.googleButtonText}>Sign in with Google</Text>
         </TouchableOpacity>
+
+        {/* Apple Sign In - Required by App Store when offering other social logins */}
+        {Platform.OS === 'ios' && (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+            cornerRadius={30}
+            style={styles.appleButton}
+            onPress={handleAppleSignIn}
+          />
+        )}
 
         <TouchableOpacity
           style={styles.getStartedButton}
@@ -174,6 +200,11 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     fontSize: 16,
     fontWeight: '600',
+  },
+  appleButton: {
+    width: 260,
+    height: 50,
+    marginBottom: 14,
   },
   getStartedButton: {
     backgroundColor: '#a8e6cf',

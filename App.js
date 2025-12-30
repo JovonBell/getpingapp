@@ -314,7 +314,7 @@ export default function App() {
                     navigationRef.current.navigate('Reminders');
                   }
                 } else {
-                  console.warn('[App] No phone number found for contact:', error);
+                  console.warn('[App] No phone number found for contact:', contactError);
                   // Fallback to reminders screen if no phone number
                   navigationRef.current.navigate('Reminders');
                 }

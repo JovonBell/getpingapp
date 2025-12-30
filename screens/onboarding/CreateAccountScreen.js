@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { signInWithGoogle } from '../../utils/storage/supabaseStorage';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { signInWithGoogle, signInWithApple } from '../../utils/storage/supabaseStorage';
 
 export default function CreateAccountScreen({ navigation }) {
   const [busy, setBusy] = useState(false);
@@ -21,6 +23,21 @@ export default function CreateAccountScreen({ navigation }) {
       const res = await signInWithGoogle();
       if (!res.success) {
         if (String(res.error).includes('canceled')) return;
+        Alert.alert('Sign in failed', res.error || 'Please try again.');
+      }
+      // On success: App.js auth gate will switch stacks automatically.
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await signInWithApple();
+      if (!res.success) {
+        if (String(res.error).includes('canceled') || String(res.error).includes('ERR_REQUEST_CANCELED')) return;
         Alert.alert('Sign in failed', res.error || 'Please try again.');
       }
       // On success: App.js auth gate will switch stacks automatically.
@@ -65,8 +82,20 @@ export default function CreateAccountScreen({ navigation }) {
               </View>
               <Text style={styles.socialButtonText}>continue with google</Text>
             </TouchableOpacity>
+
+            {/* Apple Sign In - Required by App Store when offering other social logins */}
+            {Platform.OS === 'ios' && (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                cornerRadius={12}
+                style={styles.appleButton}
+                onPress={handleAppleSignIn}
+              />
+            )}
+
             <Text style={styles.helperText}>
-              We use Google Sign In so you can quickly access your circles across devices.
+              Sign in quickly to access your circles across devices.
             </Text>
           </View>
 
@@ -198,6 +227,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
+    width: '100%',
+  },
+  appleButton: {
+    width: '100%',
+    height: 50,
     marginBottom: 12,
   },
   googleLogo: {

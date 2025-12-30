@@ -12,8 +12,20 @@ A relationship management app that helps you stay connected with the people who 
 - **Analytics Dashboard** - See your weekly activity and network health trends
 - **Push Notifications** - Get reminded to reach out to contacts
 - **Google OAuth** - Simple sign-in with your Google account
+- **Apple Sign In** - Native Apple authentication on iOS (App Store required)
 
 ## Changelog
+
+### December 30, 2025
+**Apple Sign In & App Store Compliance** (Joshua Bell)
+
+- Added Apple Sign In to WelcomeScreen and CreateAccountScreen (iOS only)
+- Apple Sign In is required by App Store when offering other social login options
+- Added Privacy Policy (`PRIVACY_POLICY.md`)
+- Added Terms of Service (`TERMS_OF_SERVICE.md`)
+- Fixed bug in App.js: corrected undefined variable reference (`error` → `contactError`)
+
+---
 
 ### December 21, 2025
 **Major Codebase Restructure & 3D Features** (Spencer Karns + Joshua Bell)
@@ -117,8 +129,9 @@ npx expo start --lan
 ```
 Then scan the QR code with Expo Go!
 
-**✅ Supabase backend is pre-configured** - everyone shares the same backend  
-**✅ Google OAuth is ready** - sign in works out of the box  
+**✅ Supabase backend is pre-configured** - everyone shares the same backend
+**✅ Google OAuth is ready** - sign in works out of the box
+**✅ Apple Sign In is ready** - native iOS authentication
 **✅ All features functional** - circles, contacts, messaging, 3D view
 
 ---
@@ -138,6 +151,10 @@ The shared Supabase backend is at: `https://ahksxziueqkacyaqtgeu.supabase.co`
 
 ## App Store review checklist
 See `APP_STORE_REVIEW_SCRIPT.md`.
+
+**Legal Documents (included):**
+- `PRIVACY_POLICY.md` - Required for App Store
+- `TERMS_OF_SERVICE.md` - Required for App Store
 
 ## Assets you must add before App Store submission
 - App icon (1024x1024)

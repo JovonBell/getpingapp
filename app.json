@@ -10,11 +10,6 @@
       "ios",
       "android"
     ],
-    "extra": {
-      "eas": {
-        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
-      }
-    },
     "plugins": [
       "expo-apple-authentication",
       "expo-contacts",
@@ -24,7 +19,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.getpingapp",
+      "bundleIdentifier": "today.getping.app",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSContactsUsageDescription": "Ping uses your contacts to help you build your circles and find who you already know on ping.",
@@ -34,7 +29,18 @@
       }
     },
     "android": {
-      "package": "com.getpingapp"
-    }
+      "package": "today.getping.app",
+      "permissions": [
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f15c8ce6-81d5-41c9-ab51-a397fefa7c4c"
+      }
+    },
+    "owner": "ping-organization"
   }
 }
