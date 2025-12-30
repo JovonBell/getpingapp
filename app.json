@@ -31,7 +31,8 @@
         "NSContactsUsageDescription": "Ping uses your contacts to help you build your circles and find who you already know on ping.",
         "NSCameraUsageDescription": "Ping uses your camera to let you take and upload a profile photo.",
         "NSPhotoLibraryUsageDescription": "Ping uses your photo library to let you choose and upload a profile photo.",
-        "NSPhotoLibraryAddUsageDescription": "Ping saves your selected profile photo."
+        "NSPhotoLibraryAddUsageDescription": "Ping saves your selected profile photo.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
