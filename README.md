@@ -24,6 +24,10 @@ A relationship management app that helps you stay connected with the people who 
 - Added Privacy Policy (`PRIVACY_POLICY.md`)
 - Added Terms of Service (`TERMS_OF_SERVICE.md`)
 - Fixed bug in App.js: corrected undefined variable reference (`error` → `contactError`)
+- Added app icon (`assets/icon.png`) - 1024x1024 square
+- Added splash screen (`assets/splash.png`)
+- Updated app.json with icon and splash configuration
+- **App is now TestFlight ready!**
 
 ---
 
@@ -156,8 +160,8 @@ See `APP_STORE_REVIEW_SCRIPT.md`.
 - `PRIVACY_POLICY.md` - Required for App Store
 - `TERMS_OF_SERVICE.md` - Required for App Store
 
-## Assets you must add before App Store submission
-- App icon (1024x1024)
-- Splash screen
+## Assets (included)
+- `assets/icon.png` - App icon (1024x1024)
+- `assets/splash.png` - Splash screen
 
-Add them under `assets/` and reference them from `app.json` (Expo docs: App Icon + Splash Screen).
+Both are already configured in `app.json`.
