@@ -21,7 +21,15 @@
       "expo-contacts",
       "expo-image-picker",
       "expo-notifications",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "react-native-nfc-manager",
+        {
+          "nfcPermission": "Ping needs NFC access to program your ring for contact sharing",
+          "selectIdentifiers": [],
+          "systemCodes": []
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true,
@@ -32,7 +40,11 @@
         "NSCameraUsageDescription": "Ping uses your camera to let you take and upload a profile photo.",
         "NSPhotoLibraryUsageDescription": "Ping uses your photo library to let you choose and upload a profile photo.",
         "NSPhotoLibraryAddUsageDescription": "Ping saves your selected profile photo.",
+        "NFCReaderUsageDescription": "Ping needs NFC access to program your ring for contact sharing.",
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.developer.nfc.readersession.formats": ["NDEF", "TAG"]
       }
     },
     "android": {
@@ -40,7 +52,8 @@
       "permissions": [
         "android.permission.READ_CONTACTS",
         "android.permission.WRITE_CONTACTS",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.NFC"
       ]
     },
     "extra": {

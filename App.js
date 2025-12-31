@@ -34,6 +34,7 @@ import HomeScreen from './screens/main/HomeScreen';
 import AlertsScreen from './screens/main/AlertsScreen';
 import MessagesScreen from './screens/main/MessagesScreen';
 import ChatScreen from './screens/main/ChatScreen';
+import NFCRingScreen from './screens/main/NFCRingScreen';
 
 // Screens - Contacts
 import AddContactScreen from './screens/contacts/AddContactScreen';
@@ -149,6 +150,16 @@ function MainTabs() {
                 </View>
               )}
             </View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="NFCTab"
+        component={NFCRingScreen}
+        options={{
+          tabBarLabel: 'ring',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="radio-outline" size={size} color={color} />
           ),
         }}
       />
