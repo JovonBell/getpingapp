@@ -2,11 +2,11 @@ import { supabase } from '../../lib/supabase';
 
 async function upsertImportedContacts(userId, contacts) {
   console.log('[UPSERT CONTACTS] Starting with', contacts?.length || 0, 'contacts');
-  
+
   const rows = (contacts || []).map((c) => {
     // Ensure contact_id is a clean string
     const contactId = typeof c.id === 'object' ? JSON.stringify(c.id) : String(c.id || '');
-    
+
     return {
       user_id: userId,
       contact_id: contactId,
@@ -15,6 +15,7 @@ async function upsertImportedContacts(userId, contacts) {
       email: c.email ? String(c.email) : null,
       phone: c.phone ? String(c.phone) : null,
       matched_user_id: c.matchedUserId || null,
+      // Note: thumbnail column needs to be added to Supabase for contact photos
     };
   });
 
@@ -31,7 +32,7 @@ async function upsertImportedContacts(userId, contacts) {
     console.error('[UPSERT CONTACTS] Error:', error);
     throw error;
   }
-  
+
   console.log('[UPSERT CONTACTS] Success, upserted:', data?.length || 0);
   return { success: true, rows: data || [] };
 }
@@ -69,8 +70,8 @@ export async function createCircleWithMembers(userId, { name, tier, contacts }) 
     const maxTier = existingCircles?.[0]?.tier ?? 0;
     let nextTier = Math.max(1, maxTier + 1);
 
-    // Check if user has reached maximum circles (max 5 tiers based on DB constraint)
-    const MAX_TIERS = 5;
+    // Check if user has reached maximum circles (matches 3D view's maxRings)
+    const MAX_TIERS = 6;
     if (nextTier > MAX_TIERS) {
       return { success: false, error: `You can have a maximum of ${MAX_TIERS} circles. Please delete one to create a new one.` };
     }
@@ -220,6 +221,7 @@ export async function loadCirclesWithMembers(userId) {
         email: c.email || '',
         phone: c.phone || '',
         matchedUserId: c.matched_user_id || null,
+        // Note: Add thumbnail column to Supabase for contact photos on 3D spheres
       };
       return acc;
     }, {});

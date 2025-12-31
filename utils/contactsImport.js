@@ -32,6 +32,10 @@ export function expoContactsToAppContacts(expoContacts) {
       const name = c?.name || [c?.firstName, c?.lastName].filter(Boolean).join(' ') || 'Unknown';
       const emails = (c?.emails || []).map((e) => normalizeEmail(e?.email)).filter(Boolean);
       const phones = (c?.phoneNumbers || []).map((p) => normalizePhone(p?.number)).filter(Boolean);
+
+      // Extract contact image if available
+      const thumbnail = c?.imageAvailable && c?.image?.uri ? c.image.uri : null;
+
       return {
         id: String(c?.id || `${name}-${Math.random().toString(16).slice(2)}`),
         name,
@@ -42,6 +46,8 @@ export function expoContactsToAppContacts(expoContacts) {
         // Keep all for matching
         emails,
         phones,
+        // Contact photo thumbnail
+        thumbnail,
       };
     })
     .filter((c) => !!c?.name);

@@ -57,7 +57,7 @@ export default function SelectContactsScreen({ navigation, route }) {
         // Race between contact loading and timeout
         const result = await Promise.race([
           Contacts.getContactsAsync({
-            fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
+            fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails, Contacts.Fields.Image],
             pageSize: 1000,
             pageOffset: 0,
           }),

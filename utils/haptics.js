@@ -101,6 +101,42 @@ export const rigidPress = () => {
   }
 };
 
+/**
+ * Nucleus tap - deep thud for tapping the center of the universe
+ */
+export const nucleusTap = () => {
+  if (isHapticsSupported) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  }
+};
+
+/**
+ * Ring cross - subtle tick when finger crosses an orbit ring
+ */
+export const ringCross = () => {
+  if (isHapticsSupported) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+};
+
+/**
+ * Shooting star - magical twinkle haptic
+ */
+export const shootingStar = () => {
+  if (isHapticsSupported) {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+};
+
+/**
+ * Comet impact - when a new contact lands in orbit
+ */
+export const cometImpact = () => {
+  if (isHapticsSupported) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }
+};
+
 // Export all as named object for convenience
 export const Haptic = {
   planetTap,
@@ -113,6 +149,10 @@ export const Haptic = {
   doubleTap,
   softRumble,
   rigidPress,
+  nucleusTap,
+  ringCross,
+  shootingStar,
+  cometImpact,
 };
 
 export default Haptic;

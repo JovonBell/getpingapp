@@ -12,16 +12,11 @@ import {
   Alert,
   AppState,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle, Line, Text as SvgText, Rect, G } from 'react-native-svg';
 import Haptic from '../../utils/haptics';
-
-// Create animated SVG components
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const AnimatedG = Animated.createAnimatedComponent(G);
 import { Ionicons } from '@expo/vector-icons';
 import PlanetZoom3D from '../../components/contacts/PlanetZoom3D';
 import CircleZoom3D from '../../components/contacts/CircleZoom3D';
+import UniverseHomeView from '../../components/3d/UniverseHomeView';
 import AddReminderModal from '../../components/modals/AddReminderModal';
 import EditContactModal from '../../components/modals/EditContactModal';
 import { getImportedContacts as loadImportedContacts } from '../../utils/storage/contactsStorage';
@@ -1120,21 +1115,56 @@ export default function HomeScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#0a2e1a', '#05140a', '#000000']}
-        style={styles.gradient}
-      >
-        {/* Header */}
-        <HomeHeader
-          unreadCount={unreadCount}
-          onDashboard={() => navigation.navigate('Dashboard')}
-          onMessages={() => navigation.navigate('Messages')}
-          onProfile={() => navigation.navigate('Profile')}
-        />
+      {/* FULL SCREEN 3D UNIVERSE - Base Layer */}
+      <UniverseHomeView
+        circles={circles}
+        healthMap={healthMap}
+        onContactTap={(contact) => {
+          const ringedIndex = ringedContacts.findIndex(entry => entry.contact?.id === contact?.id);
+          if (ringedIndex >= 0) {
+            handlePerson3DPress(contact, ringedIndex);
+          }
+        }}
+        onContactDoubleTap={(contact) => {
+          if (contact?.phone) {
+            const phoneNumber = contact.phone.replace(/[^0-9]/g, '');
+            Linking.openURL(`sms:${phoneNumber}`);
+          }
+        }}
+        onContactLongPress={(contact, position) => {
+          handleContactLongPress(contact, position);
+        }}
+        onRingTap={(circleId, ringIndex) => {
+          const circle = circles[ringIndex];
+          if (circle) {
+            setSelectedCircleForZoom(circle);
+            setCircleZoomOpen(true);
+          }
+        }}
+        onNucleusTap={() => {
+          handleCenterPress();
+        }}
+        onBackgroundTap={() => {
+          closeQuickActionMenu();
+        }}
+        style={styles.fullScreen3D}
+      />
 
-        {/* Search Bar & circle label only after first circle exists */}
+      {/* GLASS UI OVERLAY - Floats on top of 3D */}
+      <View style={styles.glassOverlayContainer} pointerEvents="box-none">
+        {/* Header with glass effect */}
+        <View style={styles.glassHeader}>
+          <HomeHeader
+            unreadCount={unreadCount}
+            onDashboard={() => navigation.navigate('Dashboard')}
+            onMessages={() => navigation.navigate('Messages')}
+            onProfile={() => navigation.navigate('Profile')}
+          />
+        </View>
+
+        {/* Search Bar & circle info - glass panel */}
         {hasCircle && (
-          <>
+          <View style={styles.glassSearchPanel}>
             <View style={styles.searchWrapper}>
               <View style={styles.searchContainer}>
                 <Ionicons name="search" size={20} color="#4FFFB0" style={styles.searchIcon} />
@@ -1157,12 +1187,10 @@ export default function HomeScreen({ navigation, route }) {
                       data={filteredContacts}
                       keyExtractor={(item) => item.id}
                       renderItem={({ item, index }) => {
-                        // Find the contact's circle and health info
                         const ringedEntry = ringedContacts.find(entry => entry.contact?.id === item?.id);
                         const circleName = ringedEntry ? circles[ringedEntry.ringIndex]?.name : null;
                         const health = healthMap[item?.importedContactId];
                         const healthColor = health ? getHealthColor(health.status) : '#4FFFB0';
-                        const healthScore = health?.health_score ?? 100;
                         const healthStatus = health?.status || 'healthy';
                         const needsAttention = healthStatus === 'cold' || healthStatus === 'at_risk';
 
@@ -1178,7 +1206,6 @@ export default function HomeScreen({ navigation, route }) {
                               }
                             }}
                           >
-                            {/* Avatar with health-colored border */}
                             <View style={[
                               styles.resultAvatar,
                               { backgroundColor: healthColor + '20', borderWidth: 2, borderColor: healthColor }
@@ -1187,7 +1214,6 @@ export default function HomeScreen({ navigation, route }) {
                             </View>
                             <View style={styles.resultInfo}>
                               <Text style={styles.resultName}>{item.name}</Text>
-                              {/* Circle and health info row */}
                               <View style={styles.resultMetaRow}>
                                 {circleName && (
                                   <View style={styles.resultCircleBadge}>
@@ -1204,7 +1230,6 @@ export default function HomeScreen({ navigation, route }) {
                                 </View>
                               </View>
                             </View>
-                            {/* Attention indicator */}
                             {needsAttention && (
                               <Text style={styles.resultAttentionBadge}>
                                 {healthStatus === 'cold' ? '❄️' : '⚠️'}
@@ -1232,333 +1257,60 @@ export default function HomeScreen({ navigation, route }) {
               healthStats={healthStats}
               onPress={() => navigation.navigate('AlertsTab')}
             />
-          </>
+          </View>
         )}
 
-        {/* Network Visualization */}
-        <View style={styles.networkContainer}>
-          {/* Flowing star background - moves upward independently */}
-          <View style={styles.starsFixed} pointerEvents="none">
-            {starAnimations.map((anim, i) => {
-              const star = starPositions[i];
-              return (
-                <Animated.View
-                  key={i}
-                  style={[
-                    styles.star,
-                    {
-                      left: star.x,
-                      width: star.size,
-                      height: star.size,
-                      opacity: star.opacity,
-                      transform: [
-                        {
-                          translateY: anim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [star.startY, star.startY - STAR_AREA_HEIGHT], // Move upward
-                          }),
-                        },
-                      ],
-                    },
-                  ]}
-                />
-              );
-            })}
-          </View>
+        {/* Circle label removed - now only in glass panel above */}
 
-          {/* Rotatable network visualization */}
-          <View
-            ref={networkViewRef}
-            style={styles.networkView}
-            onLayout={() => {
-              networkViewRef.current?.measure((_x, _y, _width, height, _pageX, pageY) => {
-                setCircleCenterY(pageY + height / 2);
-              });
+        {/* FIXED POSITION +/- buttons */}
+        <TouchableOpacity
+          style={styles.fixedPlusButton}
+          onPress={() => {
+            console.log('[HomeScreen] Fixed Plus button pressed!');
+            handleCreateNewCircle();
+          }}
+          activeOpacity={0.8}
+        >
+          <View style={styles.fixedButtonCirclePlus}>
+            <Text style={styles.fixedButtonTextPlus}>+</Text>
+          </View>
+        </TouchableOpacity>
+
+        {hasCircle && (
+          <TouchableOpacity
+            style={styles.fixedMinusButton}
+            onPress={() => {
+              console.log('[HomeScreen] Fixed Minus button pressed!');
+              handleDeleteCircleClick();
             }}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
+            activeOpacity={0.8}
           >
-            {/* Circle label */}
-            {hasCircle && (
-              <View style={styles.circleLabelContainer}>
-                <Ionicons name="people-outline" size={16} color="#4FFFB0" />
-                <Text style={styles.circleLabelText}>{primaryCircleName}</Text>
-              </View>
-            )}
-
-            <Animated.View style={[styles.svgContainer, { transform: [{ scale: zoomScale }, { rotate: rotationAnimValue.interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] }) }] }]}>
-              <Svg height="400" width={SCREEN_WIDTH} viewBox="0 0 400 400">
-                  {/* Center glow / nucleus */}
-                  <Circle cx="200" cy="200" r="40" fill="#4FFFB0" opacity="0.3" />
-                  <Circle cx="200" cy="200" r="25" fill="#4FFFB0" opacity="0.5" />
-                  <Circle cx="200" cy="200" r="15" fill="#ffffff" />
-
-                  {/* Circles */}
-                  {!hasCircle ? (
-                    <>
-                      {/* Empty state: glowing concentric circles */}
-                      <Circle cx="200" cy="200" r="70" stroke="#4FFFB0" strokeWidth="1" fill="none" opacity="0.25" />
-                      <Circle cx="200" cy="200" r="105" stroke="#4FFFB0" strokeWidth="1" fill="none" opacity="0.18" />
-                    </>
-                  ) : (
-                    <>
-                      {/* Solid rings (one per circle) - tap detected via touch handlers */}
-                      {circles.map((circle, ringIndex) => (
-                        <Circle
-                          key={circle?.id || `ring-${ringIndex}`}
-                          cx="200"
-                          cy="200"
-                          r={getRingRadius(ringIndex)}
-                          stroke="#4FFFB0"
-                          strokeWidth={ringIndex === 0 ? 2.5 : 2}
-                          fill="none"
-                          opacity={ringIndex === 0 ? 0.5 : 0.35}
-                        />
-                      ))}
-                    </>
-                  )}
-
-                  {/* Outer dotted ring (always visible) */}
-                  <Circle
-                    cx="200"
-                    cy="200"
-                    r={dottedRingRadius}
-                    stroke="#4FFFB0"
-                    strokeWidth="1"
-                    strokeDasharray="3 8"
-                    fill="none"
-                    opacity="0.25"
-                  />
-                  {/* NOTE: Plus/minus buttons moved outside rotating SVG container */}
-
-                  {/* Lines connecting contacts to center */}
-                  {ringedContacts.map((entry, arrayIndex) => {
-                    const pos = getContactPosition(entry.indexOnRing, entry.totalOnRing, entry.ringIndex, entry.contact);
-                    return (
-                      <React.Fragment key={`lines-${entry.ringIndex}-${entry.indexOnRing}-${entry.contact.id}`}>
-                        <Line
-                          x1="200"
-                          y1="200"
-                          x2={pos.x}
-                          y2={pos.y}
-                          stroke={pos.color}
-                          strokeWidth="1"
-                          opacity="0.26"
-                        />
-                      </React.Fragment>
-                    );
-                  })}
-
-                  {/* Contact nodes with improved UX */}
-                  {ringedContacts.map((entry, arrayIndex) => {
-                    const pos = getContactPosition(entry.indexOnRing, entry.totalOnRing, entry.ringIndex, entry.contact);
-                    const circumference = 2 * Math.PI * (pos.radius + 3);
-                    // Calculate label offset based on node size
-                    const labelOffset = pos.radius + 12;
-                    // Calculate pulsing opacity for cold/at-risk contacts
-                    const pulseOpacity = pos.needsAttention
-                      ? pulseAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.15, 0.4],
-                        })
-                      : 0;
-                    const pulseRadius = pos.needsAttention
-                      ? pulseAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [pos.radius + 12, pos.radius + 20],
-                        })
-                      : pos.radius + 12;
-
-                    return (
-                      <React.Fragment key={`contact-${entry.ringIndex}-${entry.indexOnRing}-${entry.contact.id}`}>
-                        {/* Animated pulsing glow for cold/at_risk contacts */}
-                        {pos.needsAttention && (
-                          <AnimatedCircle
-                            cx={pos.x}
-                            cy={pos.y}
-                            r={pulseRadius}
-                            fill={pos.color}
-                            opacity={pulseOpacity}
-                          />
-                        )}
-                        {/* Static outer glow (stronger for urgent contacts) */}
-                        <Circle
-                          cx={pos.x}
-                          cy={pos.y}
-                          r={pos.radius + 6}
-                          fill={pos.color}
-                          opacity={pos.needsAttention ? 0.25 : 0.15}
-                        />
-                        {/* Health ring (shows percentage) */}
-                        <Circle
-                          cx={pos.x}
-                          cy={pos.y}
-                          r={pos.radius + 3}
-                          stroke={pos.color}
-                          strokeWidth={pos.needsAttention ? 2.5 : 2}
-                          strokeDasharray={`${(pos.healthScore / 100) * circumference} ${circumference}`}
-                          strokeDashoffset={circumference * 0.25}
-                          fill="none"
-                          opacity="0.8"
-                          rotation="-90"
-                          origin={`${pos.x}, ${pos.y}`}
-                        />
-                        {/* Invisible larger touch target (44x44 minimum for WCAG) */}
-                        {/* Supports tap (view contact) and long-press (quick actions menu) */}
-                        <Circle
-                          cx={pos.x}
-                          cy={pos.y}
-                          r={22}
-                          fill="transparent"
-                          onPressIn={() => {
-                            // Start long-press timer
-                            longPressTimer.current = setTimeout(() => {
-                              // Calculate screen position from SVG coordinates
-                              const screenX = (pos.x / 400) * SCREEN_WIDTH;
-                              const screenY = (pos.y / 400) * SCREEN_HEIGHT * 0.5 + 150;
-                              handleContactLongPress(entry.contact, { x: screenX, y: screenY });
-                            }, 500); // 500ms for long press
-                          }}
-                          onPressOut={() => {
-                            // Cancel long-press timer if released early
-                            if (longPressTimer.current) {
-                              clearTimeout(longPressTimer.current);
-                              longPressTimer.current = null;
-                            }
-                          }}
-                          onPress={() => {
-                            // Only trigger tap if not showing quick action menu
-                            if (!quickActionMenu.visible) {
-                              handlePerson3DPress(entry.contact, arrayIndex);
-                            }
-                          }}
-                        />
-                        {/* Contact node (visible) */}
-                        <Circle
-                          cx={pos.x}
-                          cy={pos.y}
-                          r={pos.radius}
-                          fill={pos.color}
-                          opacity="0.95"
-                        />
-                        {/* Icon badge for accessibility (cold/at-risk) */}
-                        {pos.badge && (
-                          <SvgText
-                            x={pos.x + pos.radius - 2}
-                            y={pos.y - pos.radius + 4}
-                            fontSize="10"
-                            textAnchor="middle"
-                          >
-                            {pos.badge}
-                          </SvgText>
-                        )}
-                        {/* Contact first name - NOW RENDERED OUTSIDE SVG as non-rotating labels */}
-                        {/* Health bar removed - was covering names */}
-                      </React.Fragment>
-                    );
-                  })}
-                </Svg>
-
-                {/* Contact name labels - rotate naturally with the circles, centered directly underneath */}
-                {contactLabels.map((label, index) => {
-                  const centerX = (label.svgX / 400) * SCREEN_WIDTH;
-                  const centerY = ((label.svgY + label.radius + 8) / 400) * SCREEN_WIDTH; // Closer to circle
-                  
-                  return (
-                    <View
-                      key={`label-${index}`}
-                      style={[
-                        styles.contactNameLabel,
-                        {
-                          left: centerX - 30, // Center the label (half of minWidth: 60)
-                          top: centerY,
-                        },
-                      ]}
-                      pointerEvents="none"
-                    >
-                    <Text
-                      style={[
-                        styles.contactNameText,
-                        {
-                          color: '#ffffff',
-                          fontWeight: label.needsAttention ? '600' : '400',
-                          fontSize: label.needsAttention ? 11 : 10,
-                        },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {label.name}
-                    </Text>
-                    {/* Small colored dot indicator below name */}
-                    <View style={[styles.contactNameDot, { backgroundColor: label.color }]} />
-                    </View>
-                  );
-                })}
-              </Animated.View>
+            <View style={styles.fixedButtonCircleMinus}>
+              <Text style={styles.fixedButtonTextMinus}>−</Text>
             </View>
+          </TouchableOpacity>
+        )}
 
-            {/* FIXED POSITION +/- buttons - do NOT rotate with the circle */}
-            {/* Plus button on right side */}
-            <TouchableOpacity
-              style={styles.fixedPlusButton}
-              onPress={() => {
-                console.log('[HomeScreen] Fixed Plus button pressed!');
-                handleCreateNewCircle();
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={styles.fixedButtonCirclePlus}>
-                <Text style={styles.fixedButtonTextPlus}>+</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Minus button on left side - only show if there are circles */}
-            {hasCircle && (
-              <TouchableOpacity
-                style={styles.fixedMinusButton}
-                onPress={() => {
-                  console.log('[HomeScreen] Fixed Minus button pressed!');
-                  handleDeleteCircleClick();
-                }}
-                activeOpacity={0.8}
-              >
-                <View style={styles.fixedButtonCircleMinus}>
-                  <Text style={styles.fixedButtonTextMinus}>−</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-
+        {/* Bottom tap instruction */}
+        <View style={styles.bottomInstructionContainer}>
+          <View style={styles.glassBottomPanel}>
+            <Text style={styles.tapInstruction}>
+              {hasCircle
+                ? 'Tap a person to view • Tap a ring to explore that circle'
+                : 'tap the center to create your first Circle'}
+            </Text>
           </View>
-
-          {/* Large, invisible tap target over the nucleus - only when no circle exists */}
-          {/* Positioned outside networkView to avoid touch handler interference */}
-          {!hasCircle && (
-            <TouchableOpacity
-              style={styles.centerTapTarget}
-              activeOpacity={1}
-              onPress={handleCenterPress}
-            >
-              <View style={{ flex: 1 }} />
-            </TouchableOpacity>
-          )}
-
-
-        <View style={styles.tapInstructionContainer}>
-          <Text style={styles.tapInstruction}>
-            {hasCircle
-              ? 'Tap a person to view • Tap a ring to explore that circle'
-              : 'tap the center to create your first Circle • drag to rotate • pinch to zoom'}
-          </Text>
         </View>
 
-        {/* First-time user tap hint */}
-        {hasCircle && ringedContacts.length > 0 && (
-          <TapHint
-            visible={showTapHint}
-            onDismiss={dismissTapHint}
-            message="Tap a contact to view their profile"
-          />
+        {/* Large center tap target when no circle exists */}
+        {!hasCircle && (
+          <TouchableOpacity
+            style={styles.centerTapTarget}
+            activeOpacity={1}
+            onPress={handleCenterPress}
+          >
+            <View style={{ flex: 1 }} />
+          </TouchableOpacity>
         )}
 
         {/* Prominent CTA when no circles exist */}
@@ -1572,8 +1324,16 @@ export default function HomeScreen({ navigation, route }) {
             <Text style={styles.createFirstCircleText}>Create Your First Circle</Text>
           </TouchableOpacity>
         )}
+      </View>
 
-        {/* NOTE: Per UX requirement, HomeScreen shows NO popups/panels. Interaction happens only via the 3D sphere view. */}
+        {/* First-time user tap hint */}
+        {hasCircle && ringedContacts.length > 0 && (
+          <TapHint
+            visible={showTapHint}
+            onDismiss={dismissTapHint}
+            message="Tap a contact to view their profile"
+          />
+        )}
 
         {/* First Circle Congratulations Popup */}
         {showCongratsPopup && (
@@ -1835,7 +1595,6 @@ export default function HomeScreen({ navigation, route }) {
           onSetReminder={handleSetReminder}
           onViewDetails={handleQuickViewDetails}
         />
-      </LinearGradient>
     </View>
   );
 }
@@ -1843,6 +1602,72 @@ export default function HomeScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#020208',
+  },
+  // Full screen 3D universe - base layer
+  fullScreen3D: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  // Glass overlay container - floats above 3D
+  glassOverlayContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
+  },
+  // Glass header area
+  glassHeader: {
+    paddingTop: 0,
+  },
+  // Glass search panel with semi-transparent background - COMPACT
+  glassSearchPanel: {
+    marginHorizontal: 12,
+    marginTop: 4,
+    backgroundColor: 'rgba(2, 2, 8, 0.65)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.15)',
+    paddingBottom: 6,
+    // Shadow for depth
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  // Bottom instruction container
+  bottomInstructionContainer: {
+    position: 'absolute',
+    bottom: 90,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  // Glass bottom panel for instructions
+  glassBottomPanel: {
+    backgroundColor: 'rgba(2, 2, 8, 0.6)',
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.1)',
+  },
+  // Modals container
+  modalsContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 100,
   },
   gradient: {
     flex: 1,
@@ -1850,8 +1675,9 @@ const styles = StyleSheet.create({
   searchWrapper: {
     position: 'relative',
     zIndex: 100,
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    marginBottom: 4,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -1868,8 +1694,8 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     color: '#ffffff',
-    fontSize: 16,
-    paddingVertical: 12,
+    fontSize: 14,
+    paddingVertical: 8,
   },
   searchResults: {
     position: 'absolute',
@@ -1968,6 +1794,13 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
   },
+  universeView: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   starsFixed: {
     position: 'absolute',
     width: '100%',
@@ -2004,6 +1837,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   createFirstCircleButton: {
+    position: 'absolute',
+    bottom: 140,
+    left: 40,
+    right: 40,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2011,13 +1848,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 28,
-    marginHorizontal: 40,
-    marginBottom: 20,
     shadowColor: '#4FFFB0',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 8,
+    zIndex: 50,
   },
   createFirstCircleText: {
     color: '#000000',
@@ -2114,19 +1950,19 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   circleNameContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 8,
+    paddingHorizontal: 16,
+    marginBottom: 4,
   },
   circleNameLabel: {
     color: '#4FFFB0',
-    fontSize: 12,
+    fontSize: 10,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 2,
+    marginBottom: 1,
   },
   circleNameValue: {
     color: '#ffffff',
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '600',
   },
   popupOverlay: {
@@ -2279,18 +2115,20 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 15,
   },
-  // Circle label on orbit
+  // Circle label on orbit - positioned in mid-left of 3D view
   circleLabelContainer: {
     position: 'absolute',
-    top: 30,
-    left: 20,
+    top: '45%',
+    left: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(2, 2, 8, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.2)',
     zIndex: 20,
   },
   circleLabelText: {

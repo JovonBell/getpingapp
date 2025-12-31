@@ -1,8 +1,11 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { HealthSummaryBar } from '../contacts/HealthIndicator';
 
+/**
+ * Compact single-line health notification bar
+ * Shows only when contacts need attention
+ */
 export default function HealthSummaryCard({ healthStats, onPress }) {
   if (!healthStats || healthStats.needsAttention <= 0) {
     return null;
@@ -15,37 +18,43 @@ export default function HealthSummaryCard({ healthStats, onPress }) {
       activeOpacity={0.8}
     >
       <View style={styles.healthSummaryRow}>
-        <Ionicons name="alert-circle" size={20} color="#FF8C42" />
+        <View style={styles.alertDot} />
         <Text style={styles.healthSummaryText}>
-          {healthStats.needsAttention} contact{healthStats.needsAttention > 1 ? 's' : ''} need{healthStats.needsAttention === 1 ? 's' : ''} attention
+          {healthStats.needsAttention} need{healthStats.needsAttention === 1 ? 's' : ''} attention
         </Text>
-        <Ionicons name="chevron-forward" size={16} color="#666" />
+        <Ionicons name="chevron-forward" size={14} color="#666" />
       </View>
-      <HealthSummaryBar stats={healthStats} />
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
+  // Compact single-line notification bar
   healthSummaryCard: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: 'rgba(255, 140, 66, 0.1)',
-    borderRadius: 12,
+    marginHorizontal: 12,
+    marginTop: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 140, 66, 0.08)',
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 140, 66, 0.3)',
+    borderColor: 'rgba(255, 140, 66, 0.2)',
   },
   healthSummaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
+  },
+  alertDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF8C42',
   },
   healthSummaryText: {
     flex: 1,
-    color: '#ffffff',
-    fontSize: 14,
+    color: '#FF8C42',
+    fontSize: 13,
     fontWeight: '500',
   },
 });
