@@ -139,7 +139,7 @@ export default function UniverseHomeView({
   onRingTap,
   onNucleusTap,
   onBackgroundTap,
-  onSupernovaReady,  // Callback to receive supernova trigger function
+  onSupernovaReady,  // Callback to receive all cosmic effect functions
   primaryColor = 0x4fffb0,
   style,
 }) {
@@ -197,6 +197,27 @@ export default function UniverseHomeView({
     flashOpacity: 0,
     cameraShake: { x: 0, y: 0 },
     startTime: 0,
+  });
+
+  // Black hole warning for neglected contacts (90+ days)
+  const blackHoleRef = useRef({
+    active: false,
+    vortex: null,
+    neglectedContacts: [],
+    rotationSpeed: 0.02,
+  });
+
+  // Universe birth animation for first-time users
+  const universeBirthRef = useRef({
+    active: false,
+    phase: 0, // 0=dark, 1=nucleus, 2=rings, 3=stars, 4=complete
+    startTime: 0,
+  });
+
+  // Constellation lines between contacts in same circle
+  const constellationRef = useRef({
+    lines: [],
+    enabled: false,
   });
 
   // Flatten circles into contact array with positions
@@ -400,6 +421,150 @@ export default function UniverseHomeView({
     setTimeout(() => Haptic.mediumImpact(), 200);
   }, []);
 
+  /**
+   * Create/update black hole warning for critically neglected contacts
+   * Contacts not interacted with in 90+ days drift toward a dark vortex
+   */
+  const updateBlackHoleWarning = useCallback((neglectedContacts) => {
+    if (!sceneRef.current) return;
+    const scene = sceneRef.current;
+    const blackHole = blackHoleRef.current;
+
+    // Need at least 3 neglected contacts to show warning
+    if (neglectedContacts.length < 3) {
+      // Remove existing vortex if any
+      if (blackHole.vortex) {
+        scene.remove(blackHole.vortex);
+        blackHole.vortex.geometry.dispose();
+        blackHole.vortex.material.dispose();
+        blackHole.vortex = null;
+        blackHole.active = false;
+      }
+      return;
+    }
+
+    blackHole.neglectedContacts = neglectedContacts;
+    blackHole.active = true;
+
+    // Create vortex if not exists
+    if (!blackHole.vortex) {
+      const vortexGeo = new THREE.TorusGeometry(0.4, 0.15, 16, 48);
+      const vortexMat = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0.6,
+        side: THREE.DoubleSide,
+      });
+      blackHole.vortex = new THREE.Mesh(vortexGeo, vortexMat);
+      blackHole.vortex.position.set(0, -0.5, 0); // Below nucleus
+      blackHole.vortex.rotation.x = Math.PI / 2;
+      scene.add(blackHole.vortex);
+
+      // Inner dark core
+      const coreGeo = new THREE.SphereGeometry(0.25, 16, 16);
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0.9,
+      });
+      const core = new THREE.Mesh(coreGeo, coreMat);
+      blackHole.vortex.add(core);
+      core.position.set(0, 0, 0);
+
+      console.log('[UniverseHomeView] Black hole warning activated!', neglectedContacts.length, 'neglected contacts');
+      Haptic.warning();
+    }
+  }, []);
+
+  /**
+   * Play the universe birth animation for first-time users
+   */
+  const playUniverseBirth = useCallback(() => {
+    if (!sceneRef.current || universeBirthRef.current.active) return;
+
+    console.log('[UniverseHomeView] Playing universe birth animation 🌟');
+    universeBirthRef.current.active = true;
+    universeBirthRef.current.phase = 0;
+    universeBirthRef.current.startTime = Date.now();
+
+    // Initially hide everything
+    if (nucleusRef.current?.group) {
+      nucleusRef.current.group.scale.setScalar(0.01);
+      nucleusRef.current.group.visible = true;
+    }
+    if (starFieldRef.current?.layers) {
+      starFieldRef.current.layers.forEach(layer => {
+        layer.material.opacity = 0;
+      });
+    }
+
+    // Haptic heartbeat to accompany birth
+    Haptic.softPress();
+  }, []);
+
+  /**
+   * Toggle constellation lines between contacts in the same circle
+   */
+  const toggleConstellations = useCallback((enabled) => {
+    if (!sceneRef.current) return;
+    const scene = sceneRef.current;
+    const constellation = constellationRef.current;
+
+    // Remove existing lines
+    constellation.lines.forEach(line => {
+      scene.remove(line.mesh);
+      line.geo.dispose();
+      line.mat.dispose();
+    });
+    constellation.lines = [];
+
+    if (!enabled) {
+      constellation.enabled = false;
+      return;
+    }
+
+    constellation.enabled = true;
+
+    // Create lines connecting contacts within each ring
+    circles.forEach((circle, ringIndex) => {
+      if (!circle.contacts || circle.contacts.length < 2) return;
+
+      const radius = RING_CONFIG.baseRadius + ringIndex * RING_CONFIG.radiusStep;
+      const contacts = circle.contacts.slice(0, RING_CONFIG.maxContactsPerRing);
+
+      // Connect each contact to the next (creating a polygon)
+      for (let i = 0; i < contacts.length; i++) {
+        const nextI = (i + 1) % contacts.length;
+
+        const angle1 = (i / contacts.length) * Math.PI * 2;
+        const angle2 = (nextI / contacts.length) * Math.PI * 2;
+
+        const x1 = Math.cos(angle1) * radius;
+        const z1 = Math.sin(angle1) * radius;
+        const x2 = Math.cos(angle2) * radius;
+        const z2 = Math.sin(angle2) * radius;
+
+        const points = [
+          new THREE.Vector3(x1, 0, z1),
+          new THREE.Vector3(x2, 0, z2),
+        ];
+
+        const geo = new THREE.BufferGeometry().setFromPoints(points);
+        const mat = new THREE.LineBasicMaterial({
+          color: circle.color || 0x4FFFB0,
+          transparent: true,
+          opacity: 0.3,
+        });
+        const line = new THREE.Line(geo, mat);
+        scene.add(line);
+
+        constellation.lines.push({ mesh: line, geo, mat, ringIndex });
+      }
+    });
+
+    console.log('[UniverseHomeView] Constellation lines:', constellation.lines.length);
+  }, [circles]);
+
   // Convert screen touch to 3D position on the orbital plane (y=0)
   const updateGravityWellPosition = useCallback((touchX, touchY) => {
     if (!cameraRef.current) return;
@@ -482,10 +647,15 @@ export default function UniverseHomeView({
     }
   }, [circles]);
 
-  // Expose supernova trigger to parent component
+  // Expose cosmic effect functions to parent component
   useEffect(() => {
-    onSupernovaReady?.(triggerSupernova);
-  }, [onSupernovaReady, triggerSupernova]);
+    onSupernovaReady?.({
+      triggerSupernova,
+      updateBlackHoleWarning,
+      playUniverseBirth,
+      toggleConstellations,
+    });
+  }, [onSupernovaReady, triggerSupernova, updateBlackHoleWarning, playUniverseBirth, toggleConstellations]);
 
   const onContextCreate = async (gl) => {
     console.log('[UniverseHomeView] GL Context created');
@@ -968,6 +1138,75 @@ export default function UniverseHomeView({
         }
       }
 
+      // === BLACK HOLE WARNING ANIMATION ===
+      const blackHole = blackHoleRef.current;
+      if (blackHole.active && blackHole.vortex) {
+        // Rotate the vortex ominously
+        blackHole.vortex.rotation.z += blackHole.rotationSpeed;
+
+        // Pulse the opacity
+        const pulse = Math.sin(s.time * 2) * 0.15 + 0.6;
+        blackHole.vortex.material.opacity = pulse;
+
+        // Scale pulse (breathing effect)
+        const scalePulse = 1 + Math.sin(s.time * 1.5) * 0.1;
+        blackHole.vortex.scale.setScalar(scalePulse);
+      }
+
+      // === UNIVERSE BIRTH ANIMATION ===
+      const birth = universeBirthRef.current;
+      if (birth.active) {
+        const elapsed = Date.now() - birth.startTime;
+
+        // Phase 0: Darkness (0-500ms)
+        if (birth.phase === 0 && elapsed > 500) {
+          birth.phase = 1;
+          Haptic.softPress();
+        }
+
+        // Phase 1: Nucleus appears and expands (500-2500ms)
+        if (birth.phase === 1) {
+          const progress = Math.min(1, (elapsed - 500) / 2000);
+          const scale = easeOutBack(progress);
+          if (nucleusRef.current?.group) {
+            nucleusRef.current.group.scale.setScalar(scale);
+          }
+          if (progress >= 1) {
+            birth.phase = 2;
+            Haptic.mediumImpact();
+          }
+        }
+
+        // Phase 2: Rings ripple outward (2500-4000ms)
+        if (birth.phase === 2) {
+          const progress = Math.min(1, (elapsed - 2500) / 1500);
+          ringMeshes.forEach((ring, i) => {
+            const ringProgress = Math.max(0, Math.min(1, (progress - i * 0.15) / 0.5));
+            const scale = easeOutBack(ringProgress);
+            ring.mesh.scale.setScalar(scale);
+          });
+          if (progress >= 1) {
+            birth.phase = 3;
+          }
+        }
+
+        // Phase 3: Stars fade in (4000-6000ms)
+        if (birth.phase === 3) {
+          const progress = Math.min(1, (elapsed - 4000) / 2000);
+          if (starFieldRef.current?.layers) {
+            starFieldRef.current.layers.forEach(layer => {
+              layer.material.opacity = layer.userData.baseOpacity * progress;
+            });
+          }
+          if (progress >= 1) {
+            birth.phase = 4;
+            birth.active = false;
+            console.log('[UniverseHomeView] Universe birth complete! ✨');
+            Haptic.success();
+          }
+        }
+      }
+
       // Update ring glow based on camera distance
       const camDist = camera.position.length();
       ringGlows.forEach((g, i) => {
@@ -1053,6 +1292,30 @@ export default function UniverseHomeView({
       // Clear texture cache
       clearTextureCache();
 
+      // Dispose black hole
+      if (blackHoleRef.current.vortex) {
+        scene.remove(blackHoleRef.current.vortex);
+        blackHoleRef.current.vortex.geometry.dispose();
+        blackHoleRef.current.vortex.material.dispose();
+        blackHoleRef.current.vortex = null;
+      }
+
+      // Dispose constellation lines
+      constellationRef.current.lines.forEach(line => {
+        scene.remove(line.mesh);
+        line.geo.dispose();
+        line.mat.dispose();
+      });
+      constellationRef.current.lines = [];
+
+      // Dispose supernova particles
+      supernovaRef.current.particles.forEach(p => {
+        scene.remove(p.mesh);
+        p.geo.dispose();
+        p.mat.dispose();
+      });
+      supernovaRef.current.particles = [];
+
       renderer.dispose?.();
     };
   };
@@ -1098,10 +1361,10 @@ export default function UniverseHomeView({
           const hitPoint = new THREE.Vector3().copy(rayDir).multiplyScalar(t).add(rayOrigin);
           const distFromCenter = Math.sqrt(hitPoint.x * hitPoint.x + hitPoint.z * hitPoint.z);
 
-          // Check each ring
+          // Check each ring (tolerance 0.8 for better tap detection)
           for (let i = 0; i < circles.length && i < RING_CONFIG.maxRings; i++) {
             const ringRadius = RING_CONFIG.baseRadius + i * RING_CONFIG.radiusStep;
-            if (Math.abs(distFromCenter - ringRadius) < 0.5) {
+            if (Math.abs(distFromCenter - ringRadius) < 0.8) {
               return { type: 'ring', index: i };
             }
           }

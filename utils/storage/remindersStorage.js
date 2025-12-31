@@ -6,6 +6,7 @@ import {
   scheduleBirthdayNotification,
   scheduleImmediateNotification,
 } from '../notifications/pushNotifications';
+import { sanitizeUnicode } from './sanitizeUnicode';
 
 /**
  * Create a new reminder
@@ -32,8 +33,8 @@ export async function createReminder(userId, {
         user_id: userId,
         imported_contact_id: contactId,
         reminder_type: reminderType,
-        title,
-        note,
+        title: sanitizeUnicode(title),
+        note: sanitizeUnicode(note),
         due_date: new Date(dueDate).toISOString(),
         repeat_interval: repeatInterval,
       })
@@ -526,7 +527,7 @@ export async function saveContactDate(userId, contactId, dateType, dateValue, la
         imported_contact_id: contactId,
         date_type: dateType,
         date_value: formattedDate,
-        label: label,
+        label: sanitizeUnicode(label),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id,imported_contact_id,date_type' })
       .select()

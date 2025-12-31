@@ -99,6 +99,9 @@ export default function HomeScreen({ navigation, route }) {
   const [showEditContactModal, setShowEditContactModal] = useState(false);
   const [editContact, setEditContact] = useState(null);
 
+  // Cosmic effects functions from UniverseHomeView
+  const cosmicEffectsRef = useRef(null);
+
   // Celebration context for achievements and streak milestones
   const { celebrateAchievement, celebrateStreak, celebrateNewAchievements } = useCelebration();
 
@@ -1069,6 +1072,8 @@ export default function HomeScreen({ navigation, route }) {
       const unlockResult = await checkAndUnlockAchievements(user.id);
       if (unlockResult.success && unlockResult.newlyUnlocked?.length > 0) {
         celebrateNewAchievements(unlockResult.newlyUnlocked);
+        // Trigger cosmic supernova for new achievements!
+        cosmicEffectsRef.current?.triggerSupernova?.();
       }
     } catch (err) {
       console.error('[HomeScreen] Just Talked error:', err);
@@ -1147,6 +1152,14 @@ export default function HomeScreen({ navigation, route }) {
         onBackgroundTap={() => {
           closeQuickActionMenu();
         }}
+        onSupernovaReady={(effects) => {
+          cosmicEffectsRef.current = effects;
+          // Available cosmic effects:
+          // - effects.triggerSupernova() - Epic particle explosion for achievements
+          // - effects.updateBlackHoleWarning(neglectedContacts) - Show/hide black hole
+          // - effects.playUniverseBirth() - First-time user animation
+          // - effects.toggleConstellations(enabled) - Lines between contacts
+        }}
         style={styles.fullScreen3D}
       />
 
@@ -1159,6 +1172,15 @@ export default function HomeScreen({ navigation, route }) {
             onDashboard={() => navigation.navigate('Dashboard')}
             onMessages={() => navigation.navigate('Messages')}
             onProfile={() => navigation.navigate('Profile')}
+            onImportContacts={() => {
+              const parent = navigation.getParent();
+              const params = { isAddingToCircle: true, circleId: circles?.[0]?.id };
+              if (parent) {
+                parent.navigate('SelectContacts', params);
+              } else {
+                navigation.navigate('SelectContacts', params);
+              }
+            }}
           />
         </View>
 
@@ -1425,6 +1447,7 @@ export default function HomeScreen({ navigation, route }) {
                         const unlockResult = await checkAndUnlockAchievements(user.id);
                         if (unlockResult.success && unlockResult.newlyUnlocked?.length > 0) {
                           celebrateNewAchievements(unlockResult.newlyUnlocked);
+                          cosmicEffectsRef.current?.triggerSupernova?.();
                         }
                       }).catch(err => {
                         console.warn('[HomeScreen] Failed to record activity:', err);
@@ -1494,6 +1517,7 @@ export default function HomeScreen({ navigation, route }) {
                         const unlockResult = await checkAndUnlockAchievements(user.id);
                         if (unlockResult.success && unlockResult.newlyUnlocked?.length > 0) {
                           celebrateNewAchievements(unlockResult.newlyUnlocked);
+                          cosmicEffectsRef.current?.triggerSupernova?.();
                         }
                       }).catch(err => {
                         console.warn('[HomeScreen] Failed to record activity:', err);
@@ -1626,15 +1650,15 @@ const styles = StyleSheet.create({
   glassHeader: {
     paddingTop: 0,
   },
-  // Glass search panel with semi-transparent background - COMPACT
+  // Glass search panel with semi-transparent background - ULTRA COMPACT
   glassSearchPanel: {
-    marginHorizontal: 12,
-    marginTop: 4,
+    marginHorizontal: 10,
+    marginTop: 2,
     backgroundColor: 'rgba(2, 2, 8, 0.65)',
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(79, 255, 176, 0.15)',
-    paddingBottom: 6,
+    paddingBottom: 4,
     // Shadow for depth
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

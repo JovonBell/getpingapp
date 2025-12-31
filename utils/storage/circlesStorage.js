@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { sanitizeUnicode } from './sanitizeUnicode';
 
 async function upsertImportedContacts(userId, contacts) {
   console.log('[UPSERT CONTACTS] Starting with', contacts?.length || 0, 'contacts');
@@ -9,11 +10,11 @@ async function upsertImportedContacts(userId, contacts) {
 
     return {
       user_id: userId,
-      contact_id: contactId,
-      name: String(c.name || 'Unknown'),
-      initials: c.initials ? String(c.initials) : null,
-      email: c.email ? String(c.email) : null,
-      phone: c.phone ? String(c.phone) : null,
+      contact_id: sanitizeUnicode(contactId),
+      name: sanitizeUnicode(String(c.name || 'Unknown')),
+      initials: c.initials ? sanitizeUnicode(String(c.initials)) : null,
+      email: c.email ? sanitizeUnicode(String(c.email)) : null,
+      phone: c.phone ? sanitizeUnicode(String(c.phone)) : null,
       matched_user_id: c.matchedUserId || null,
       // Note: thumbnail column needs to be added to Supabase for contact photos
     };
@@ -39,10 +40,12 @@ async function upsertImportedContacts(userId, contacts) {
 
 export async function createCircleWithMembers(userId, { name, tier, contacts }) {
   try {
-    console.log('[CREATE CIRCLE] Starting:', { userId, name, tier, contactCount: contacts?.length });
-    
+    // Sanitize circle name to prevent Unicode errors
+    const sanitizedName = sanitizeUnicode(name);
+    console.log('[CREATE CIRCLE] Starting:', { userId, name: sanitizedName, tier, contactCount: contacts?.length });
+
     if (!userId) return { success: false, error: 'Missing userId' };
-    if (!name) return { success: false, error: 'Missing circle name' };
+    if (!sanitizedName) return { success: false, error: 'Missing circle name' };
 
     // Ensure imported contacts exist in DB and get their UUIDs
     const upserted = await upsertImportedContacts(userId, contacts || []);
@@ -86,7 +89,7 @@ export async function createCircleWithMembers(userId, { name, tier, contacts }) 
     while (!circle && attempts < maxAttempts) {
       const { data, error: circleErr } = await supabase
         .from('circles')
-        .insert({ user_id: userId, name, tier: nextTier })
+        .insert({ user_id: userId, name: sanitizedName, tier: nextTier })
         .select('id,name,tier')
         .single();
 

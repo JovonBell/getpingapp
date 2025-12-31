@@ -29,32 +29,32 @@ export default function HealthSummaryCard({ healthStats, onPress }) {
 }
 
 const styles = StyleSheet.create({
-  // Compact single-line notification bar
+  // Ultra-compact single-line notification bar
   healthSummaryCard: {
-    marginHorizontal: 12,
-    marginTop: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    marginHorizontal: 10,
+    marginTop: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
     backgroundColor: 'rgba(255, 140, 66, 0.08)',
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 140, 66, 0.2)',
   },
   healthSummaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   alertDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#FF8C42',
   },
   healthSummaryText: {
     flex: 1,
     color: '#FF8C42',
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '500',
   },
 });

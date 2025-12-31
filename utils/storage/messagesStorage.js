@@ -1,8 +1,9 @@
 import { supabase } from '../../lib/supabase';
+import { sanitizeUnicode } from './sanitizeUnicode';
 
 export async function sendMessage(senderId, receiverId, content) {
   try {
-    const trimmed = String(content || '').trim();
+    const trimmed = sanitizeUnicode(String(content || '').trim());
     if (!senderId || !receiverId) return { success: false, error: 'Missing sender/receiver' };
     if (!trimmed) return { success: false, error: 'Empty message' };
 

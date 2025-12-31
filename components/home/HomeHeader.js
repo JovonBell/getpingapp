@@ -2,27 +2,34 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function HomeHeader({ 
-  unreadCount = 0, 
-  onDashboard, 
-  onMessages, 
-  onProfile 
+export default function HomeHeader({
+  unreadCount = 0,
+  onDashboard,
+  onMessages,
+  onProfile,
+  onImportContacts,
 }) {
   return (
     <View style={styles.header}>
       <Text style={styles.logo}>ping!</Text>
       <View style={styles.headerRight}>
         <TouchableOpacity
-          style={styles.dashboardButton}
+          style={styles.iconButton}
           onPress={onDashboard}
         >
-          <Ionicons name="stats-chart" size={22} color="#4FFFB0" />
+          <Ionicons name="stats-chart" size={18} color="#4FFFB0" />
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.messageButton}
+          style={styles.iconButton}
+          onPress={onImportContacts}
+        >
+          <Ionicons name="person-add-outline" size={18} color="#4FFFB0" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.iconButton}
           onPress={onMessages}
         >
-          <Ionicons name="chatbubble-outline" size={24} color="#ffffff" />
+          <Ionicons name="chatbubble-outline" size={18} color="#ffffff" />
           {unreadCount > 0 && (
             <View style={styles.messageBadge}>
               <Text style={styles.messageBadgeText}>
@@ -32,10 +39,10 @@ export default function HomeHeader({
           )}
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.profilePic}
+          style={styles.iconButton}
           onPress={onProfile}
         >
-          <Ionicons name="person" size={24} color="#ffffff" />
+          <Ionicons name="person" size={18} color="#ffffff" />
         </TouchableOpacity>
       </View>
     </View>
@@ -47,61 +54,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingTop: 35,
+    marginBottom: 6,
   },
   logo: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#ffffff',
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
-  dashboardButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(79, 255, 176, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(79, 255, 176, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  messageButton: {
+  iconButton: {
     position: 'relative',
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    backgroundColor: '#2a4a3a',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(79, 255, 176, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   messageBadge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    top: -2,
+    right: -2,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: '#ff6b6b',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 3,
   },
   messageBadgeText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: 'bold',
-  },
-  profilePic: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    backgroundColor: '#2a4a3a',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
