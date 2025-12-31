@@ -16,7 +16,34 @@ A relationship management app that helps you stay connected with the people who 
 
 ## Changelog
 
-### December 30, 2025
+### December 30, 2025 (Evening)
+**Cosmic Universe Enhancements & Bug Fixes**
+
+**3D Universe Visual Effects:**
+- ✦ Pointed star burst textures (8-point stars with glowing center)
+- Time-of-day themes (dawn/day/sunset/night color palettes)
+- Device motion parallax depth effect
+- Gravity well finger interactions (contacts attract toward touch)
+- Black hole warning for neglected contacts (90+ days)
+- Universe birth animation for first-time users
+- Constellation lines between contacts in same circle
+- Supernova celebrations on achievement unlock
+
+**Bug Fixes:**
+- Fixed Unicode surrogate pair errors when saving contacts with emoji
+- Added `sanitizeUnicode` utility for all database operations
+- Fixed duplicate contact key errors in CircleZoom3D and UniverseHomeView
+- Fixed React Native compatibility (DataTexture instead of canvas)
+
+**Files Updated:**
+- `EnhancedStarField.js` - Star burst textures using THREE.DataTexture
+- `UniverseHomeView.js` - Cosmic effects, parallax, gravity well
+- `CircleZoom3D.js` - Contact deduplication
+- `circlesStorage.js`, `messagesStorage.js`, `remindersStorage.js` - Unicode sanitization
+
+---
+
+### December 30, 2025 (Morning)
 **Apple Sign In & App Store Compliance** (Joshua Bell)
 
 - Added Apple Sign In to WelcomeScreen and CreateAccountScreen (iOS only)

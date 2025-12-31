@@ -221,16 +221,24 @@ export default function UniverseHomeView({
   });
 
   // Flatten circles into contact array with positions
+  // Deduplicate contacts by ID to prevent issues
   const flattenedContacts = useMemo(() => {
     const contacts = [];
+    const seenIds = new Set();
     let instanceIndex = 0;
 
     circles.forEach((circle, ringIndex) => {
       if (ringIndex >= RING_CONFIG.maxRings) return;
 
       const radius = RING_CONFIG.baseRadius + ringIndex * RING_CONFIG.radiusStep;
-      const visibleContacts = circle.contacts?.slice(0, RING_CONFIG.maxContactsPerRing) || [];
-      const totalContacts = circle.contacts?.length || 0;
+      // Deduplicate contacts within each circle
+      const uniqueContacts = (circle.contacts || []).filter(c => {
+        if (!c.id || seenIds.has(c.id)) return false;
+        seenIds.add(c.id);
+        return true;
+      });
+      const visibleContacts = uniqueContacts.slice(0, RING_CONFIG.maxContactsPerRing);
+      const totalContacts = uniqueContacts.length;
       const overflow = totalContacts - visibleContacts.length;
 
       visibleContacts.forEach((contact, i) => {

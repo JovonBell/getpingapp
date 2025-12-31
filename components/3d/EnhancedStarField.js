@@ -5,15 +5,109 @@
  * - Distant stars (dim, slow parallax)
  * - Mid-field stars (twinkle animation)
  * - Close stars (bright, fast parallax)
+ * - Pointed star burst textures ✦
  */
 
 import * as THREE from 'three';
+
+// Cached star texture (created once, reused for all layers)
+let cachedStarTexture = null;
+
+/**
+ * Create a pointed star burst texture ✦ using DataTexture
+ * Works in React Native (no canvas/DOM needed)
+ */
+function createStarTexture() {
+  const size = 64;
+  const data = new Uint8Array(size * size * 4); // RGBA
+  const center = size / 2;
+
+  // Helper to set pixel with alpha blending (max)
+  const setPixel = (x, y, alpha) => {
+    if (x < 0 || x >= size || y < 0 || y >= size) return;
+    const i = (Math.floor(y) * size + Math.floor(x)) * 4;
+    const newAlpha = Math.floor(alpha * 255);
+    // Use max blending for overlapping spikes
+    if (newAlpha > data[i + 3]) {
+      data[i] = 255;     // R
+      data[i + 1] = 255; // G
+      data[i + 2] = 255; // B
+      data[i + 3] = newAlpha; // A
+    }
+  };
+
+  // Draw a spike from center outward at given angle
+  const drawSpike = (angle, length, width) => {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const perpCos = Math.cos(angle + Math.PI / 2);
+    const perpSin = Math.sin(angle + Math.PI / 2);
+
+    for (let d = 0; d < length; d++) {
+      const progress = d / length;
+      const alpha = 1 - progress; // Fade out along spike
+
+      // Width tapers toward tip
+      const currentWidth = width * (1 - progress * 0.8);
+
+      for (let w = -currentWidth / 2; w <= currentWidth / 2; w++) {
+        const x = center + cos * d + perpCos * w;
+        const y = center + sin * d + perpSin * w;
+        const widthFade = 1 - Math.abs(w) / (currentWidth / 2);
+        setPixel(x, y, alpha * widthFade);
+      }
+    }
+  };
+
+  // Draw 4 main spikes (up, down, left, right)
+  const spikeLength = center * 0.9;
+  const spikeWidth = 5;
+  drawSpike(0, spikeLength, spikeWidth);               // Right
+  drawSpike(Math.PI, spikeLength, spikeWidth);         // Left
+  drawSpike(Math.PI / 2, spikeLength, spikeWidth);     // Down
+  drawSpike(-Math.PI / 2, spikeLength, spikeWidth);    // Up
+
+  // Draw 4 smaller diagonal spikes
+  const diagLength = spikeLength * 0.5;
+  const diagWidth = 3;
+  drawSpike(Math.PI / 4, diagLength, diagWidth);
+  drawSpike(3 * Math.PI / 4, diagLength, diagWidth);
+  drawSpike(-Math.PI / 4, diagLength, diagWidth);
+  drawSpike(-3 * Math.PI / 4, diagLength, diagWidth);
+
+  // Draw bright center glow
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = x - center;
+      const dy = y - center;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 8) {
+        const alpha = 1 - dist / 8;
+        setPixel(x, y, alpha);
+      }
+    }
+  }
+
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
+ * Get or create the star texture (cached)
+ */
+function getStarTexture() {
+  if (!cachedStarTexture) {
+    cachedStarTexture = createStarTexture();
+  }
+  return cachedStarTexture;
+}
 
 // Layer configurations for different depth perception
 const LAYER_CONFIG = {
   distant: {
     count: 1000,
-    size: 0.5,
+    size: 1.5,
     baseOpacity: 0.25,
     spread: 350,
     parallaxFactor: 0.02,
@@ -23,7 +117,7 @@ const LAYER_CONFIG = {
   },
   mid: {
     count: 500,
-    size: 0.9,
+    size: 2.5,
     baseOpacity: 0.4,
     spread: 200,
     parallaxFactor: 0.05,
@@ -33,7 +127,7 @@ const LAYER_CONFIG = {
   },
   close: {
     count: 300,
-    size: 1.4,
+    size: 4.0,
     baseOpacity: 0.7,
     spread: 100,
     parallaxFactor: 0.1,
@@ -88,6 +182,7 @@ function createStarLayer(config, layerName) {
     transparent: true,
     opacity: baseOpacity,
     color,
+    map: getStarTexture(),  // Pointed star burst texture ✦
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });

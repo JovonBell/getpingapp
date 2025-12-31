@@ -23,12 +23,20 @@ export default function CircleZoom3D({
   circleId, // NEW: Circle ID for adding contacts
 }) {
   // Note: Parent controls visibility by conditionally rendering this component
+  // Deduplicate contacts by ID to prevent React key errors
   const normalizedContacts = useMemo(() => {
     if (contacts && contacts.length > 0) {
-      return contacts.map((c, i) => ({
-        ...c,
-        color: c.color || CONTACT_COLORS[i % CONTACT_COLORS.length],
-      }));
+      const seen = new Set();
+      return contacts
+        .filter(c => {
+          if (!c.id || seen.has(c.id)) return false;
+          seen.add(c.id);
+          return true;
+        })
+        .map((c, i) => ({
+          ...c,
+          color: c.color || CONTACT_COLORS[i % CONTACT_COLORS.length],
+        }));
     }
     return [];
   }, [contacts]);
