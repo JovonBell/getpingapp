@@ -24,6 +24,7 @@ import { createEnhancedStarField } from './EnhancedStarField';
 import { createNebulaSystem } from './NebulaSystem';
 import { createFloatingParticles } from './FloatingParticles';
 import { createNucleus } from './NucleusGlow';
+import { createCelestialSystem } from './CelestialBodies';
 import { createContactMaterial, createContactGlow, clearTextureCache } from './ContactTextureHelper';
 import { getHealthColor } from '../../utils/scoring/healthScoring';
 import Haptic from '../../utils/haptics';
@@ -79,7 +80,7 @@ const TIME_THEMES = {
     nucleus: 0xFFB347,
     rings: 0xFF8E72,
     accent: 0xFF6B35,
-    starBrightness: 0.4,
+    starBrightness: 0.5,   // Visible but fading
     fogDensity: 0.015,
   },
   day: {      // 8am-5pm - Vibrant greens, active energy
@@ -87,7 +88,7 @@ const TIME_THEMES = {
     nucleus: 0x4FFFB0,
     rings: 0x4FFFB0,
     accent: 0x00D4AA,
-    starBrightness: 0.3,
+    starBrightness: 0.6,   // FIXED: Was 0.3, stars now visible!
     fogDensity: 0.012,
   },
   sunset: {   // 5pm-8pm - Purple-pink, winding down
@@ -95,7 +96,7 @@ const TIME_THEMES = {
     nucleus: 0xFF9F4F,
     rings: 0xB04FFF,
     accent: 0xFF4F9F,
-    starBrightness: 0.6,
+    starBrightness: 0.7,   // Stars brightening
     fogDensity: 0.01,
   },
   night: {    // 8pm-5am - Deep space, mysterious
@@ -103,7 +104,7 @@ const TIME_THEMES = {
     nucleus: 0x4F9FFF,
     rings: 0x4F9FFF,
     accent: 0xB04FFF,
-    starBrightness: 1.0,
+    starBrightness: 1.0,   // Maximum brightness
     fogDensity: 0.008,
   },
 };
@@ -172,6 +173,7 @@ export default function UniverseHomeView({
   const nebulaRef = useRef(null);
   const particlesRef = useRef(null);
   const nucleusRef = useRef(null);
+  const celestialRef = useRef(null);  // Sun, moon, aurora, horizon
 
   // Contact data for raycasting
   const contactDataRef = useRef([]);
@@ -722,6 +724,11 @@ export default function UniverseHomeView({
     // === NUCLEUS (Center) - Uses time theme color ===
     nucleusRef.current = createNucleus(scene, { primaryColor: timeTheme.nucleus }, isHighQuality);
 
+    // === CELESTIAL BODIES (Sun, Moon, Aurora, Horizon) ===
+    celestialRef.current = createCelestialSystem(scene);
+    // Initial update with current theme
+    celestialRef.current.update(themeName, 0);
+
     // === ORBIT RINGS (Including ghost rings for always-visible effect) ===
     const ringMeshes = [];
     const ringGlows = [];
@@ -945,6 +952,7 @@ export default function UniverseHomeView({
       nebulaRef.current?.update(s.time);
       particlesRef.current?.update(s.time);
       nucleusRef.current?.update(s.time);
+      celestialRef.current?.update(themeName, s.time);
 
       // === PARALLAX DEPTH EFFECT ===
       // Different layers move at different speeds based on device tilt
@@ -1261,6 +1269,7 @@ export default function UniverseHomeView({
       nebulaRef.current?.dispose();
       particlesRef.current?.dispose();
       nucleusRef.current?.dispose();
+      celestialRef.current?.dispose();
 
       // Dispose shooting stars
       shootingStars.forEach(ss => {

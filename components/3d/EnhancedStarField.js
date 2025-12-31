@@ -183,6 +183,7 @@ function createStarLayer(config, layerName) {
     opacity: baseOpacity,
     color,
     map: getStarTexture(),  // Pointed star burst texture ✦
+    alphaTest: 0.01,        // Discard transparent pixels to show star shape ✦
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
@@ -191,6 +192,7 @@ function createStarLayer(config, layerName) {
   stars.userData = {
     layerName,
     baseOpacity,
+    baseSize: size,  // Store base size for twinkle size variation
     twinkle,
     twinkleSpeed: twinkleSpeed || 1,
     parallaxFactor: config.parallaxFactor,
@@ -202,28 +204,36 @@ function createStarLayer(config, layerName) {
 
 /**
  * Update twinkle animation for a star layer
- * Now with more aggressive twinkling for that living universe feel
+ * VERY aggressive twinkling for that magical living universe feel
+ * Uses size variation for more visible twinkling effect
  */
 function updateTwinkle(stars, time) {
   if (!stars.userData.twinkle) return;
 
-  const { baseOpacity, twinkleSpeed, currentBrightness = 1.0 } = stars.userData;
-  const phases = stars.geometry.attributes.phase?.array;
+  const { baseOpacity, twinkleSpeed, currentBrightness = 1.0, baseSize } = stars.userData;
 
-  if (!phases) return;
+  // Super aggressive twinkling - multiple frequencies for sparkle effect
+  const phase = time * twinkleSpeed * 5; // Even faster animation
+  const primaryWave = Math.sin(phase) * 0.6;
+  const secondaryWave = Math.sin(phase * 3.1 + 1.3) * 0.4;
+  const tertiaryWave = Math.sin(phase * 5.7 + 2.7) * 0.3;
+  const sparkle = Math.pow(Math.sin(phase * 11.3), 6) * 0.5; // Sharp sparkle bursts
 
-  // More aggressive twinkling - combine multiple frequencies
-  const layerPhase = time * twinkleSpeed;
-  const primaryWave = Math.sin(layerPhase) * 0.4;
-  const secondaryWave = Math.sin(layerPhase * 2.3) * 0.2;
-  const tertiaryWave = Math.sin(layerPhase * 0.7) * 0.15;
-
-  // Combined variation creates more organic, less predictable twinkling
-  const variation = primaryWave + secondaryWave + tertiaryWave;
+  // Combined variation creates magical twinkling
+  const variation = primaryWave + secondaryWave + tertiaryWave + sparkle;
 
   // Apply brightness multiplier for time-of-day themes
-  const adjustedOpacity = baseOpacity * currentBrightness;
-  stars.material.opacity = Math.max(0.1, adjustedOpacity * (1 + variation));
+  const adjustedOpacity = baseOpacity * Math.max(0.5, currentBrightness);
+
+  // OPACITY: Range from 0.3 to 1.0 for visible twinkle
+  const opacityMultiplier = 0.6 + variation * 0.4;
+  stars.material.opacity = Math.max(0.3, Math.min(1.0, adjustedOpacity * opacityMultiplier));
+
+  // SIZE: Also vary the size for more noticeable twinkling effect
+  if (baseSize) {
+    const sizeMultiplier = 0.8 + variation * 0.3;
+    stars.material.size = baseSize * Math.max(0.6, Math.min(1.4, sizeMultiplier));
+  }
 }
 
 /**
