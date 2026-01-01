@@ -51,6 +51,7 @@ export default function HomeScreen({ navigation, route }) {
   const [circles, setCircles] = useState([]);
   const [circlesLoading, setCirclesLoading] = useState(true);
   const [justDeleted, setJustDeleted] = useState(false); // Prevent reload after delete
+  const loadingRef = useRef(false); // Prevent concurrent loadCircles calls
   const hasCircle = circles.length > 0;
   // Helper to get first name from full name
   const getFirstName = (fullName) => fullName.split(' ')[0];
@@ -116,31 +117,8 @@ export default function HomeScreen({ navigation, route }) {
   });
   const longPressTimer = useRef(null);
 
-  // Handler for showing quick action menu on long press
-  const handleContactLongPress = useCallback((contact, position) => {
-    // CRITICAL: Reset touch state before showing menu to prevent gesture conflicts
-    resetTouchState();
-    
-    if (showTapHint) {
-      dismissTapHint();
-    }
-    setQuickActionMenu({
-      visible: true,
-      contact,
-      position,
-    });
-  }, [showTapHint, dismissTapHint, resetTouchState]);
-
-  // Handler to close quick action menu
-  const closeQuickActionMenu = useCallback(() => {
-    // CRITICAL: Reset touch state when closing menu to prevent stuck gestures
-    resetTouchState();
-    setQuickActionMenu({
-      visible: false,
-      contact: null,
-      position: { x: 0, y: 0 },
-    });
-  }, [resetTouchState]);
+  // NOTE: handleContactLongPress and closeQuickActionMenu are defined later,
+  // after resetTouchState which they depend on (see ~line 650)
 
   // Handler for quick action: open message
   const handleQuickMessage = useCallback(async (contact) => {
@@ -200,35 +178,60 @@ export default function HomeScreen({ navigation, route }) {
       console.log('[HomeScreen] Skipping reload - just deleted a circle');
       return;
     }
-    
+
+    // Prevent concurrent loads (race condition fix)
+    if (loadingRef.current && !force) {
+      console.log('[HomeScreen] Skipping reload - already loading');
+      return;
+    }
+
     console.log('[HomeScreen] Loading circles from Supabase...');
+    loadingRef.current = true;
     setCirclesLoading(true);
-    
+
     try {
       const { success: userSuccess, user } = await getCurrentUser();
       console.log('[HomeScreen] User check:', { userSuccess, userId: user?.id });
-      
+
       if (!userSuccess || !user) {
         console.warn('[HomeScreen] No authenticated user found');
         setCircles([]);
         setCirclesLoading(false);
+        loadingRef.current = false;
         return;
       }
 
       setUserId(user.id);
 
-      const res = await loadCirclesWithMembers(user.id);
-      console.log('[HomeScreen] Circles loaded:', { success: res.success, count: res.circles?.length, error: res.error });
-      
-      if (res.success) {
-        setCircles(res.circles || []);
-        console.log('[HomeScreen] ✅ Circles set to state:', res.circles?.length || 0);
+      // Load circles AND health scores in parallel for faster initial render
+      const [circlesRes, healthRes] = await Promise.all([
+        loadCirclesWithMembers(user.id),
+        getHealthScores(user.id),
+      ]);
 
-        // Refresh health scores and check for alerts (non-blocking)
-        if (res.circles?.length > 0) {
+      console.log('[HomeScreen] Circles loaded:', { success: circlesRes.success, count: circlesRes.circles?.length, error: circlesRes.error });
+      console.log('[HomeScreen] Health scores loaded:', { count: healthRes.healthScores?.length || 0 });
+
+      if (circlesRes.success) {
+        // Set health map FIRST so contacts render with correct colors immediately
+        if (healthRes.healthScores && healthRes.healthScores.length > 0) {
+          const map = {};
+          for (const h of healthRes.healthScores) {
+            map[h.imported_contact_id] = h;
+          }
+          setHealthMap(map);
+          console.log('[HomeScreen] ✅ Health map set with', Object.keys(map).length, 'entries');
+        }
+
+        // Now set circles (contacts will render with health colors)
+        setCircles(circlesRes.circles || []);
+        console.log('[HomeScreen] ✅ Circles set to state:', circlesRes.circles?.length || 0);
+
+        // Refresh health scores and check for alerts (non-blocking background task)
+        if (circlesRes.circles?.length > 0) {
           refreshHealthScores(user.id).then(async () => {
-            console.log('[HomeScreen] ✅ Health scores refreshed');
-            // Load health scores into state
+            console.log('[HomeScreen] ✅ Health scores refreshed in background');
+            // Reload health scores after refresh to get updated values
             const { healthScores } = await getHealthScores(user.id);
             if (healthScores && healthScores.length > 0) {
               const map = {};
@@ -248,12 +251,14 @@ export default function HomeScreen({ navigation, route }) {
           });
         }
       } else {
-        console.error('[HomeScreen] Failed to load circles:', res.error);
+        console.error('[HomeScreen] Failed to load circles:', circlesRes.error);
       }
       setCirclesLoading(false);
+      loadingRef.current = false;
     } catch (e) {
       console.error('[HomeScreen] Exception loading circles:', e?.message || e);
       setCirclesLoading(false);
+      loadingRef.current = false;
     }
   }, [justDeleted]);
 
@@ -620,6 +625,34 @@ export default function HomeScreen({ navigation, route }) {
     }
   }, []);
 
+  // Handler for showing quick action menu on long press
+  // IMPORTANT: Defined after resetTouchState to avoid stale closure
+  const handleContactLongPress = useCallback((contact, position) => {
+    // CRITICAL: Reset touch state before showing menu to prevent gesture conflicts
+    resetTouchState();
+
+    if (showTapHint) {
+      dismissTapHint();
+    }
+    setQuickActionMenu({
+      visible: true,
+      contact,
+      position,
+    });
+  }, [showTapHint, dismissTapHint, resetTouchState]);
+
+  // Handler to close quick action menu
+  // IMPORTANT: Defined after resetTouchState to avoid stale closure
+  const closeQuickActionMenu = useCallback(() => {
+    // CRITICAL: Reset touch state when closing menu to prevent stuck gestures
+    resetTouchState();
+    setQuickActionMenu({
+      visible: false,
+      contact: null,
+      position: { x: 0, y: 0 },
+    });
+  }, [resetTouchState]);
+
   // CRITICAL: Reset touch state when app goes to background/foreground
   // This prevents stuck gesture state when user switches apps
   useEffect(() => {
@@ -627,7 +660,7 @@ export default function HomeScreen({ navigation, route }) {
       console.log('[HomeScreen] AppState changed to:', nextAppState);
       // Reset touch state on ANY app state change to prevent stuck gestures
       resetTouchState();
-      
+
       // Also close any open menus
       if (quickActionMenu.visible) {
         closeQuickActionMenu();
@@ -635,7 +668,7 @@ export default function HomeScreen({ navigation, route }) {
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-    
+
     return () => {
       subscription?.remove();
       // Cleanup: clear long press timer on unmount

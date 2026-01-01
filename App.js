@@ -248,7 +248,9 @@ export default function App() {
     const userId = session?.user?.id;
     if (!userId) return;
     // Best-effort push registration (requires device + permissions + device_tokens table migration)
-    registerForPushNotificationsAsync(userId).catch(() => {});
+    registerForPushNotificationsAsync(userId).catch((err) => {
+      console.warn('[App] Push notification registration failed (non-fatal):', err?.message || err);
+    });
   }, [session?.user?.id]);
 
   // Set up notification listeners

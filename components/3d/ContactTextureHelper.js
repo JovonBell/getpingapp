@@ -103,6 +103,9 @@ export function createContactMaterial(contact, healthColor = '#4FFFB0', loadPhot
         material.map = texture;
         material.needsUpdate = true;
       }
+    }).catch((err) => {
+      // Texture load failed - contact will display with initials/color instead
+      console.warn('[ContactTextureHelper] Failed to load contact texture:', err?.message || err);
     });
   }
 

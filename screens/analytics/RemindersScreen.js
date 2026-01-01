@@ -169,7 +169,10 @@ export default function RemindersScreen({ navigation }) {
       const phoneNumber = phone.replace(/[^0-9]/g, '');
       const message = getPrePopulatedMessage(dateInfo.date_type, contactName);
       const encodedMessage = encodeURIComponent(message);
-      Linking.openURL(`sms:${phoneNumber}&body=${encodedMessage}`);
+      Linking.openURL(`sms:${phoneNumber}&body=${encodedMessage}`).catch((err) => {
+        console.error('[RemindersScreen] Failed to open SMS:', err?.message || err);
+        Alert.alert('Error', 'Could not open the Messages app.');
+      });
     }
   };
 

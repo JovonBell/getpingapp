@@ -37,8 +37,8 @@ const isHighQuality = Platform.OS === 'ios' || (Platform.OS === 'android' && Pla
 // Ring configuration
 const RING_CONFIG = {
   baseRadius: 3.5,
-  radiusStep: 2.8,
-  maxRings: 6,
+  radiusStep: 2.2, // Reduced to fit 10 rings comfortably
+  maxRings: 10,
   maxContactsPerRing: 12,
   contactRadius: 0.45,
   ringOpacity: 0.5, // Boosted visibility
@@ -47,8 +47,8 @@ const RING_CONFIG = {
   minVisibleRings: 2, // Always show at least 2 rings
 };
 
-// Ring rotation speeds (different for each ring)
-const RING_ROTATION_SPEEDS = [0.0004, 0.00035, 0.0003, 0.00025, 0.0002, 0.00015];
+// Ring rotation speeds (different for each ring - 10 rings total)
+const RING_ROTATION_SPEEDS = [0.0004, 0.00035, 0.0003, 0.00025, 0.0002, 0.00018, 0.00015, 0.00012, 0.0001, 0.00008];
 
 // Animation settings
 const ORBIT_SPEED = 0.00025;

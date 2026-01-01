@@ -74,7 +74,7 @@ export async function createCircleWithMembers(userId, { name, tier, contacts }) 
     let nextTier = Math.max(1, maxTier + 1);
 
     // Check if user has reached maximum circles (matches 3D view's maxRings)
-    const MAX_TIERS = 6;
+    const MAX_TIERS = 10;
     if (nextTier > MAX_TIERS) {
       return { success: false, error: `You can have a maximum of ${MAX_TIERS} circles. Please delete one to create a new one.` };
     }
@@ -104,8 +104,8 @@ export async function createCircleWithMembers(userId, { name, tier, contacts }) 
 
         // Check if it's a tier check constraint error (tier out of valid range)
         if (circleErr.code === '23514' && circleErr.message?.includes('circles_tier_check')) {
-          console.error('[CREATE CIRCLE] Tier', nextTier, 'is outside valid range (1-5)');
-          throw new Error('You have reached the maximum number of circles (5). Please delete one to create a new one.');
+          console.error('[CREATE CIRCLE] Tier', nextTier, 'is outside valid range (1-10)');
+          throw new Error('You have reached the maximum number of circles (10). Please delete one to create a new one.');
         }
 
         console.error('[CREATE CIRCLE] Circle insert error:', circleErr);

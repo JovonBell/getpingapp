@@ -21,8 +21,8 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Ring configuration
 const RING_CONFIG = {
   baseRadius: 3,
-  radiusStep: 2.5,
-  maxRings: 6,
+  radiusStep: 2.0, // Reduced to fit 10 rings comfortably
+  maxRings: 10,
   maxContactsPerRing: 12,
   contactRadius: 0.4,
   ringOpacity: 0.3,
