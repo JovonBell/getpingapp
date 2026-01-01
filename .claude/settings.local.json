@@ -18,7 +18,11 @@
       "WebSearch",
       "Bash(curl:*)",
       "Bash(npx expo install:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(eas build:*)",
+      "Bash(node -e:*)",
+      "WebFetch(domain:forums.developer.apple.com)",
+      "WebFetch(domain:www.themobileentity.com)"
     ]
   }
 }

@@ -351,7 +351,7 @@ export default function UniverseHomeView({
         if (hit.type === 'contact') {
           const contact = contactDataRef.current[hit.index];
           if (contact && !contact.isOverflow) {
-            Haptic.impact();
+            Haptic.mediumImpact();
             onContactLongPress?.(contact, { x: pos.x, y: pos.y });
           }
         }

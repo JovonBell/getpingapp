@@ -150,7 +150,7 @@ export default function NFCRingScreen({ navigation }) {
 
     setStatus(STATUS.SCANNING);
     setErrorMessage(null);
-    Haptic.impact();
+    Haptic.mediumImpact();
 
     const result = await programRing(userId);
 
