@@ -30,12 +30,12 @@
           "systemCodes": []
         }
       ],
-      ["./plugins/withIosDeploymentTarget", { "deploymentTarget": "17.0" }]
+      ["./plugins/withIosDeploymentTarget", { "deploymentTarget": "15.0" }]
     ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "today.getping.app",
-      "deploymentTarget": "17.0",
+      "deploymentTarget": "15.0",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSContactsUsageDescription": "Ping uses your contacts to help you build your circles and find who you already know on ping.",
@@ -46,7 +46,7 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "com.apple.developer.nfc.readersession.formats": ["TAG"]
+        "com.apple.developer.nfc.readersession.formats": ["NDEF", "TAG"]
       }
     },
     "android": {
