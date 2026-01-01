@@ -30,6 +30,7 @@
           "systemCodes": []
         }
       ],
+      "./plugins/withNfcEntitlementsFix",
       ["./plugins/withIosDeploymentTarget", { "deploymentTarget": "15.1" }]
     ],
     "ios": {
