@@ -25,6 +25,7 @@ import {
   checkNfcAvailability,
   openNfcSettings,
   programRing,
+  readRing,
   getStoredRingInfo,
   cancelNfcOperation,
 } from '../../utils/nfc/nfcManager';
@@ -37,7 +38,9 @@ const STATUS = {
   DISABLED: 'disabled',
   READY: 'ready',
   SCANNING: 'scanning',
+  READING: 'reading',
   SUCCESS: 'success',
+  READ_SUCCESS: 'read_success',
   ERROR: 'error',
 };
 
@@ -47,6 +50,7 @@ export default function NFCRingScreen({ navigation }) {
   const [errorMessage, setErrorMessage] = useState(null);
   const [userId, setUserId] = useState(null);
   const [storedRingInfo, setStoredRingInfo] = useState(null);
+  const [readResult, setReadResult] = useState(null);
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -63,9 +67,9 @@ export default function NFCRingScreen({ navigation }) {
     };
   }, []);
 
-  // Start pulse animation when scanning
+  // Start pulse animation when scanning or reading
   useEffect(() => {
-    if (status === STATUS.SCANNING) {
+    if (status === STATUS.SCANNING || status === STATUS.READING) {
       startPulseAnimation();
       startRotateAnimation();
     } else {
@@ -175,6 +179,35 @@ export default function NFCRingScreen({ navigation }) {
     }
   };
 
+  const handleReadRing = async () => {
+    setStatus(STATUS.READING);
+    setErrorMessage(null);
+    setReadResult(null);
+    Haptic.mediumImpact();
+
+    const result = await readRing();
+
+    if (result.success) {
+      setStatus(STATUS.READ_SUCCESS);
+      setReadResult(result.data);
+      Haptic.success();
+
+      // Reset to ready after 5 seconds
+      setTimeout(() => {
+        setStatus(STATUS.READY);
+      }, 5000);
+    } else {
+      setStatus(STATUS.ERROR);
+      setErrorMessage(result.error || 'Failed to read ring');
+      Haptic.error();
+
+      // Reset to ready after 5 seconds
+      setTimeout(() => {
+        setStatus(STATUS.READY);
+      }, 5000);
+    }
+  };
+
   const handleCancel = () => {
     cancelNfcOperation();
     setStatus(STATUS.READY);
@@ -190,8 +223,8 @@ export default function NFCRingScreen({ navigation }) {
   });
 
   const renderRingIcon = () => {
-    const isScanning = status === STATUS.SCANNING;
-    const isSuccess = status === STATUS.SUCCESS;
+    const isScanning = status === STATUS.SCANNING || status === STATUS.READING;
+    const isSuccess = status === STATUS.SUCCESS || status === STATUS.READ_SUCCESS;
     const isError = status === STATUS.ERROR;
 
     return (
@@ -278,7 +311,25 @@ export default function NFCRingScreen({ navigation }) {
         return (
           <View style={styles.statusContainer}>
             <Text style={[styles.statusTitle, { color: theme.primary }]}>
-              Scanning...
+              Programming...
+            </Text>
+            <Text style={styles.statusText}>
+              Hold your ring near the {Platform.OS === 'ios' ? 'top of your iPhone' : 'back of your phone'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.cancelButton]}
+              onPress={handleCancel}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        );
+
+      case STATUS.READING:
+        return (
+          <View style={styles.statusContainer}>
+            <Text style={[styles.statusTitle, { color: theme.primary }]}>
+              Reading...
             </Text>
             <Text style={styles.statusText}>
               Hold your ring near the {Platform.OS === 'ios' ? 'top of your iPhone' : 'back of your phone'}
@@ -304,11 +355,29 @@ export default function NFCRingScreen({ navigation }) {
           </View>
         );
 
+      case STATUS.READ_SUCCESS:
+        return (
+          <View style={styles.statusContainer}>
+            <Text style={[styles.statusTitle, { color: theme.success }]}>
+              Ring Read!
+            </Text>
+            {readResult?.url ? (
+              <Text style={styles.statusText}>
+                URL on ring:{'\n'}{readResult.url}
+              </Text>
+            ) : (
+              <Text style={styles.statusText}>
+                Ring is empty or has no URL.
+              </Text>
+            )}
+          </View>
+        );
+
       case STATUS.ERROR:
         return (
           <View style={styles.statusContainer}>
             <Text style={[styles.statusTitle, { color: theme.error }]}>
-              Programming Failed
+              Operation Failed
             </Text>
             <Text style={styles.statusText}>{errorMessage}</Text>
             <TouchableOpacity
@@ -336,6 +405,7 @@ export default function NFCRingScreen({ navigation }) {
   };
 
   const canProgram = status === STATUS.READY && userId;
+  const canRead = status === STATUS.READY;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -358,18 +428,33 @@ export default function NFCRingScreen({ navigation }) {
         {/* Status */}
         {renderStatus()}
 
-        {/* Program Button */}
-        {canProgram && (
-          <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: theme.primary }]}
-            onPress={handleProgramRing}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="radio" size={24} color="#000" />
-            <Text style={styles.primaryButtonText}>
-              {storedRingInfo?.url ? 'Reprogram Ring' : 'Program My Ring'}
-            </Text>
-          </TouchableOpacity>
+        {/* Action Buttons */}
+        {status === STATUS.READY && (
+          <View style={styles.buttonRow}>
+            {/* Program Button */}
+            {canProgram && (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: theme.primary }]}
+                onPress={handleProgramRing}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="create-outline" size={24} color="#000" />
+                <Text style={styles.actionButtonText}>Program</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Read Button */}
+            {canRead && (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: '#333', borderWidth: 1, borderColor: theme.primary }]}
+                onPress={handleReadRing}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="scan-outline" size={24} color={theme.primary} />
+                <Text style={[styles.actionButtonText, { color: theme.primary }]}>Read</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
 
         {/* Info Section */}
@@ -493,6 +578,28 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 24,
+    paddingHorizontal: 20,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 25,
+    gap: 8,
+    minWidth: 130,
+  },
+  actionButtonText: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#000',
   },
