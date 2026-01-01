@@ -30,12 +30,12 @@
           "systemCodes": []
         }
       ],
-      ["./plugins/withIosDeploymentTarget", { "deploymentTarget": "15.0" }]
+      ["./plugins/withIosDeploymentTarget", { "deploymentTarget": "15.1" }]
     ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "today.getping.app",
-      "deploymentTarget": "15.0",
+      "deploymentTarget": "15.1",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSContactsUsageDescription": "Ping uses your contacts to help you build your circles and find who you already know on ping.",
