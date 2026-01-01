@@ -11,11 +11,14 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  TextInput,
   Animated,
   Easing,
   Alert,
   Platform,
   Linking,
+  KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -51,6 +54,7 @@ export default function NFCRingScreen({ navigation }) {
   const [userId, setUserId] = useState(null);
   const [storedRingInfo, setStoredRingInfo] = useState(null);
   const [readResult, setReadResult] = useState(null);
+  const [customUrl, setCustomUrl] = useState('');
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -147,16 +151,24 @@ export default function NFCRingScreen({ navigation }) {
   };
 
   const handleProgramRing = async () => {
-    if (!userId) {
-      Alert.alert('Not Signed In', 'Please sign in to program your ring.');
+    // Validate URL
+    const urlToWrite = customUrl.trim();
+    if (!urlToWrite) {
+      Alert.alert('No URL', 'Please enter a URL to write to your ring.');
       return;
+    }
+
+    // Add https:// if no protocol specified
+    let finalUrl = urlToWrite;
+    if (!urlToWrite.startsWith('http://') && !urlToWrite.startsWith('https://')) {
+      finalUrl = 'https://' + urlToWrite;
     }
 
     setStatus(STATUS.SCANNING);
     setErrorMessage(null);
     Haptic.mediumImpact();
 
-    const result = await programRing(userId);
+    const result = await programRing(finalUrl);
 
     if (result.success) {
       setStatus(STATUS.SUCCESS);
@@ -395,99 +407,130 @@ export default function NFCRingScreen({ navigation }) {
       default:
         return (
           <View style={styles.statusContainer}>
-            <Text style={styles.statusTitle}>Setup Your Ring</Text>
+            <Text style={styles.statusTitle}>Program Your Ring</Text>
             <Text style={styles.statusText}>
-              Your NFC ring lets you share your contact info with a simple tap.
+              Write any link to your NFC ring and share it with a tap.
             </Text>
           </View>
         );
     }
   };
 
-  const canProgram = status === STATUS.READY && userId;
+  const canProgram = status === STATUS.READY;
   const canRead = status === STATUS.READY;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>NFC Ring</Text>
-          {storedRingInfo?.date && status === STATUS.READY && (
-            <Text style={styles.subtitle}>
-              Last programmed: {new Date(storedRingInfo.date).toLocaleDateString()}
-            </Text>
-          )}
-        </View>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.title}>NFC Ring</Text>
+              {storedRingInfo?.date && status === STATUS.READY && (
+                <Text style={styles.subtitle}>
+                  Last programmed: {new Date(storedRingInfo.date).toLocaleDateString()}
+                </Text>
+              )}
+            </View>
 
-        {/* Ring Animation */}
-        <View style={styles.ringWrapper}>
-          {renderRingIcon()}
-        </View>
+            {/* Ring Animation */}
+            <View style={styles.ringWrapper}>
+              {renderRingIcon()}
+            </View>
 
-        {/* Status */}
-        {renderStatus()}
+            {/* Status */}
+            {renderStatus()}
 
-        {/* Action Buttons */}
-        {status === STATUS.READY && (
-          <View style={styles.buttonRow}>
-            {/* Program Button */}
-            {canProgram && (
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: theme.primary }]}
-                onPress={handleProgramRing}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="create-outline" size={24} color="#000" />
-                <Text style={styles.actionButtonText}>Program</Text>
-              </TouchableOpacity>
+            {/* URL Input */}
+            {status === STATUS.READY && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Enter URL to write:</Text>
+                <TextInput
+                  style={[styles.urlInput, { borderColor: theme.primary }]}
+                  placeholder="instagram.com/yourusername"
+                  placeholderTextColor="#666"
+                  value={customUrl}
+                  onChangeText={setCustomUrl}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                />
+                <Text style={styles.inputHint}>
+                  e.g. your Instagram, YouTube, website, or any link
+                </Text>
+              </View>
             )}
 
-            {/* Read Button */}
-            {canRead && (
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#333', borderWidth: 1, borderColor: theme.primary }]}
-                onPress={handleReadRing}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="scan-outline" size={24} color={theme.primary} />
-                <Text style={[styles.actionButtonText, { color: theme.primary }]}>Read</Text>
-              </TouchableOpacity>
+            {/* Action Buttons */}
+            {status === STATUS.READY && (
+              <View style={styles.buttonRow}>
+                {/* Program Button */}
+                {canProgram && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: theme.primary }]}
+                    onPress={handleProgramRing}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="create-outline" size={24} color="#000" />
+                    <Text style={styles.actionButtonText}>Write</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Read Button */}
+                {canRead && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: '#333', borderWidth: 1, borderColor: theme.primary }]}
+                    onPress={handleReadRing}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="scan-outline" size={24} color={theme.primary} />
+                    <Text style={[styles.actionButtonText, { color: theme.primary }]}>Read</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
-          </View>
-        )}
 
         {/* Info Section */}
-        {status === STATUS.READY && (
-          <View style={styles.infoSection}>
-            <Text style={styles.infoTitle}>How it works</Text>
-            <View style={styles.infoItem}>
-              <View style={[styles.infoNumber, { backgroundColor: theme.primary }]}>
-                <Text style={styles.infoNumberText}>1</Text>
+            {status === STATUS.READY && (
+              <View style={styles.infoSection}>
+                <Text style={styles.infoTitle}>How it works</Text>
+                <View style={styles.infoItem}>
+                  <View style={[styles.infoNumber, { backgroundColor: theme.primary }]}>
+                    <Text style={styles.infoNumberText}>1</Text>
+                  </View>
+                  <Text style={styles.infoText}>
+                    Enter any URL - Instagram, YouTube, your website, etc.
+                  </Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <View style={[styles.infoNumber, { backgroundColor: theme.primary }]}>
+                    <Text style={styles.infoNumberText}>2</Text>
+                  </View>
+                  <Text style={styles.infoText}>
+                    Tap "Write" and hold your ring to your phone
+                  </Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <View style={[styles.infoNumber, { backgroundColor: theme.primary }]}>
+                    <Text style={styles.infoNumberText}>3</Text>
+                  </View>
+                  <Text style={styles.infoText}>
+                    Anyone who taps your ring will open your link!
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.infoText}>
-                Tap "Program My Ring" and hold your ring to your phone
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <View style={[styles.infoNumber, { backgroundColor: theme.primary }]}>
-                <Text style={styles.infoNumberText}>2</Text>
-              </View>
-              <Text style={styles.infoText}>
-                Your contact card URL gets written to the ring
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <View style={[styles.infoNumber, { backgroundColor: theme.primary }]}>
-                <Text style={styles.infoNumberText}>3</Text>
-              </View>
-              <Text style={styles.infoText}>
-                When someone taps your ring, they see your contact card!
-              </Text>
-            </View>
-          </View>
-        )}
-      </Animated.View>
+            )}
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -585,8 +628,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 16,
-    marginTop: 24,
+    marginTop: 16,
     paddingHorizontal: 20,
+  },
+  inputContainer: {
+    marginTop: 20,
+    paddingHorizontal: 10,
+  },
+  inputLabel: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 8,
+  },
+  urlInput: {
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#fff',
+  },
+  inputHint: {
+    fontSize: 12,
+    color: '#555',
+    marginTop: 8,
+    textAlign: 'center',
   },
   actionButton: {
     flexDirection: 'row',

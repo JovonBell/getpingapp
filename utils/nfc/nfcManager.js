@@ -65,21 +65,19 @@ export async function openNfcSettings() {
 }
 
 /**
- * Program the NFC ring with the user's contact card URL
- * @param {string} userId - The user's ID for the contact card URL
- * @param {string} baseUrl - Base URL for contact cards (e.g., 'https://getping.today/card')
- * @returns {Promise<{success: boolean, error?: string}>}
+ * Program the NFC ring with a custom URL
+ * @param {string} url - The URL to write to the ring
+ * @returns {Promise<{success: boolean, url?: string, error?: string, message?: string}>}
  */
-export async function programRing(userId, baseUrl = 'https://getping.today/card') {
-  const profileUrl = `${baseUrl}/${userId}`;
+export async function programRing(url) {
   let timeoutId = null;
 
   try {
-    console.log('[NFC] Starting ring programming for:', profileUrl);
+    console.log('[NFC] Starting ring programming for:', url);
 
-    // Check if already programmed
+    // Check if already programmed with same URL
     const existingUrl = await AsyncStorage.getItem(NFC_RING_URL_KEY);
-    if (existingUrl === profileUrl) {
+    if (existingUrl === url) {
       const existingDate = await AsyncStorage.getItem(NFC_RING_DATE_KEY);
       console.log('[NFC] Ring already programmed on:', existingDate);
     }
@@ -110,7 +108,7 @@ export async function programRing(userId, baseUrl = 'https://getping.today/card'
     console.log('[NFC] Tag detected:', tag?.id);
 
     // Encode the URL
-    const bytes = Ndef.encodeMessage([Ndef.uriRecord(profileUrl)]);
+    const bytes = Ndef.encodeMessage([Ndef.uriRecord(url)]);
 
     // Check tag capacity
     if (tag?.maxSize && bytes.length > tag.maxSize) {
@@ -126,10 +124,10 @@ export async function programRing(userId, baseUrl = 'https://getping.today/card'
     console.log('[NFC] Verified tag:', verifyTag?.id);
 
     // Store that we programmed this ring
-    await AsyncStorage.setItem(NFC_RING_URL_KEY, profileUrl);
+    await AsyncStorage.setItem(NFC_RING_URL_KEY, url);
     await AsyncStorage.setItem(NFC_RING_DATE_KEY, new Date().toISOString());
 
-    return { success: true, url: profileUrl };
+    return { success: true, url: url };
 
   } catch (error) {
     console.error('[NFC] Programming error:', error);
