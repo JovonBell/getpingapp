@@ -27,10 +27,10 @@
         {
           "nfcPermission": "Ping needs NFC access to program your ring for contact sharing",
           "selectIdentifiers": [],
-          "systemCodes": []
+          "systemCodes": [],
+          "includeNdefEntitlement": false
         }
       ],
-      "./plugins/withNfcEntitlementsFix",
       ["./plugins/withIosDeploymentTarget", { "deploymentTarget": "15.1" }]
     ],
     "ios": {
