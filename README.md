@@ -4,8 +4,9 @@ A relationship management app that helps you stay connected with the people who 
 
 ## Features
 
-- **Circles** - Organize contacts into customizable tiers (Inner Circle, Close Friends, etc.)
+- **Circles** - Organize contacts into up to 10 customizable tiers (Inner Circle, Close Friends, etc.)
 - **3D Visualization** - Interactive planet/circle view of your network
+- **NFC Ring** - Program NFC rings with custom URLs for instant contact sharing
 - **Relationship Health** - Track how well you're maintaining each relationship
 - **Reminders** - Set follow-up reminders for birthdays, check-ins, and more
 - **Gamification** - Earn streaks, achievements, and track your engagement
@@ -15,6 +16,40 @@ A relationship management app that helps you stay connected with the people who 
 - **Apple Sign In** - Native Apple authentication on iOS (App Store required)
 
 ## Changelog
+
+### January 1, 2026
+**NFC Ring Programming, Circle Limit Increase & Bug Fixes**
+
+**NFC Ring Features:**
+- Program NFC rings with custom URLs (Instagram, YouTube, website, etc.)
+- Read ring contents to verify what's stored
+- Fixed iOS SDK 26 NFC entitlement issue (`includeNdefEntitlement: false`)
+
+**Circle Limit Increase:**
+- Increased max circles from 6 to **10**
+- Added rotation speeds for rings 7-10 in 3D universe view
+- Reduced ring spacing to fit 10 rings comfortably
+
+**Data Loading & Performance:**
+- Circles and health scores now load in parallel for faster startup
+- Fixed race condition with loading lock to prevent duplicate calls
+- Health map set before circles so contacts render with correct colors immediately
+
+**Bug Fixes:**
+- Fixed callback dependency order (resetTouchState defined before handlers that use it)
+- Added missing error handlers in ContactTextureHelper, RemindersScreen, App.js
+- Push notification registration errors now logged instead of silently caught
+
+**Files Updated:**
+- `NFCRingScreen.js` - Custom URL input, read ring feature
+- `nfcManager.js` - Accept custom URL for programming
+- `UniverseHomeView.js`, `SolarSystemView.js` - 10 ring support
+- `circlesStorage.js` - MAX_TIERS = 10
+- `HomeScreen.js` - Parallel loading, race condition fix
+
+**Note:** Update Supabase constraint: `ALTER TABLE circles DROP CONSTRAINT IF EXISTS circles_tier_check; ALTER TABLE circles ADD CONSTRAINT circles_tier_check CHECK (tier >= 1 AND tier <= 10);`
+
+---
 
 ### December 30, 2025 (Evening)
 **Cosmic Universe Enhancements & Bug Fixes**
