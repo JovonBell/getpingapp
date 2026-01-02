@@ -19,7 +19,36 @@ A relationship management app that helps you stay connected with the people who 
 
 ## Changelog
 
-### January 2, 2026
+### January 2, 2026 (Afternoon)
+**Comprehensive Bug Fix Release**
+
+**Critical Loading Fixes:**
+- Fixed loading spinner stuck on circle creation (added missing state reset)
+- Fixed "Create First Circle" showing when circles exist (removed early return race condition)
+- Consolidated import loading state with try-finally pattern for reliability
+
+**Visual Improvements:**
+- Removed cross/X pattern from contact orbs (perpendicular torus ring)
+- Restored contact name labels below spheres
+- Increased circle spin speed 3x for more visible animation
+
+**Error Handling:**
+- Added user-facing error alerts in AddContactModal
+- Added user-facing error alerts in EditContactModal
+- Added user-facing error alerts in AddReminderModal
+- Added disabled button styling during import operations
+
+**Files Updated:**
+- `screens/onboarding/VisualizeCircleScreen.js` - Loading state fix
+- `screens/main/HomeScreen.js` - Race condition fix
+- `screens/onboarding/SelectContactsScreen.js` - Loading consolidation
+- `components/3d/ContactTextureHelper.js` - Visual fix
+- `components/3d/UniverseHomeView.js` - Names + spin speed
+- `components/modals/*.js` - Error handling
+
+---
+
+### January 2, 2026 (Morning)
 **Immersive Audio System & Enhanced Onboarding**
 
 **Audio System:**
