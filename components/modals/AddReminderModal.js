@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -164,9 +165,11 @@ export default function AddReminderModal({
         onClose();
       } else {
         console.error('[AddReminderModal] Failed to save:', result.error);
+        Alert.alert('Error', 'Failed to save reminder. Please try again.');
       }
     } catch (error) {
       console.error('[AddReminderModal] Error saving reminder:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setSaving(false);
     }

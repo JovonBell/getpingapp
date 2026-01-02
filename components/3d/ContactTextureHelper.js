@@ -135,10 +135,7 @@ export function createContactGlow(radius, color) {
   border.rotation.x = Math.PI / 2; // Lay flat around equator
   group.add(border);
 
-  // Second border ring at different angle for 3D effect
-  const border2 = new THREE.Mesh(borderGeo, borderMat.clone());
-  border2.rotation.y = Math.PI / 2;
-  group.add(border2);
+  // NOTE: Second perpendicular ring removed - it was creating an unwanted cross/X pattern
 
   // Outer soft glow sphere - health-colored aura
   const glowGeo = new THREE.SphereGeometry(radius * 1.2, 16, 16);
@@ -155,13 +152,11 @@ export function createContactGlow(radius, color) {
   group.userData = {
     borderGeo,
     borderMat,
-    border2Mat: border2.material,
     glowGeo,
     glowMat,
     dispose: () => {
       borderGeo.dispose();
       borderMat.dispose();
-      border2.material.dispose();
       glowGeo.dispose();
       glowMat.dispose();
     }

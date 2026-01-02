@@ -281,7 +281,7 @@ export default function SelectContactsScreen({ navigation, route }) {
             {selectedContactIds.length} selected
           </Text>
           <TouchableOpacity
-            style={styles.importButton}
+            style={[styles.importButton, isImporting && styles.importButtonDisabled]}
             disabled={isImporting}
             onPress={async () => {
               const selected = contacts.filter(c => selectedContactIds.includes(c.id));
@@ -293,64 +293,64 @@ export default function SelectContactsScreen({ navigation, route }) {
 
               setIsImporting(true);
 
-              if (isInitialImport || isAddContacts) {
-                // Persist imported universe locally
-                let enriched = selected;
+              try {
+                if (isInitialImport || isAddContacts) {
+                  // Persist imported universe locally
+                  let enriched = selected;
 
-                // Best-effort match & create connections in Supabase (requires migration)
-                // Use a timeout to prevent hanging if Supabase is slow/unavailable
-                const matchingTimeout = new Promise((_, reject) => 
-                  setTimeout(() => reject(new Error('Matching timeout')), 5000)
-                );
+                  // Best-effort match & create connections in Supabase (requires migration)
+                  // Use a timeout to prevent hanging if Supabase is slow/unavailable
+                  const matchingTimeout = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Matching timeout')), 5000)
+                  );
 
-                try {
-                  const { success: userSuccess, user } = await getCurrentUser();
-                  if (userSuccess && user) {
-                    await Promise.race([
-                      (async () => {
-                        const byContact = await hashContactsForMatching(selected);
-                        const { emailHashes, phoneHashes } = await buildIdentifierHashes(selected);
-                        const [emailMatches, phoneMatches] = await Promise.all([
-                          findUsersByHashes('email', emailHashes),
-                          findUsersByHashes('phone', phoneHashes),
-                        ]);
+                  try {
+                    const { success: userSuccess, user } = await getCurrentUser();
+                    if (userSuccess && user) {
+                      await Promise.race([
+                        (async () => {
+                          const byContact = await hashContactsForMatching(selected);
+                          const { emailHashes, phoneHashes } = await buildIdentifierHashes(selected);
+                          const [emailMatches, phoneMatches] = await Promise.all([
+                            findUsersByHashes('email', emailHashes),
+                            findUsersByHashes('phone', phoneHashes),
+                          ]);
 
-                        const matchedUserIds = Array.from(
-                          new Set([...(emailMatches.userIds || []), ...(phoneMatches.userIds || [])])
-                        );
+                          const matchedUserIds = Array.from(
+                            new Set([...(emailMatches.userIds || []), ...(phoneMatches.userIds || [])])
+                          );
 
-                        await upsertConnections(user.id, matchedUserIds, 3);
+                          await upsertConnections(user.id, matchedUserIds, 3);
 
-                        // Contact-level match so "Message" knows who to target
-                        const [emailMapRes, phoneMapRes] = await Promise.all([
-                          findIdentityMapByHashes('email', emailHashes),
-                          findIdentityMapByHashes('phone', phoneHashes),
-                        ]);
+                          // Contact-level match so "Message" knows who to target
+                          const [emailMapRes, phoneMapRes] = await Promise.all([
+                            findIdentityMapByHashes('email', emailHashes),
+                            findIdentityMapByHashes('phone', phoneHashes),
+                          ]);
 
-                        const emailMap = emailMapRes.map || {};
-                        const phoneMap = phoneMapRes.map || {};
+                          const emailMap = emailMapRes.map || {};
+                          const phoneMap = phoneMapRes.map || {};
 
-                        enriched = selected.map((c) => {
-                          const hashes = byContact[String(c.id)] || { emailHashes: [], phoneHashes: [] };
-                          const matched =
-                            hashes.emailHashes.find((h) => emailMap[h]) ||
-                            hashes.phoneHashes.find((h) => phoneMap[h]) ||
-                            null;
+                          enriched = selected.map((c) => {
+                            const hashes = byContact[String(c.id)] || { emailHashes: [], phoneHashes: [] };
+                            const matched =
+                              hashes.emailHashes.find((h) => emailMap[h]) ||
+                              hashes.phoneHashes.find((h) => phoneMap[h]) ||
+                              null;
 
-                          const matchedUserId = matched ? (emailMap[matched] || phoneMap[matched]) : null;
-                          return { ...c, matchedUserId };
-                        });
-                      })(),
-                      matchingTimeout
-                    ]);
+                            const matchedUserId = matched ? (emailMap[matched] || phoneMap[matched]) : null;
+                            return { ...c, matchedUserId };
+                          });
+                        })(),
+                        matchingTimeout
+                      ]);
+                    }
+                  } catch (e) {
+                    console.warn('Matching/import connections failed (continuing):', e?.message || e);
+                    // Continue with unmatched contacts - don't block the flow
                   }
-                } catch (e) {
-                  console.warn('Matching/import connections failed (continuing):', e?.message || e);
-                  // Continue with unmatched contacts - don't block the flow
-                }
 
-                // Merge with existing contacts
-                try {
+                  // Merge with existing contacts
                   const { success: existingSuccess, contacts: existingContacts } = await getImportedContacts();
                   const existing = existingSuccess ? existingContacts : [];
                   const existingIds = new Set(existing.map(c => c.id));
@@ -359,7 +359,6 @@ export default function SelectContactsScreen({ navigation, route }) {
 
                   await saveImportedContacts(merged);
 
-                  setIsImporting(false);
                   if (isAddContacts) {
                     // Adding contacts - go back to contacts list
                     Alert.alert('Success', `Added ${newContacts.length} new contacts!`);
@@ -368,15 +367,16 @@ export default function SelectContactsScreen({ navigation, route }) {
                     // Initial import - go to confirmation screen
                     navigation.navigate('ImportConfirmation', { contacts: enriched });
                   }
-                } catch (saveError) {
-                  setIsImporting(false);
-                  console.error('Error saving/navigating:', saveError);
-                  Alert.alert('Error', 'Failed to save contacts. Please try again.');
+                } else {
+                  // Creating a circle - go to name/visualize screen
+                  navigation.navigate('VisualizeCircle', { contacts: selected, isFirstCircle, existingCircles });
                 }
-              } else {
-                // Creating a circle - go to name/visualize screen
+              } catch (err) {
+                console.error('Error in import flow:', err);
+                Alert.alert('Error', 'Failed to process contacts. Please try again.');
+              } finally {
+                // ALWAYS reset loading state
                 setIsImporting(false);
-                navigation.navigate('VisualizeCircle', { contacts: selected, isFirstCircle, existingCircles });
               }
             }}
           >
@@ -562,6 +562,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 20,
+  },
+  importButtonDisabled: {
+    opacity: 0.6,
   },
   importButtonText: {
     color: '#1a1a1a',

@@ -11,7 +11,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, Platform, StyleSheet, View } from 'react-native';
+import { Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
 import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
 import * as THREE from 'three';
@@ -48,10 +48,12 @@ const RING_CONFIG = {
 };
 
 // Ring rotation speeds (different for each ring - 10 rings total)
-const RING_ROTATION_SPEEDS = [0.0004, 0.00035, 0.0003, 0.00025, 0.0002, 0.00018, 0.00015, 0.00012, 0.0001, 0.00008];
+// Increased 3x for more visible spinning
+const RING_ROTATION_SPEEDS = [0.0012, 0.00105, 0.0009, 0.00075, 0.0006, 0.00054, 0.00045, 0.00036, 0.0003, 0.00024];
 
 // Animation settings
-const ORBIT_SPEED = 0.00025;
+// Orbit speed increased 3x for faster contact movement
+const ORBIT_SPEED = 0.00075;
 const CONTACT_FLOAT_SPEED = 0.0015;
 const CONTACT_FLOAT_AMOUNT = 0.08;
 
@@ -1488,7 +1490,28 @@ export default function UniverseHomeView({
         onTouchCancel={handleTouchCancel}
       />
 
-      {/* Name labels removed - contact photos display directly on spheres */}
+      {/* Contact name labels - displayed on top of 3D scene */}
+      {labelPositions.map((pos, i) =>
+        pos.visible && !pos.isOverflow ? (
+          <View
+            key={i}
+            style={[
+              styles.label,
+              {
+                left: pos.x - 40,
+                top: pos.y + 22,
+                opacity: pos.opacity,
+              },
+              pos.isSelected && styles.labelSelected,
+            ]}
+            pointerEvents="none"
+          >
+            <Text style={[styles.labelText, pos.isSelected && styles.labelTextSelected]} numberOfLines={1}>
+              {pos.name?.split(' ')[0] || 'Unknown'}
+            </Text>
+          </View>
+        ) : null
+      )}
 
       {/* Supernova flash overlay */}
       {flashOpacity > 0 && (
@@ -1516,5 +1539,29 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: '#ffffff',
+  },
+  label: {
+    position: 'absolute',
+    width: 80,
+    alignItems: 'center',
+  },
+  labelSelected: {
+    zIndex: 100,
+  },
+  labelText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '500',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  labelTextSelected: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4FFFB0',
+    textShadowColor: 'rgba(79, 255, 176, 0.5)',
+    textShadowRadius: 6,
   },
 });

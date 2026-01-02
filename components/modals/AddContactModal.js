@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   StyleSheet,
   Text,
   View,
@@ -91,6 +92,7 @@ function AddContactModal({ visible, onClose, onSave, existingContactIds = [] }) 
       onClose();
     } catch (error) {
       console.error('[AddContactModal] Save failed:', error);
+      Alert.alert('Error', 'Failed to add contacts. Please try again.');
     } finally {
       setIsSaving(false);
     }

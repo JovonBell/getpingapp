@@ -161,10 +161,13 @@ export default function HomeScreen({ navigation, route }) {
       const fromRoute = route?.params?.importedContacts;
       if (fromRoute && Array.isArray(fromRoute) && fromRoute.length > 0) {
         if (mounted) setImportedContacts(fromRoute);
-        return;
+        // DON'T return here - continue to load contacts from storage too
       }
       const { contacts: stored } = await loadImportedContacts();
-      if (mounted) setImportedContacts(stored || []);
+      if (mounted && (!fromRoute || fromRoute.length === 0)) {
+        // Only set from storage if route didn't provide contacts
+        setImportedContacts(stored || []);
+      }
     };
     boot();
     return () => {

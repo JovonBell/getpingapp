@@ -184,6 +184,9 @@ export default function VisualizeCircleScreen({ navigation, route }) {
 
       console.log('[VisualizeCircle] Navigating to Home with circles:', circles.length);
 
+      // CRITICAL: Reset loading state before navigation
+      setIsCreating(false);
+
       navigation.navigate('Home', {
         screen: 'HomeTab',
         params: {

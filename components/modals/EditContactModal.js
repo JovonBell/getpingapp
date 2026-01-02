@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -126,9 +127,11 @@ export default function EditContactModal({
         onClose();
       } else {
         console.error('[EditContactModal] Failed to save:', result.error);
+        Alert.alert('Error', 'Failed to save contact details. Please try again.');
       }
     } catch (err) {
       console.error('[EditContactModal] Error saving:', err);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setSaving(false);
     }
