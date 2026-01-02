@@ -14,8 +14,42 @@ A relationship management app that helps you stay connected with the people who 
 - **Push Notifications** - Get reminded to reach out to contacts
 - **Google OAuth** - Simple sign-in with your Google account
 - **Apple Sign In** - Native Apple authentication on iOS (App Store required)
+- **Immersive Audio** - Ambient music and tactile sound effects
+- **Magic Link Auth** - Passwordless email authentication
 
 ## Changelog
+
+### January 2, 2026
+**Immersive Audio System & Enhanced Onboarding**
+
+**Audio System:**
+- Added sound effects: tap (button clicks), success (achievements), whoosh (transitions), chime (celebrations)
+- Added ambient background music: onboarding (dreamy lo-fi), home (cosmic space), focus (calm minimal)
+- Volume controls and toggles in Settings → Sound & Music
+- Audio sourced from royalty-free libraries (CC0/Free for Profit)
+
+**Enhanced Onboarding:**
+- Floating particle backgrounds with themed animations (welcome, contacts, goals, complete)
+- HapticButton component with tactile feedback and ripple effects
+- Device motion parallax for immersive particle movement
+
+**New Auth Options:**
+- Email/password authentication
+- Magic link (passwordless) login - enter email, click link, signed in
+- Improved auth state management in App.js
+
+**New Files:**
+- `utils/soundManager.js` - Sound effects playback and settings
+- `utils/musicManager.js` - Background music with fade in/out
+- `components/onboarding/HapticButton.js` - Tactile button component
+- `components/onboarding/ParticleBackground.js` - Animated particle system
+- `screens/onboarding/EmailAuthScreen.js` - Email/password auth
+- `screens/onboarding/MagicLinkSentScreen.js` - Magic link confirmation
+- `assets/sounds/` - tap.mp3, success.mp3, whoosh.mp3, chime.mp3
+- `assets/music/` - ambient_onboarding.mp3, ambient_home.mp3, ambient_focus.mp3
+- `assets/AUDIO_LICENSES.md` - Audio attribution and licenses
+
+---
 
 ### January 1, 2026 (Evening)
 **Instant Contact Loading & UI Polish**
