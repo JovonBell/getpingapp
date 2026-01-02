@@ -17,6 +17,18 @@ A relationship management app that helps you stay connected with the people who 
 
 ## Changelog
 
+### January 1, 2026 (Evening)
+**Instant Contact Loading & UI Polish**
+
+- Contacts now load immediately on app startup (no animation delay)
+- Entrance animation only plays for newly created circles
+- Removed "needs attention" banner from top of screen
+- More transparent floating glass panels for immersive 3D view
+- Dismissable bottom hint (tap to hide "Tap a person to view" message)
+- Faster entrance animation when it does play (800ms vs 1200ms)
+
+---
+
 ### January 1, 2026
 **NFC Ring Programming, Circle Limit Increase & Bug Fixes**
 
