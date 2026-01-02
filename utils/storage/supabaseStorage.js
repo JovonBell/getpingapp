@@ -141,6 +141,58 @@ export const signInWithEmail = async (email, password) => {
   }
 };
 
+// Send Magic Link (passwordless email sign in)
+export const signInWithMagicLink = async (email) => {
+  try {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: 'getpingapp://auth/callback',
+      },
+    });
+
+    if (error) throw error;
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending magic link:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Verify Magic Link token (for deep link handling)
+export const verifyMagicLinkToken = async (tokenHash) => {
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: 'email',
+    });
+
+    if (error) throw error;
+
+    return { success: true, user: data?.user, session: data?.session };
+  } catch (error) {
+    console.error('Error verifying magic link:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Reset password (sends reset email)
+export const resetPassword = async (email) => {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'getpingapp://auth/reset-password',
+    });
+
+    if (error) throw error;
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending reset email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Sign in with Apple (iOS only)
 export const signInWithApple = async () => {
   try {

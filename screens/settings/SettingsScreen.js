@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,12 +6,26 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import Slider from '@react-native-community/slider';
 import { signOut } from '../../utils/storage/supabaseStorage';
 import { getCurrentUser } from '../../utils/storage/supabaseStorage';
 import { getUnreadMessageCount } from '../../utils/storage/messagesStorage';
+import {
+  isSoundEnabled,
+  setSoundEnabled,
+  getSoundVolume,
+  setSoundVolume,
+} from '../../utils/soundManager';
+import {
+  isMusicEnabled,
+  setMusicEnabled,
+  getMusicVolume,
+  setMusicVolume,
+} from '../../utils/musicManager';
 
 const SETTINGS_SECTIONS = [
   {
@@ -41,7 +55,39 @@ const SETTINGS_SECTIONS = [
 ];
 
 export default function SettingsScreen({ navigation }) {
-  const [unreadCount, setUnreadCount] = React.useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [soundOn, setSoundOn] = useState(true);
+  const [musicOn, setMusicOn] = useState(true);
+  const [soundVol, setSoundVol] = useState(0.5);
+  const [musicVol, setMusicVol] = useState(0.25);
+
+  // Load audio settings
+  useEffect(() => {
+    setSoundOn(isSoundEnabled());
+    setMusicOn(isMusicEnabled());
+    setSoundVol(getSoundVolume());
+    setMusicVol(getMusicVolume());
+  }, []);
+
+  const handleSoundToggle = (value) => {
+    setSoundOn(value);
+    setSoundEnabled(value);
+  };
+
+  const handleMusicToggle = (value) => {
+    setMusicOn(value);
+    setMusicEnabled(value);
+  };
+
+  const handleSoundVolumeChange = (value) => {
+    setSoundVol(value);
+    setSoundVolume(value);
+  };
+
+  const handleMusicVolumeChange = (value) => {
+    setMusicVol(value);
+    setMusicVolume(value);
+  };
 
   const handleLogout = async () => {
     const res = await signOut();
@@ -86,6 +132,75 @@ export default function SettingsScreen({ navigation }) {
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Sound & Music Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Sound & Music</Text>
+
+            {/* Sound Effects Toggle */}
+            <View style={styles.audioRow}>
+              <View style={styles.settingLeft}>
+                <Ionicons name="volume-high-outline" size={24} color="#4FFFB0" />
+                <Text style={styles.settingLabel}>Sound Effects</Text>
+              </View>
+              <Switch
+                value={soundOn}
+                onValueChange={handleSoundToggle}
+                trackColor={{ false: '#333', true: '#2a6a4a' }}
+                thumbColor={soundOn ? '#4FFFB0' : '#666'}
+              />
+            </View>
+
+            {/* Sound Volume Slider */}
+            {soundOn && (
+              <View style={styles.volumeRow}>
+                <Ionicons name="volume-low" size={18} color="#666" />
+                <Slider
+                  style={styles.slider}
+                  minimumValue={0}
+                  maximumValue={1}
+                  value={soundVol}
+                  onSlidingComplete={handleSoundVolumeChange}
+                  minimumTrackTintColor="#4FFFB0"
+                  maximumTrackTintColor="#333"
+                  thumbTintColor="#4FFFB0"
+                />
+                <Ionicons name="volume-high" size={18} color="#666" />
+              </View>
+            )}
+
+            {/* Background Music Toggle */}
+            <View style={styles.audioRow}>
+              <View style={styles.settingLeft}>
+                <Ionicons name="musical-notes-outline" size={24} color="#4FFFB0" />
+                <Text style={styles.settingLabel}>Background Music</Text>
+              </View>
+              <Switch
+                value={musicOn}
+                onValueChange={handleMusicToggle}
+                trackColor={{ false: '#333', true: '#2a6a4a' }}
+                thumbColor={musicOn ? '#4FFFB0' : '#666'}
+              />
+            </View>
+
+            {/* Music Volume Slider */}
+            {musicOn && (
+              <View style={styles.volumeRow}>
+                <Ionicons name="volume-low" size={18} color="#666" />
+                <Slider
+                  style={styles.slider}
+                  minimumValue={0}
+                  maximumValue={1}
+                  value={musicVol}
+                  onSlidingComplete={handleMusicVolumeChange}
+                  minimumTrackTintColor="#4FFFB0"
+                  maximumTrackTintColor="#333"
+                  thumbTintColor="#4FFFB0"
+                />
+                <Ionicons name="volume-high" size={18} color="#666" />
+              </View>
+            )}
+          </View>
+
           {SETTINGS_SECTIONS.map((section, index) => (
             <View key={index} style={styles.section}>
               <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -213,6 +328,28 @@ const styles = StyleSheet.create({
   settingLabel: {
     color: '#ffffff',
     fontSize: 16,
+  },
+  audioRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a3a2a',
+  },
+  volumeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(42, 58, 42, 0.3)',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  slider: {
+    flex: 1,
+    height: 40,
+    marginHorizontal: 8,
   },
   diagnosticsButton: {
     flexDirection: 'row',

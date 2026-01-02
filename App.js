@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { ActivityIndicator, View, Text, Linking } from 'react-native';
+import { ActivityIndicator, View, Text, Linking, Alert } from 'react-native';
 import { NavigationContainer, useNavigationState } from '@react-navigation/native';
+import * as ExpoLinking from 'expo-linking';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,12 +15,15 @@ import {
   scheduleDailyDigest,
   scheduleStreakWarning,
 } from './utils/notifications/pushNotifications';
+import { verifyMagicLinkToken } from './utils/storage/supabaseStorage';
 import { getUnreadAlertCount } from './utils/storage/alertsStorage';
 import { getStreak, isStreakActive } from './utils/streaksStorage';
 
 // Screens - Onboarding
 import WelcomeScreen from './screens/onboarding/WelcomeScreen';
 import CreateAccountScreen from './screens/onboarding/CreateAccountScreen';
+import EmailAuthScreen from './screens/onboarding/EmailAuthScreen';
+import MagicLinkSentScreen from './screens/onboarding/MagicLinkSentScreen';
 import WelcomeIntroScreen from './screens/onboarding/WelcomeIntroScreen';
 import CirclesExplainerScreen from './screens/onboarding/CirclesExplainerScreen';
 import BuildUniverseScreen from './screens/onboarding/BuildUniverseScreen';
@@ -244,6 +248,60 @@ export default function App() {
     };
   }, []);
 
+  // Handle deep links for magic link authentication
+  useEffect(() => {
+    const handleDeepLink = async (url) => {
+      if (!url) return;
+
+      try {
+        const parsed = ExpoLinking.parse(url);
+        console.log('[App] Deep link received:', parsed);
+
+        // Handle magic link callback: getpingapp://auth/callback?token_hash=xxx
+        if (parsed.path === 'auth/callback' && parsed.queryParams?.token_hash) {
+          console.log('[App] Processing magic link...');
+          const result = await verifyMagicLinkToken(parsed.queryParams.token_hash);
+
+          if (result.success) {
+            console.log('[App] Magic link verified successfully');
+            // Auth state change listener will automatically update session
+          } else {
+            Alert.alert(
+              'Sign In Failed',
+              result.error || 'The magic link may have expired. Please try again.',
+              [{ text: 'OK' }]
+            );
+          }
+        }
+
+        // Handle password reset: getpingapp://auth/reset-password?token_hash=xxx
+        if (parsed.path === 'auth/reset-password' && parsed.queryParams?.token_hash) {
+          console.log('[App] Password reset link received');
+          // For now just show an alert - could navigate to a reset password screen
+          Alert.alert(
+            'Password Reset',
+            'Password reset is not yet implemented in the app. Please use the web version.',
+            [{ text: 'OK' }]
+          );
+        }
+      } catch (err) {
+        console.error('[App] Deep link handling error:', err);
+      }
+    };
+
+    // Handle deep link when app is opened from a link
+    ExpoLinking.getInitialURL().then(handleDeepLink);
+
+    // Listen for deep links while app is running
+    const subscription = ExpoLinking.addEventListener('url', ({ url }) => {
+      handleDeepLink(url);
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
+
   useEffect(() => {
     const userId = session?.user?.id;
     if (!userId) return;
@@ -412,6 +470,8 @@ export default function App() {
                 <>
                   <Stack.Screen name="Welcome" component={WelcomeScreen} />
                   <Stack.Screen name="CreateAccount" component={CreateAccountScreen} />
+                  <Stack.Screen name="EmailAuth" component={EmailAuthScreen} />
+                  <Stack.Screen name="MagicLinkSent" component={MagicLinkSentScreen} />
                 </>
               ) : (
                 <>

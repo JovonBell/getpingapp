@@ -1,6 +1,7 @@
 import React from 'react';
 import { Alert, StyleSheet, Text, View, TouchableOpacity, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { signInWithGoogle, signInWithApple } from '../../utils/storage/supabaseStorage';
 
@@ -76,6 +77,22 @@ export default function WelcomeScreen({ navigation }) {
             onPress={handleAppleSignIn}
           />
         )}
+
+        {/* Divider */}
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* Email Sign In */}
+        <TouchableOpacity
+          style={styles.emailButton}
+          onPress={() => navigation.navigate('EmailAuth')}
+        >
+          <Ionicons name="mail-outline" size={20} color="#1a1a1a" style={styles.emailIcon} />
+          <Text style={styles.emailButtonText}>Continue with Email</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.getStartedButton}
@@ -205,6 +222,41 @@ const styles = StyleSheet.create({
     width: 260,
     height: 50,
     marginBottom: 14,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+    width: 260,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  dividerText: {
+    color: '#888',
+    paddingHorizontal: 16,
+    fontSize: 14,
+  },
+  emailButton: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    width: 260,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emailIcon: {
+    marginRight: 12,
+  },
+  emailButtonText: {
+    color: '#1a1a1a',
+    fontSize: 16,
+    fontWeight: '600',
   },
   getStartedButton: {
     backgroundColor: '#a8e6cf',
