@@ -59,9 +59,9 @@ const CONTACT_FLOAT_AMOUNT = 0.08;
 const SUPERNOVA_COLORS = [0xFFD700, 0xFF6B6B, 0x4FFFB0, 0xB04FFF, 0xFF9F4F, 0x4F9FFF];
 
 // Entrance animation settings
-const ENTRANCE_DELAY = 300; // ms before animation starts
-const ENTRANCE_DURATION = 1200; // ms for full animation
-const ENTRANCE_STAGGER = 80; // ms between ring animations
+const ENTRANCE_DELAY = 0; // ms before animation starts (was 300, reduced for faster load)
+const ENTRANCE_DURATION = 800; // ms for full animation (was 1200, faster for snappier feel)
+const ENTRANCE_STAGGER = 50; // ms between ring animations (was 80, faster stagger)
 
 // Easing function for entrance animation (overshoot effect)
 const easeOutBack = (t) => {
@@ -649,11 +649,24 @@ export default function UniverseHomeView({
   }, []);
 
   // Track if we need entrance animation (set flag, but don't set time until GL is ready)
+  // Skip animation on initial load with existing circles - show them immediately
+  const isInitialLoadRef = useRef(true);
   useEffect(() => {
     if (circles.length > 0) {
-      stateRef.current.needsEntranceAnimation = true;
-      stateRef.current.entranceProgress = {};
-      setIsEntranceComplete(false);
+      if (isInitialLoadRef.current) {
+        // First load with existing circles - skip entrance animation, show immediately
+        isInitialLoadRef.current = false;
+        stateRef.current.needsEntranceAnimation = false;
+        stateRef.current.entranceStartTime = 0; // Treat as already complete
+        setIsEntranceComplete(true);
+        console.log('[UniverseHomeView] Initial load - skipping entrance animation');
+      } else {
+        // Circles changed after initial load (new circle added) - play animation
+        stateRef.current.needsEntranceAnimation = true;
+        stateRef.current.entranceProgress = {};
+        setIsEntranceComplete(false);
+        console.log('[UniverseHomeView] Circles changed - playing entrance animation');
+      }
     }
   }, [circles]);
 
@@ -992,12 +1005,14 @@ export default function UniverseHomeView({
         const now = Date.now();
 
         // Initialize entrance start time on first frame (ensures GL is ready)
-        if (s.needsEntranceAnimation && !s.entranceStartTime) {
+        if (s.needsEntranceAnimation && s.entranceStartTime === null) {
           s.entranceStartTime = now + ENTRANCE_DELAY;
           s.needsEntranceAnimation = false;
         }
 
-        const entranceStart = s.entranceStartTime || now;
+        // If entranceStartTime is 0 (skipped animation), use a very old time so progress = 1
+        // Using null check because 0 is a valid "skip animation" value
+        const entranceStart = s.entranceStartTime !== null ? s.entranceStartTime : (now - 100000);
         const entranceElapsed = now - entranceStart;
 
         contactDataRef.current.forEach((contact, i) => {

@@ -62,6 +62,7 @@ export default function HomeScreen({ navigation, route }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [circleCenterY, setCircleCenterY] = useState(250);
+  const [showBottomHint, setShowBottomHint] = useState(true); // Dismissable bottom hint
   
   // State for contact name labels (non-rotating)
   const [contactLabels, setContactLabels] = useState([]);
@@ -1307,11 +1308,7 @@ export default function HomeScreen({ navigation, route }) {
               <Text style={styles.circleNameValue}>{primaryCircleName}</Text>
             </View>
 
-            {/* Health Dashboard Summary Card */}
-            <HealthSummaryCard
-              healthStats={healthStats}
-              onPress={() => navigation.navigate('AlertsTab')}
-            />
+            {/* Health Dashboard Summary Card - removed per user request */}
           </View>
         )}
 
@@ -1346,16 +1343,23 @@ export default function HomeScreen({ navigation, route }) {
           </TouchableOpacity>
         )}
 
-        {/* Bottom tap instruction */}
-        <View style={styles.bottomInstructionContainer}>
-          <View style={styles.glassBottomPanel}>
-            <Text style={styles.tapInstruction}>
-              {hasCircle
-                ? 'Tap a person to view • Tap a ring to explore that circle'
-                : 'tap the center to create your first Circle'}
-            </Text>
-          </View>
-        </View>
+        {/* Bottom tap instruction - dismissable */}
+        {showBottomHint && (
+          <TouchableOpacity
+            style={styles.bottomInstructionContainer}
+            onPress={() => setShowBottomHint(false)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.glassBottomPanel}>
+              <Text style={styles.tapInstruction}>
+                {hasCircle
+                  ? 'Tap a person to view • Tap a ring to explore'
+                  : 'tap the center to create your first Circle'}
+              </Text>
+              <Ionicons name="close" size={14} color="#666" style={{ marginLeft: 8 }} />
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Large center tap target when no circle exists */}
         {!hasCircle && (
@@ -1683,21 +1687,21 @@ const styles = StyleSheet.create({
   glassHeader: {
     paddingTop: 0,
   },
-  // Glass search panel with semi-transparent background - ULTRA COMPACT
+  // Glass search panel - more transparent floating style
   glassSearchPanel: {
-    marginHorizontal: 10,
-    marginTop: 2,
-    backgroundColor: 'rgba(2, 2, 8, 0.65)',
-    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(79, 255, 176, 0.15)',
-    paddingBottom: 4,
-    // Shadow for depth
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    borderColor: 'rgba(79, 255, 176, 0.1)',
+    paddingBottom: 6,
+    // Subtle shadow for floating effect
+    shadowColor: '#4FFFB0',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
   },
   // Bottom instruction container
   bottomInstructionContainer: {
@@ -1708,14 +1712,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
   },
-  // Glass bottom panel for instructions
+  // Glass bottom panel for instructions - floating pill style
   glassBottomPanel: {
-    backgroundColor: 'rgba(2, 2, 8, 0.6)',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    borderRadius: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: 'rgba(79, 255, 176, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   // Modals container
   modalsContainer: {
