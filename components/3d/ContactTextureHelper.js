@@ -114,19 +114,60 @@ export function createContactMaterial(contact, healthColor = '#4FFFB0', loadPhot
 
 /**
  * Create a glowing ring around a contact sphere
+ * Creates a beautiful aesthetic border effect with:
+ * - Inner bright border ring (white/cyan)
+ * - Outer soft health-colored glow
  * @param {number} radius - Sphere radius
- * @param {string} color - Hex color
- * @returns {THREE.Mesh}
+ * @param {string} color - Hex color for health status
+ * @returns {THREE.Group} Group containing border and glow meshes
  */
 export function createContactGlow(radius, color) {
-  const glowGeo = new THREE.SphereGeometry(radius * 1.15, 16, 16);
+  const group = new THREE.Group();
+
+  // Inner bright border ring - gives photos a crisp circular frame
+  const borderGeo = new THREE.TorusGeometry(radius * 1.02, 0.025, 8, 32);
+  const borderMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.7,
+  });
+  const border = new THREE.Mesh(borderGeo, borderMat);
+  border.rotation.x = Math.PI / 2; // Lay flat around equator
+  group.add(border);
+
+  // Second border ring at different angle for 3D effect
+  const border2 = new THREE.Mesh(borderGeo, borderMat.clone());
+  border2.rotation.y = Math.PI / 2;
+  group.add(border2);
+
+  // Outer soft glow sphere - health-colored aura
+  const glowGeo = new THREE.SphereGeometry(radius * 1.2, 16, 16);
   const glowMat = new THREE.MeshBasicMaterial({
     color: new THREE.Color(color),
     transparent: true,
-    opacity: 0.2,
+    opacity: 0.25,
     side: THREE.BackSide,
   });
-  return new THREE.Mesh(glowGeo, glowMat);
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  group.add(glow);
+
+  // Store references for cleanup
+  group.userData = {
+    borderGeo,
+    borderMat,
+    border2Mat: border2.material,
+    glowGeo,
+    glowMat,
+    dispose: () => {
+      borderGeo.dispose();
+      borderMat.dispose();
+      border2.material.dispose();
+      glowGeo.dispose();
+      glowMat.dispose();
+    }
+  };
+
+  return group;
 }
 
 /**

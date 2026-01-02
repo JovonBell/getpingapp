@@ -11,7 +11,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Platform, StyleSheet, View } from 'react-native';
 import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
 import * as THREE from 'three';
@@ -1315,8 +1315,13 @@ export default function UniverseHomeView({
         scene.remove(mesh);
       });
       contactGlows.forEach(glow => {
-        glow.geometry.dispose();
-        glow.material.dispose();
+        // Glow is now a Group with dispose function
+        if (glow.userData?.dispose) {
+          glow.userData.dispose();
+        } else if (glow.geometry) {
+          glow.geometry.dispose();
+          glow.material.dispose();
+        }
         scene.remove(glow);
       });
       sharedGeo.dispose();
@@ -1483,28 +1488,7 @@ export default function UniverseHomeView({
         onTouchCancel={handleTouchCancel}
       />
 
-      {/* Contact labels overlay */}
-      {labelPositions.map((pos, i) =>
-        pos.visible && !pos.isOverflow ? (
-          <View
-            key={i}
-            style={[
-              styles.label,
-              {
-                left: pos.x - 45,
-                top: pos.y + 22,
-                opacity: pos.opacity,
-              },
-              pos.isSelected && styles.labelSelected,
-            ]}
-            pointerEvents="none"
-          >
-            <Text style={[styles.labelText, pos.isSelected && styles.labelTextSelected]} numberOfLines={1}>
-              {pos.name?.split(' ')[0] || 'Unknown'}
-            </Text>
-          </View>
-        ) : null
-      )}
+      {/* Name labels removed - contact photos display directly on spheres */}
 
       {/* Supernova flash overlay */}
       {flashOpacity > 0 && (
@@ -1524,30 +1508,6 @@ const styles = StyleSheet.create({
   },
   glView: {
     flex: 1,
-  },
-  label: {
-    position: 'absolute',
-    width: 90,
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-  },
-  labelSelected: {
-    backgroundColor: 'rgba(79, 255, 176, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(79, 255, 176, 0.4)',
-  },
-  labelText: {
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: 11,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  labelTextSelected: {
-    color: '#4FFFB0',
-    fontWeight: '600',
   },
   supernovaFlash: {
     position: 'absolute',
