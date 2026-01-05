@@ -33,7 +33,7 @@ export function HealthDot({ score, status, size = 10, showLabel = false, variant
       />
       {showLabel && (
         <Text style={[styles.label, { color }]}>
-          {healthStatus.replace('_', ' ')}
+          {(healthStatus || 'unknown').replace('_', ' ')}
         </Text>
       )}
     </View>

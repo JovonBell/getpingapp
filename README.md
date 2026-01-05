@@ -19,6 +19,44 @@ A relationship management app that helps you stay connected with the people who 
 
 ## Changelog
 
+### January 5, 2026
+**Critical Persistence & 3D Rendering Fixes**
+
+**Circle Persistence (Finally Fixed!):**
+- Circles now load reliably on app restart using `useFocusEffect`
+- Fixed timing bug where 3D view rendered before data loaded
+- Added `contactMeshesRef` and `contactGlowsRef` for persistent mesh storage
+- Dynamic mesh creation now works when circles arrive after GL init
+
+**Circle Deletion (Now Works!):**
+- Delete actually persists to database (race condition fixed)
+- 3D view updates immediately when circles deleted (no restart needed)
+- Added `justDeleted` flag to prevent reload race conditions
+- Extended reload lockout from 500ms to 1500ms for safety
+
+**Expo Go Compatibility:**
+- Fixed native module errors for expo-notifications
+- Fixed WebBrowser.maybeCompleteAuthSession crash
+- Fixed musicManager/soundManager init errors
+- Lazy load NFCRingScreen to avoid native module crash
+- Fixed `removeNotificationSubscription` cleanup error
+
+**Bug Fixes:**
+- Fixed `healthStatus.replace()` undefined error in HealthIndicator
+- Added diagnostic logging to circlesStorage for debugging
+
+**Files Updated:**
+- `screens/main/HomeScreen.js` - useFocusEffect, delete race condition fix
+- `components/3d/UniverseHomeView.js` - Dynamic mesh creation/cleanup
+- `utils/storage/circlesStorage.js` - Diagnostic logging
+- `utils/notifications/pushNotifications.js` - Expo Go guard
+- `utils/storage/supabaseStorage.js` - WebBrowser try-catch
+- `utils/musicManager.js`, `utils/soundManager.js` - Init try-catch
+- `components/contacts/HealthIndicator.js` - Null check fix
+- `App.js` - NFCRingScreen lazy load, notification cleanup fix
+
+---
+
 ### January 2, 2026 (Afternoon)
 **Comprehensive Bug Fix Release**
 

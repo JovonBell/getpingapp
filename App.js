@@ -423,11 +423,16 @@ export default function App() {
     });
 
     return () => {
-      if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
-      }
-      if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
+      // Expo Go doesn't support removeNotificationSubscription - guard against it
+      try {
+        if (notificationListener.current && Notifications.removeNotificationSubscription) {
+          Notifications.removeNotificationSubscription(notificationListener.current);
+        }
+        if (responseListener.current && Notifications.removeNotificationSubscription) {
+          Notifications.removeNotificationSubscription(responseListener.current);
+        }
+      } catch (e) {
+        // Ignore cleanup errors in Expo Go
       }
     };
   }, []);

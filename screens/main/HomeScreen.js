@@ -284,6 +284,13 @@ export default function HomeScreen({ navigation, route }) {
       let isActive = true;
 
       const loadOnFocus = async () => {
+        // Don't reload if we just deleted a circle - prevents race condition
+        // where deleted circles come back before Supabase delete completes
+        if (justDeleted) {
+          console.log('[HomeScreen] Focus - skipping reload (just deleted)');
+          return;
+        }
+
         console.log('[HomeScreen] Focus - loading circles...');
         const { data: { session } } = await supabase.auth.getSession();
         console.log('[HomeScreen] Session:', session?.user?.id);
@@ -298,7 +305,7 @@ export default function HomeScreen({ navigation, route }) {
       return () => {
         isActive = false;
       };
-    }, [])
+    }, [justDeleted])
   );
 
   useEffect(() => {
@@ -952,8 +959,8 @@ export default function HomeScreen({ navigation, route }) {
         console.error('[HOME] Supabase delete error:', e);
       } finally {
         // Allow reloads after Supabase operation completes (success or fail)
-        // Small delay to prevent immediate re-fetch from showing deleted circle
-        setTimeout(() => setJustDeleted(false), 500);
+        // Longer delay to ensure any pending focus events don't reload deleted data
+        setTimeout(() => setJustDeleted(false), 1500);
       }
     })();
   };

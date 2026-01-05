@@ -282,20 +282,54 @@ export default function UniverseHomeView({
     return contacts;
   }, [circles, healthMap]);
 
-  // DYNAMIC CONTACT CREATION: Create meshes when circles data arrives AFTER GL init
-  // This fixes the timing bug where onContextCreate runs before circles are loaded
+  // DYNAMIC CONTACT CREATION: Create/update meshes when circles data changes
+  // This handles: initial load, adding circles, and DELETING circles
   useEffect(() => {
-    if (!sceneRef.current || flattenedContacts.length === 0) return;
+    if (!sceneRef.current) return;
 
-    // Skip if meshes already exist (created in onContextCreate)
-    if (contactMeshesRef.current.length > 0) {
-      console.log('[UniverseHomeView] Meshes already exist, skipping dynamic creation');
+    const scene = sceneRef.current;
+
+    // If no contacts, clear any existing meshes (handles delete all)
+    if (flattenedContacts.length === 0) {
+      if (contactMeshesRef.current.length > 0) {
+        console.log('[UniverseHomeView] No contacts - clearing', contactMeshesRef.current.length, 'meshes');
+        contactMeshesRef.current.forEach(mesh => {
+          scene.remove(mesh);
+          if (mesh.geometry) mesh.geometry.dispose();
+          if (mesh.material) mesh.material.dispose();
+        });
+        contactGlowsRef.current.forEach(glow => {
+          scene.remove(glow);
+          if (glow.geometry) glow.geometry.dispose();
+          if (glow.material) glow.material.dispose();
+        });
+        contactMeshesRef.current = [];
+        contactGlowsRef.current = [];
+        contactDataRef.current = [];
+        instancedMeshRef.current = { meshes: [] };
+      }
       return;
     }
 
-    console.log('[UniverseHomeView] Dynamic mesh creation for', flattenedContacts.length, 'contacts');
+    // Clear existing meshes before recreating (handles delete/update)
+    if (contactMeshesRef.current.length > 0) {
+      console.log('[UniverseHomeView] Clearing old meshes for update');
+      contactMeshesRef.current.forEach(mesh => {
+        scene.remove(mesh);
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) mesh.material.dispose();
+      });
+      contactGlowsRef.current.forEach(glow => {
+        scene.remove(glow);
+        if (glow.geometry) glow.geometry.dispose();
+        if (glow.material) glow.material.dispose();
+      });
+      contactMeshesRef.current = [];
+      contactGlowsRef.current = [];
+    }
 
-    const scene = sceneRef.current;
+    console.log('[UniverseHomeView] Creating meshes for', flattenedContacts.length, 'contacts');
+
     const sharedGeo = new THREE.SphereGeometry(RING_CONFIG.contactRadius, 20, 20);
 
     contactDataRef.current = flattenedContacts;
@@ -316,7 +350,7 @@ export default function UniverseHomeView({
     });
 
     instancedMeshRef.current = { meshes: contactMeshesRef.current };
-    console.log('[UniverseHomeView] ✅ Dynamic meshes created:', contactMeshesRef.current.length);
+    console.log('[UniverseHomeView] ✅ Meshes updated:', contactMeshesRef.current.length);
   }, [flattenedContacts]);
 
   // Initialize touch controller
