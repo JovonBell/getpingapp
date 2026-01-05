@@ -99,11 +99,9 @@ export async function hashContactsForMatching(contacts) {
     const p1 = normalizePhone(c?.phone);
     if (p1) phones.add(p1);
 
-    const emailHashes = [];
-    const phoneHashes = [];
-
-    for (const e of emails) emailHashes.push(await sha256(e));
-    for (const p of phones) phoneHashes.push(await sha256(p));
+    // Hash all emails and phones in PARALLEL (not sequential) for performance
+    const emailHashes = await Promise.all(Array.from(emails).map(e => sha256(e)));
+    const phoneHashes = await Promise.all(Array.from(phones).map(p => sha256(p)));
 
     out[String(c.id)] = { emailHashes, phoneHashes };
   }

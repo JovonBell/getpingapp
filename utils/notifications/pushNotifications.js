@@ -4,38 +4,48 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { supabase } from '../../lib/supabase';
 
+// Detect if running in Expo Go (notifications not supported since SDK 53)
+const isExpoGo = Constants.appOwnership === 'expo';
+
 // Configure how notifications are handled when app is in foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
-
-// Notification channel for Android
-if (Platform.OS === 'android') {
-  Notifications.setNotificationChannelAsync('reminders', {
-    name: 'Reminders',
-    importance: Notifications.AndroidImportance.HIGH,
-    vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#4FFFB0',
+// Skip in Expo Go - native module not available
+if (!isExpoGo) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
   });
 
-  Notifications.setNotificationChannelAsync('daily-digest', {
-    name: 'Daily Digest',
-    importance: Notifications.AndroidImportance.DEFAULT,
-  });
+  // Notification channel for Android
+  if (Platform.OS === 'android') {
+    Notifications.setNotificationChannelAsync('reminders', {
+      name: 'Reminders',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#4FFFB0',
+    });
 
-  Notifications.setNotificationChannelAsync('achievements', {
-    name: 'Achievements',
-    importance: Notifications.AndroidImportance.DEFAULT,
-  });
+    Notifications.setNotificationChannelAsync('daily-digest', {
+      name: 'Daily Digest',
+      importance: Notifications.AndroidImportance.DEFAULT,
+    });
+
+    Notifications.setNotificationChannelAsync('achievements', {
+      name: 'Achievements',
+      importance: Notifications.AndroidImportance.DEFAULT,
+    });
+  }
 }
 
 export async function registerForPushNotificationsAsync(userId) {
   try {
     if (!userId) return { success: false, error: 'Missing userId' };
+    if (isExpoGo) {
+      console.log('[Push] Notifications not available in Expo Go');
+      return { success: false, error: 'Notifications require a development build' };
+    }
     if (!Device.isDevice) return { success: false, error: 'Push notifications require a physical device.' };
 
     const { status: existingStatus } = await Notifications.getPermissionsAsync();

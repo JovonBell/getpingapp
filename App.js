@@ -38,7 +38,9 @@ import HomeScreen from './screens/main/HomeScreen';
 import AlertsScreen from './screens/main/AlertsScreen';
 import MessagesScreen from './screens/main/MessagesScreen';
 import ChatScreen from './screens/main/ChatScreen';
-import NFCRingScreen from './screens/main/NFCRingScreen';
+
+// Lazy load NFCRingScreen to avoid loading react-native-nfc-manager in Expo Go
+const NFCRingScreen = React.lazy(() => import('./screens/main/NFCRingScreen'));
 
 // Screens - Contacts
 import AddContactScreen from './screens/contacts/AddContactScreen';
@@ -159,14 +161,19 @@ function MainTabs() {
       />
       <Tab.Screen
         name="NFCTab"
-        component={NFCRingScreen}
         options={{
           tabBarLabel: 'ring',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="radio-outline" size={size} color={color} />
           ),
         }}
-      />
+      >
+        {(props) => (
+          <React.Suspense fallback={<View style={{flex:1,justifyContent:'center',alignItems:'center'}}><ActivityIndicator size="large" /></View>}>
+            <NFCRingScreen {...props} />
+          </React.Suspense>
+        )}
+      </Tab.Screen>
       <Tab.Screen
         name="ContactsTab"
         component={ContactsListScreen}

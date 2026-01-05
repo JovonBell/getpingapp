@@ -31,7 +31,13 @@
           "includeNdefEntitlement": false
         }
       ],
-      ["./plugins/withIosDeploymentTarget", { "deploymentTarget": "15.1" }]
+      [
+        "./plugins/withIosDeploymentTarget",
+        {
+          "deploymentTarget": "15.1"
+        }
+      ],
+      "expo-asset"
     ],
     "ios": {
       "supportsTablet": true,
@@ -47,7 +53,9 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "com.apple.developer.nfc.readersession.formats": ["TAG"]
+        "com.apple.developer.nfc.readersession.formats": [
+          "TAG"
+        ]
       }
     },
     "android": {

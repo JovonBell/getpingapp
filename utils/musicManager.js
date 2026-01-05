@@ -30,8 +30,12 @@ class MusicManager {
     this.initialized = false;
     this.appStateSubscription = null;
 
-    this.loadSettings();
-    this.setupAppStateListener();
+    try {
+      this.loadSettings();
+      this.setupAppStateListener();
+    } catch (err) {
+      console.log('[MusicManager] Init failed (Expo Go?):', err?.message);
+    }
   }
 
   async loadSettings() {

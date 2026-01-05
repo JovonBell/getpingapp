@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   StyleSheet,
   Text,
@@ -11,6 +12,7 @@ import {
   Linking,
   Alert,
   AppState,
+  ActivityIndicator,
 } from 'react-native';
 import Haptic from '../../utils/haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +23,7 @@ import AddReminderModal from '../../components/modals/AddReminderModal';
 import EditContactModal from '../../components/modals/EditContactModal';
 import { getImportedContacts as loadImportedContacts } from '../../utils/storage/contactsStorage';
 import { getCurrentUser } from '../../utils/storage/supabaseStorage';
+import { supabase } from '../../lib/supabase';
 import { loadCirclesWithMembers, deleteCircle, addContactsToCircle } from '../../utils/storage/circlesStorage';
 import { getUnreadMessageCount } from '../../utils/storage/messagesStorage';
 import { refreshHealthScores, logInteraction, getHealthScores, getHealthColor, updateHealthScore } from '../../utils/scoring/healthScoring';
@@ -176,7 +179,8 @@ export default function HomeScreen({ navigation, route }) {
   }, [route?.params?.importedContacts]);
 
   // Load circles function - moved outside useEffect so it can be called from anywhere
-  const loadCircles = useCallback(async (force = false) => {
+  // Auth state is now handled by onAuthStateChange listener, no retries needed
+  const loadCircles = useCallback(async (force = false, passedUser = null) => {
     // Skip reload if we just deleted (prevents bringing back deleted circles)
     if (justDeleted && !force) {
       console.log('[HomeScreen] Skipping reload - just deleted a circle');
@@ -194,15 +198,21 @@ export default function HomeScreen({ navigation, route }) {
     setCirclesLoading(true);
 
     try {
-      const { success: userSuccess, user } = await getCurrentUser();
-      console.log('[HomeScreen] User check:', { userSuccess, userId: user?.id });
-
-      if (!userSuccess || !user) {
-        console.warn('[HomeScreen] No authenticated user found');
-        setCircles([]);
-        setCirclesLoading(false);
-        loadingRef.current = false;
-        return;
+      // Use passed user if available, otherwise fetch (avoids network call on startup)
+      let user = passedUser;
+      if (!user) {
+        const { success: userSuccess, user: fetchedUser } = await getCurrentUser();
+        console.log('[HomeScreen] User check:', { userSuccess, userId: fetchedUser?.id });
+        if (!userSuccess || !fetchedUser) {
+          // No user - auth listener will call loadCircles when ready
+          console.log('[HomeScreen] No authenticated user, waiting for auth...');
+          setCirclesLoading(false);
+          loadingRef.current = false;
+          return;
+        }
+        user = fetchedUser;
+      } else {
+        console.log('[HomeScreen] Using passed user:', { userId: user?.id });
       }
 
       setUserId(user.id);
@@ -266,18 +276,30 @@ export default function HomeScreen({ navigation, route }) {
     }
   }, [justDeleted]);
 
-  // Load circles from Supabase (authoritative) when the Home tab is focused.
-  useEffect(() => {
-    loadCircles(true); // Force load on mount
-    const unsub = navigation.addListener('focus', () => {
-      console.log('[HomeScreen] Tab focused, reloading circles...');
-      loadCircles();
-    });
-    
-    return () => {
-      unsub();
-    };
-  }, [navigation, loadCircles]);
+  // BULLETPROOF: Load circles when screen is focused (including initial mount)
+  // useFocusEffect is React Navigation's official solution for screen-level data loading
+  // It ALWAYS fires when screen gains focus, including the first mount
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const loadOnFocus = async () => {
+        console.log('[HomeScreen] Focus - loading circles...');
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[HomeScreen] Session:', session?.user?.id);
+
+        if (isActive && session?.user) {
+          await loadCircles(true, session.user);
+        }
+      };
+
+      loadOnFocus();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
 
   useEffect(() => {
     const loadUnread = async () => {
@@ -1375,6 +1397,14 @@ export default function HomeScreen({ navigation, route }) {
           </TouchableOpacity>
         )}
 
+        {/* Loading indicator while circles are loading */}
+        {circlesLoading && !hasCircle && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4FFFB0" />
+            <Text style={styles.loadingText}>Loading your circles...</Text>
+          </View>
+        )}
+
         {/* Prominent CTA when no circles exist */}
         {!hasCircle && !circlesLoading && (
           <TouchableOpacity
@@ -1901,6 +1931,21 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     paddingTop: 10,
     alignItems: 'center',
+  },
+  loadingContainer: {
+    position: 'absolute',
+    bottom: 160,
+    left: 40,
+    right: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 50,
+  },
+  loadingText: {
+    color: '#ffffff',
+    fontSize: 14,
+    marginTop: 12,
+    opacity: 0.8,
   },
   createFirstCircleButton: {
     position: 'absolute',

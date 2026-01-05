@@ -7,7 +7,12 @@ import { normalizeEmail, normalizePhone, sha256 } from '../contactsImport';
 import { upsertUserIdentities } from './identitiesStorage';
 
 // Tell the browser to dismiss when auth is complete
-WebBrowser.maybeCompleteAuthSession();
+// Wrapped in try-catch for Expo Go compatibility
+try {
+  WebBrowser.maybeCompleteAuthSession();
+} catch (err) {
+  console.log('[Auth] WebBrowser not available:', err?.message);
+}
 
 // Save profile to Supabase
 export const saveProfileToSupabase = async (profileData, userId) => {

@@ -215,6 +215,12 @@ export async function loadCirclesWithMembers(userId) {
       throw iErr;
     }
 
+    // DIAGNOSTIC: Log what we got from circle_members vs imported_contacts
+    console.log('[LOAD CIRCLES] Members found in circle_members:', members?.length || 0);
+    console.log('[LOAD CIRCLES] Imported contacts found:', imported?.length || 0);
+    console.log('[LOAD CIRCLES] Contact IDs requested:', contactIds);
+    console.log('[LOAD CIRCLES] Imported IDs received:', imported?.map(i => i.id));
+
     const importedById = (imported || []).reduce((acc, c) => {
       acc[c.id] = {
         id: String(c.contact_id),
@@ -232,7 +238,12 @@ export async function loadCirclesWithMembers(userId) {
     const membersByCircle = (members || []).reduce((acc, m) => {
       if (!acc[m.circle_id]) acc[m.circle_id] = [];
       const c = importedById[m.imported_contact_id];
-      if (c) acc[m.circle_id].push(c);
+      if (c) {
+        acc[m.circle_id].push(c);
+      } else {
+        // LOG WHEN MEMBER IS DROPPED - critical for debugging data integrity issues
+        console.warn('[LOAD CIRCLES] ⚠️ Member dropped - imported_contact_id not found:', m.imported_contact_id);
+      }
       return acc;
     }, {});
 

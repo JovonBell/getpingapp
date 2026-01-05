@@ -179,6 +179,8 @@ export default function UniverseHomeView({
 
   // Contact data for raycasting
   const contactDataRef = useRef([]);
+  const contactMeshesRef = useRef([]);  // Meshes for contacts (needed for dynamic creation)
+  const contactGlowsRef = useRef([]);   // Glow effects for contacts
 
   // Long press detection
   const longPressTimerRef = useRef(null);
@@ -279,6 +281,43 @@ export default function UniverseHomeView({
 
     return contacts;
   }, [circles, healthMap]);
+
+  // DYNAMIC CONTACT CREATION: Create meshes when circles data arrives AFTER GL init
+  // This fixes the timing bug where onContextCreate runs before circles are loaded
+  useEffect(() => {
+    if (!sceneRef.current || flattenedContacts.length === 0) return;
+
+    // Skip if meshes already exist (created in onContextCreate)
+    if (contactMeshesRef.current.length > 0) {
+      console.log('[UniverseHomeView] Meshes already exist, skipping dynamic creation');
+      return;
+    }
+
+    console.log('[UniverseHomeView] Dynamic mesh creation for', flattenedContacts.length, 'contacts');
+
+    const scene = sceneRef.current;
+    const sharedGeo = new THREE.SphereGeometry(RING_CONFIG.contactRadius, 20, 20);
+
+    contactDataRef.current = flattenedContacts;
+
+    flattenedContacts.forEach((contact, i) => {
+      const healthStatus = contact.health?.status || 'unknown';
+      const healthColor = contact.isOverflow ? '#888888' : getHealthColor(healthStatus);
+
+      const material = createContactMaterial(contact, healthColor, !contact.isOverflow);
+      const mesh = new THREE.Mesh(sharedGeo, material);
+      mesh.userData = { contactIndex: i, contact };
+      scene.add(mesh);
+      contactMeshesRef.current.push(mesh);
+
+      const glow = createContactGlow(RING_CONFIG.contactRadius, healthColor);
+      scene.add(glow);
+      contactGlowsRef.current.push(glow);
+    });
+
+    instancedMeshRef.current = { meshes: contactMeshesRef.current };
+    console.log('[UniverseHomeView] ✅ Dynamic meshes created:', contactMeshesRef.current.length);
+  }, [flattenedContacts]);
 
   // Initialize touch controller
   useEffect(() => {
@@ -935,11 +974,13 @@ export default function UniverseHomeView({
         mesh.userData = { contactIndex: i, contact };
         scene.add(mesh);
         contactMeshes.push(mesh);
+        contactMeshesRef.current.push(mesh);  // Also store in ref for dynamic updates
 
         // Create glow ring around contact
         const glow = createContactGlow(RING_CONFIG.contactRadius, healthColor);
         scene.add(glow);
         contactGlows.push(glow);
+        contactGlowsRef.current.push(glow);  // Also store in ref for dynamic updates
       });
 
       // Store meshes for raycasting
@@ -1003,6 +1044,9 @@ export default function UniverseHomeView({
       }
 
       // Update contact positions with entrance animation
+      // Read from refs so dynamic mesh creation works
+      const contactMeshes = contactMeshesRef.current;
+      const contactGlows = contactGlowsRef.current;
       if (contactMeshes.length > 0 && contactDataRef.current.length > 0) {
         const now = Date.now();
 

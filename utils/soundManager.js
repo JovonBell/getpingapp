@@ -30,7 +30,11 @@ class SoundManager {
 
   constructor() {
     this.initialized = false;
-    this.loadSettings();
+    try {
+      this.loadSettings();
+    } catch (err) {
+      console.log('[SoundManager] Init failed (Expo Go?):', err?.message);
+    }
   }
 
   async loadSettings() {

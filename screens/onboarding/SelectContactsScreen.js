@@ -301,7 +301,7 @@ export default function SelectContactsScreen({ navigation, route }) {
                   // Best-effort match & create connections in Supabase (requires migration)
                   // Use a timeout to prevent hanging if Supabase is slow/unavailable
                   const matchingTimeout = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Matching timeout')), 5000)
+                    setTimeout(() => reject(new Error('Matching timeout')), 30000)
                   );
 
                   try {
@@ -347,7 +347,12 @@ export default function SelectContactsScreen({ navigation, route }) {
                     }
                   } catch (e) {
                     console.warn('Matching/import connections failed (continuing):', e?.message || e);
-                    // Continue with unmatched contacts - don't block the flow
+                    // Show user-friendly notice about partial failure
+                    Alert.alert(
+                      'Import Notice',
+                      'Contact matching timed out. Your contacts were saved but may not be linked to existing users.',
+                      [{ text: 'OK' }]
+                    );
                   }
 
                   // Merge with existing contacts
