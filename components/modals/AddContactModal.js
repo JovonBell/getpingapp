@@ -86,13 +86,23 @@ function AddContactModal({ visible, onClose, onSave, existingContactIds = [] }) 
 
     setIsSaving(true);
     try {
-      await onSave(selected);
+      // Add timeout to prevent hanging on parent callback
+      const saveTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Save timeout')), 15000)
+      );
+      await Promise.race([onSave(selected), saveTimeout]);
+
       setSelectedContactIds([]);
       setSearchQuery('');
       onClose();
     } catch (error) {
       console.error('[AddContactModal] Save failed:', error);
-      Alert.alert('Error', 'Failed to add contacts. Please try again.');
+      Alert.alert(
+        'Error',
+        error.message === 'Save timeout'
+          ? 'Operation timed out. Please try again.'
+          : 'Failed to add contacts. Please try again.'
+      );
     } finally {
       setIsSaving(false);
     }

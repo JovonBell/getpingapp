@@ -7,6 +7,8 @@ import {
   TextInput,
   ScrollView,
   Modal,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +19,7 @@ export default function AddContactScreen({ navigation, route }) {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [showTierPicker, setShowTierPicker] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleAddToCircle = () => {
     if (!name.trim() || !phone.trim()) {
@@ -26,7 +29,7 @@ export default function AddContactScreen({ navigation, route }) {
     setShowTierPicker(true);
   };
 
-  const handleTierSelect = (tier) => {
+  const handleTierSelect = async (tier) => {
     // Create initials from name
     const nameParts = name.trim().split(' ');
     const initials = nameParts.length > 1
@@ -43,17 +46,33 @@ export default function AddContactScreen({ navigation, route }) {
       tier: tier,
     };
 
-    // Persist into imported contacts store (the app-wide universe)
-    (async () => {
+    setIsSaving(true);
+    try {
+      // Add timeout to prevent hanging
+      const saveTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Save timeout')), 15000)
+      );
+
       const { contacts: existing } = await getImportedContacts();
       const updated = [...(existing || []), newContact];
-      await saveImportedContacts(updated);
+      await Promise.race([saveImportedContacts(updated), saveTimeout]);
+
       setShowTierPicker(false);
       setName('');
       setPhone('');
       setEmail('');
       navigation.goBack();
-    })();
+    } catch (error) {
+      console.error('[AddContactScreen] Save failed:', error);
+      Alert.alert(
+        'Error',
+        error.message === 'Save timeout'
+          ? 'Operation timed out. Please try again.'
+          : 'Failed to add contact. Please try again.'
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -138,10 +157,11 @@ export default function AddContactScreen({ navigation, route }) {
               <Text style={styles.tierPickerTitle}>Select Circle Tier</Text>
               <Text style={styles.tierPickerSubtitle}>Choose how close this contact is to you</Text>
 
-              <View style={styles.tierOptions}>
+              <View style={[styles.tierOptions, isSaving && { opacity: 0.5 }]}>
                 <TouchableOpacity
                   style={styles.tierOption}
                   onPress={() => handleTierSelect('close')}
+                  disabled={isSaving}
                 >
                   <View style={styles.tierCircleContainer}>
                     <View style={[styles.tierCircle, styles.tierCircleClose]} />
@@ -153,6 +173,7 @@ export default function AddContactScreen({ navigation, route }) {
                 <TouchableOpacity
                   style={styles.tierOption}
                   onPress={() => handleTierSelect('medium')}
+                  disabled={isSaving}
                 >
                   <View style={styles.tierCircleContainer}>
                     <View style={[styles.tierCircle, styles.tierCircleMedium]} />
@@ -164,6 +185,7 @@ export default function AddContactScreen({ navigation, route }) {
                 <TouchableOpacity
                   style={styles.tierOption}
                   onPress={() => handleTierSelect('distant')}
+                  disabled={isSaving}
                 >
                   <View style={styles.tierCircleContainer}>
                     <View style={[styles.tierCircle, styles.tierCircleDistant]} />
@@ -172,6 +194,13 @@ export default function AddContactScreen({ navigation, route }) {
                   <Text style={styles.tierDescription}>Outer ring</Text>
                 </TouchableOpacity>
               </View>
+
+              {isSaving && (
+                <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                  <ActivityIndicator size="small" color="#4FFFB0" />
+                  <Text style={{ color: '#999', marginTop: 8, fontSize: 12 }}>Saving contact...</Text>
+                </View>
+              )}
 
               <TouchableOpacity
                 style={styles.cancelButton}

@@ -362,7 +362,11 @@ export default function SelectContactsScreen({ navigation, route }) {
                   const newContacts = enriched.filter(c => !existingIds.has(c.id));
                   const merged = [...existing, ...newContacts];
 
-                  await saveImportedContacts(merged);
+                  // Add timeout to prevent hanging
+                  const saveTimeout = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Save timeout')), 15000)
+                  );
+                  await Promise.race([saveImportedContacts(merged), saveTimeout]);
 
                   if (isAddContacts) {
                     // Adding contacts - go back to contacts list

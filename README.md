@@ -19,6 +19,32 @@ A relationship management app that helps you stay connected with the people who 
 
 ## Changelog
 
+### January 6, 2026
+**Button Loading State Fixes**
+
+Fixed buttons in the contacts feature that would get stuck in loading states and timeout without recovering.
+
+**SelectContactsScreen - "import selected" / "continue":**
+- Added 15-second timeout to `saveImportedContacts` to prevent indefinite hangs
+
+**AddContactScreen - "Add to Circle" (Major Fix):**
+- Fixed fire-and-forget async pattern that had NO loading state and NO error handling
+- Added proper `isSaving` state with loading indicator
+- Added 15-second timeout to prevent hanging
+- Added user-friendly error alerts with timeout-specific messaging
+- Tier buttons now disabled during save with visual feedback
+
+**AddContactModal - "Add to Circle":**
+- Added 15-second timeout to `onSave` callback
+- Improved error messaging for timeout vs other failures
+
+**Files Updated:**
+- `screens/onboarding/SelectContactsScreen.js` - Added timeout wrapper
+- `screens/contacts/AddContactScreen.js` - Complete async/loading overhaul
+- `components/modals/AddContactModal.js` - Added timeout to callback
+
+---
+
 ### January 5, 2026
 **Critical Persistence & 3D Rendering Fixes**
 
