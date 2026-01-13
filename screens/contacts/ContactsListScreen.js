@@ -25,44 +25,50 @@ export default function ContactsListScreen({ navigation }) {
 
   const loadContacts = async () => {
     setLoading(true);
-    const { contacts: stored } = await getImportedContacts();
-    setContacts(stored || []);
+    try {
+      const { contacts: stored } = await getImportedContacts();
+      setContacts(stored || []);
 
-    // Load health scores - map by contact_id (device ID) for matching with AsyncStorage contacts
-    const { success, user } = await getCurrentUser();
-    if (success && user) {
-      const { healthScores } = await getHealthScores(user.id);
-      if (healthScores && healthScores.length > 0) {
-        const map = {};
-        for (const h of healthScores) {
-          // Use contact_id (device ID) as key since AsyncStorage contacts use device IDs
-          const deviceId = h.contact?.contact_id;
-          if (deviceId) {
-            map[deviceId] = h;
+      // Load health scores - map by contact_id (device ID) for matching with AsyncStorage contacts
+      const { success, user } = await getCurrentUser();
+      if (success && user) {
+        const { healthScores } = await getHealthScores(user.id);
+        if (healthScores && healthScores.length > 0) {
+          const map = {};
+          for (const h of healthScores) {
+            // Use contact_id (device ID) as key since AsyncStorage contacts use device IDs
+            const deviceId = h.contact?.contact_id;
+            if (deviceId) {
+              map[deviceId] = h;
+            }
           }
+          setHealthMap(map);
         }
-        setHealthMap(map);
       }
+    } catch (error) {
+      console.error('[CONTACTS LIST] Error loading contacts:', error?.message || error);
+    } finally {
+      // ALWAYS reset loading state to prevent stuck loading screen
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
+  // Combined data loading to avoid double focus listeners
   useEffect(() => {
-    loadContacts();
-    const unsub = navigation.addListener('focus', loadContacts);
-    return unsub;
-  }, [navigation]);
+    const loadAllData = async () => {
+      // Load contacts and health scores
+      await loadContacts();
 
-  useEffect(() => {
-    const loadUnread = async () => {
+      // Load unread count
       const { success, user } = await getCurrentUser();
-      if (!success || !user) return;
-      const res = await getUnreadMessageCount(user.id);
-      if (res.success) setUnreadCount(res.count);
+      if (success && user) {
+        const res = await getUnreadMessageCount(user.id);
+        if (res.success) setUnreadCount(res.count);
+      }
     };
-    loadUnread();
-    const unsub = navigation.addListener('focus', loadUnread);
+
+    loadAllData();
+    const unsub = navigation.addListener('focus', loadAllData);
     return unsub;
   }, [navigation]);
 
@@ -116,7 +122,11 @@ export default function ContactsListScreen({ navigation }) {
               )}
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => navigation.navigate('SelectContacts', { mode: 'addContacts' })}
+              onPress={() => {
+                const parent = navigation.getParent?.();
+                if (parent) parent.navigate('SelectContacts', { mode: 'addContacts' });
+                else navigation.navigate('SelectContacts', { mode: 'addContacts' });
+              }}
             >
               <Ionicons name="person-add" size={24} color="#00ff88" />
             </TouchableOpacity>
@@ -145,7 +155,7 @@ export default function ContactsListScreen({ navigation }) {
           <FlatList
             data={filteredContacts}
             renderItem={renderContact}
-            keyExtractor={item => item.id}
+            keyExtractor={(item, index) => item?.id || `contact-${index}`}
             style={styles.contactList}
             showsVerticalScrollIndicator={false}
           />

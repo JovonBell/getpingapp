@@ -43,6 +43,8 @@ export function createPathAnimation(scene, pathNodes, options = {}) {
   let isPlaying = false;
   let isPaused = false;
   let animationId = null;
+  const glowAnimationIds = new Set(); // Track glow animation frames
+  let celebrationAnimationId = null; // Track celebration animation frame
 
   // Create path line geometry
   const pathPoints = pathNodes.map(n => n.position.clone());
@@ -269,21 +271,24 @@ export function createPathAnimation(scene, pathNodes, options = {}) {
   function triggerNodeGlow(nodeIndex) {
     const glow = nodeGlows[nodeIndex];
     if (!glow) return;
-    
+
     glow.mat.opacity = 0.8;
-    
+
     // Animate glow fade
     const fadeStart = Date.now();
+    let glowRafId = null;
     const fadeGlow = () => {
       const elapsed = Date.now() - fadeStart;
       const progress = elapsed / PATH_CONFIG.nodeGlowDuration;
-      
+
       if (progress < 1) {
         glow.mat.opacity = 0.8 * (1 - progress);
         glow.mesh.scale.setScalar(1 + progress * 0.5);
-        requestAnimationFrame(fadeGlow);
+        glowRafId = requestAnimationFrame(fadeGlow);
+        glowAnimationIds.add(glowRafId);
       } else {
         glow.mat.opacity = 0;
+        if (glowRafId) glowAnimationIds.delete(glowRafId);
       }
     };
     fadeGlow();
@@ -326,16 +331,17 @@ export function createPathAnimation(scene, pathNodes, options = {}) {
     let celebFrame = 0;
     const animateCelebration = () => {
       celebFrame++;
-      
+
       celebrationParticles.forEach(p => {
         p.mesh.position.add(p.mesh.userData.velocity);
         p.mesh.userData.velocity.y -= 0.005; // Gravity
         p.mat.opacity = Math.max(0, 1 - celebFrame / 60);
       });
-      
+
       if (celebFrame < 60) {
-        requestAnimationFrame(animateCelebration);
+        celebrationAnimationId = requestAnimationFrame(animateCelebration);
       } else {
+        celebrationAnimationId = null;
         // Cleanup celebration particles
         celebrationParticles.forEach(p => {
           scene.remove(p.mesh);
@@ -355,6 +361,16 @@ export function createPathAnimation(scene, pathNodes, options = {}) {
    */
   function dispose() {
     stop();
+
+    // Cancel any pending glow animations
+    glowAnimationIds.forEach(id => cancelAnimationFrame(id));
+    glowAnimationIds.clear();
+
+    // Cancel celebration animation
+    if (celebrationAnimationId) {
+      cancelAnimationFrame(celebrationAnimationId);
+      celebrationAnimationId = null;
+    }
     
     scene.remove(pathLine);
     lineGeometry.dispose();

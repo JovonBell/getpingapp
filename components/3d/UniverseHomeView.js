@@ -16,6 +16,7 @@ import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import { DeviceMotion } from 'expo-sensors';
+import { gsap } from 'gsap';
 
 // Import sub-systems
 import { TouchController } from './TouchController';
@@ -28,6 +29,18 @@ import { createCelestialSystem } from './CelestialBodies';
 import { createContactMaterial, createContactGlow, clearTextureCache } from './ContactTextureHelper';
 import { getHealthColor } from '../../utils/scoring/healthScoring';
 import Haptic from '../../utils/haptics';
+
+// View states for Apple Astronomy-style navigation
+const VIEW_STATE = {
+  SYSTEM_VIEW: 'SYSTEM_VIEW',     // Full solar system visible
+  CONTACT_FOCUS: 'CONTACT_FOCUS', // Zoomed in on a contact
+};
+
+// GSAP animation settings (Apple Astronomy spec)
+const CAMERA_ANIMATION_DURATION = 1.5;
+const CAMERA_ANIMATION_EASE = 'power3.inOut';
+const SYSTEM_VIEW_POSITION = { x: 0, y: 14, z: 24 };
+const CONTACT_FOCUS_DISTANCE = 2.5; // Distance from contact when focused
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -150,6 +163,17 @@ export default function UniverseHomeView({
   const [selectedContact, setSelectedContact] = useState(null);
   const [isEntranceComplete, setIsEntranceComplete] = useState(false);
   const [flashOpacity, setFlashOpacity] = useState(0);
+
+  // View state for Apple Astronomy-style navigation
+  const [viewState, setViewState] = useState(VIEW_STATE.SYSTEM_VIEW);
+  const [focusedContact, setFocusedContact] = useState(null);
+  const focusedContactMeshRef = useRef(null); // Track focused contact's mesh for camera target
+  const viewStateRef = useRef(VIEW_STATE.SYSTEM_VIEW); // Ref for touch handler access
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    viewStateRef.current = viewState;
+  }, [viewState]);
 
   // Refs for 3D scene
   const stateRef = useRef({
@@ -359,14 +383,27 @@ export default function UniverseHomeView({
       onTap: (pos) => {
         clearLongPressTimer();
         const hit = performRaycast(pos.x, pos.y);
+        const currentViewState = viewStateRef.current;
 
+        // If in CONTACT_FOCUS, any tap zooms back out (Apple Astronomy behavior)
+        if (currentViewState === VIEW_STATE.CONTACT_FOCUS) {
+          Haptic.lightTick();
+          zoomToSystemView();
+          onBackgroundTap?.();
+          return;
+        }
+
+        // SYSTEM_VIEW tap handling
         if (hit.type === 'contact') {
           Haptic.planetTap();
           const contact = contactDataRef.current[hit.index];
+          const contactMesh = instancedMeshRef.current?.meshes?.[hit.index];
+
           if (contact?.isOverflow) {
             onRingTap?.(contact.circleId, contact.ringIndex);
-          } else {
-            setSelectedContact(contact);
+          } else if (contact && contactMesh) {
+            // Zoom to contact (Apple Astronomy style)
+            zoomToContact(contact, contactMesh);
             onContactTap?.(contact);
           }
         } else if (hit.type === 'nucleus') {
@@ -437,7 +474,7 @@ export default function UniverseHomeView({
       touchControllerRef.current?.reset();
       clearLongPressTimer();
     };
-  }, [circles, onContactTap, onContactDoubleTap, onContactLongPress, onRingTap, onNucleusTap, onBackgroundTap]);
+  }, [circles, onContactTap, onContactDoubleTap, onContactLongPress, onRingTap, onNucleusTap, onBackgroundTap, zoomToContact, zoomToSystemView]);
 
   const clearLongPressTimer = () => {
     if (longPressTimerRef.current) {
@@ -445,6 +482,92 @@ export default function UniverseHomeView({
       longPressTimerRef.current = null;
     }
   };
+
+  /**
+   * Zoom camera to focus on a contact (Apple Astronomy style)
+   * Uses GSAP for smooth power3.inOut animation over 1.5s
+   */
+  const zoomToContact = useCallback((contact, contactMesh) => {
+    if (!cameraRef.current || !contactMesh) return;
+
+    const camera = cameraRef.current;
+    const contactPosition = contactMesh.position.clone();
+
+    // Calculate target camera position (offset from contact toward camera)
+    const direction = new THREE.Vector3();
+    direction.subVectors(camera.position, contactPosition).normalize();
+    const targetPosition = contactPosition.clone().add(direction.multiplyScalar(CONTACT_FOCUS_DISTANCE));
+
+    // Store the mesh for continuous tracking
+    focusedContactMeshRef.current = contactMesh;
+
+    // Kill any existing camera animations
+    gsap.killTweensOf(camera.position);
+
+    // Update view state
+    setViewState(VIEW_STATE.CONTACT_FOCUS);
+    setFocusedContact(contact);
+    setSelectedContact(contact);
+
+    console.log('[UniverseHomeView] Zooming to contact:', contact.name);
+
+    // Animate camera to contact (Apple Astronomy style)
+    gsap.to(camera.position, {
+      x: targetPosition.x,
+      y: targetPosition.y,
+      z: targetPosition.z,
+      duration: CAMERA_ANIMATION_DURATION,
+      ease: CAMERA_ANIMATION_EASE,
+      onUpdate: () => {
+        // Keep camera looking at contact during animation
+        if (focusedContactMeshRef.current) {
+          camera.lookAt(focusedContactMeshRef.current.position);
+        }
+      },
+      onComplete: () => {
+        console.log('[UniverseHomeView] Zoom to contact complete');
+      },
+    });
+  }, []);
+
+  /**
+   * Zoom camera back to system view (full solar system)
+   * Uses GSAP for smooth power3.inOut animation over 1.5s
+   */
+  const zoomToSystemView = useCallback(() => {
+    if (!cameraRef.current) return;
+
+    const camera = cameraRef.current;
+    const targetPosition = SYSTEM_VIEW_POSITION;
+    const lookAtTarget = new THREE.Vector3(0, 0, 0);
+
+    // Kill any existing camera animations
+    gsap.killTweensOf(camera.position);
+
+    // Update view state
+    setViewState(VIEW_STATE.SYSTEM_VIEW);
+    setFocusedContact(null);
+    setSelectedContact(null);
+    focusedContactMeshRef.current = null;
+
+    console.log('[UniverseHomeView] Zooming to system view');
+
+    // Animate camera back to overview (Apple Astronomy style)
+    gsap.to(camera.position, {
+      x: targetPosition.x,
+      y: targetPosition.y,
+      z: targetPosition.z,
+      duration: CAMERA_ANIMATION_DURATION,
+      ease: CAMERA_ANIMATION_EASE,
+      onUpdate: () => {
+        // Gradually shift lookAt back to origin
+        camera.lookAt(lookAtTarget);
+      },
+      onComplete: () => {
+        console.log('[UniverseHomeView] Zoom to system view complete');
+      },
+    });
+  }, []);
 
   /**
    * Trigger a supernova celebration effect!
@@ -757,6 +880,13 @@ export default function UniverseHomeView({
 
   const onContextCreate = async (gl) => {
     console.log('[UniverseHomeView] GL Context created');
+
+    // Cancel any existing animation loop before starting new one (handles device rotation)
+    if (stateRef.current.raf) {
+      cancelAnimationFrame(stateRef.current.raf);
+      stateRef.current.raf = null;
+    }
+
     glRef.current = gl;
 
     const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
@@ -798,14 +928,18 @@ export default function UniverseHomeView({
     // 3. Floating particles (mid-ground atmosphere)
     particlesRef.current = createFloatingParticles(scene, isHighQuality);
 
-    // === LIGHTING ===
-    scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+    // === LIGHTING (Apple Astronomy aesthetic) ===
+    // Near-zero ambient light for dramatic shadows
+    scene.add(new THREE.AmbientLight(0xffffff, 0.08));
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 0.9);
-    keyLight.position.set(5, 10, 5);
-    scene.add(keyLight);
+    // Point light at center (inside nucleus) - creates strong terminator line on contacts
+    // This is the key to the Apple Astronomy look: contacts lit only on sun-facing side
+    const centerLight = new THREE.PointLight(0xffffff, 2.5, 60);
+    centerLight.position.set(0, 0, 0);
+    scene.add(centerLight);
 
-    const rimLight = new THREE.DirectionalLight(primaryColor, 0.4);
+    // Subtle rim light for depth (much dimmer than before)
+    const rimLight = new THREE.DirectionalLight(primaryColor, 0.15);
     rimLight.position.set(-5, -5, -5);
     scene.add(rimLight);
 

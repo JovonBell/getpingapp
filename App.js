@@ -213,6 +213,30 @@ export default function App() {
       try {
         const { data } = await supabase.auth.getSession();
         if (!mounted) return;
+
+        // Validate session by calling getUser() - this will detect invalid refresh tokens
+        if (data?.session) {
+          try {
+            const { data: userData, error: userError } = await supabase.auth.getUser();
+            if (userError) {
+              const errorMsg = userError.message || '';
+              // Check for refresh token errors
+              if (errorMsg.includes('Refresh Token') || errorMsg.includes('refresh_token') ||
+                  errorMsg.includes('Invalid token') || errorMsg.includes('JWT')) {
+                console.error('[APP] Invalid session detected on startup - signing out');
+                await supabase.auth.signOut();
+                if (mounted) {
+                  setSession(null);
+                  setHasCompletedOnboarding(false);
+                }
+                return;
+              }
+            }
+          } catch (validateErr) {
+            console.warn('[APP] Session validation error:', validateErr?.message);
+          }
+        }
+
         setSession(data?.session ?? null);
 
         // Check if user has completed onboarding by checking if they have a profile
@@ -222,7 +246,7 @@ export default function App() {
             .select('id')
             .eq('user_id', data.session.user.id)
             .single();
-          
+
           if (mounted) setHasCompletedOnboarding(!!profile);
         }
       } finally {

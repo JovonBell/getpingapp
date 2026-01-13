@@ -222,13 +222,17 @@ export async function getUpcomingReminders(userId, daysAhead = 7) {
       if (data && data.length > 0) {
         console.log('[REMINDERS] Manually fetching contact data for', data.length, 'reminders');
         const contactIds = data.map(r => r.imported_contact_id).filter(Boolean);
-        
+
         if (contactIds.length > 0) {
-          const { data: contacts } = await supabase
+          const { data: contacts, error: contactErr } = await supabase
             .from('imported_contacts')
             .select('id, name, phone, email')
             .in('id', contactIds);
-          
+
+          if (contactErr) {
+            console.warn('[REMINDERS] Failed to fetch upcoming contact details:', contactErr.message);
+          }
+
           // Map contacts back to reminders
           if (contacts) {
             data = data.map(reminder => {
@@ -319,11 +323,15 @@ export async function getOverdueReminders(userId) {
         const contactIds = data.map(r => r.imported_contact_id).filter(Boolean);
         
         if (contactIds.length > 0) {
-          const { data: contacts } = await supabase
+          const { data: contacts, error: contactErr } = await supabase
             .from('imported_contacts')
             .select('id, name, phone, email')
             .in('id', contactIds);
-          
+
+          if (contactErr) {
+            console.warn('[REMINDERS] Failed to fetch overdue contact details:', contactErr.message);
+          }
+
           // Map contacts back to reminders
           if (contacts) {
             data = data.map(reminder => {

@@ -129,8 +129,15 @@ export default function VisualizeCircleScreen({ navigation, route }) {
         if (userSuccess && user) {
           const tier = (existingCircles?.length || 0) + 1;
           console.log('[VisualizeCircle] Saving to Supabase with tier:', tier);
-          
-          const result = await createCircleWithMembers(user.id, { name: finalName, tier, contacts: selectedContacts });
+
+          // Add timeout to prevent hanging indefinitely
+          const createTimeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Circle creation timed out. Please check your connection and try again.')), 20000)
+          );
+          const result = await Promise.race([
+            createCircleWithMembers(user.id, { name: finalName, tier, contacts: selectedContacts }),
+            createTimeout
+          ]);
           console.log('[VisualizeCircle] Supabase save result:', result);
           
           if (result.success) {

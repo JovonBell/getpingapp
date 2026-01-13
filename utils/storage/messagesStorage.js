@@ -87,13 +87,17 @@ export async function fetchRecentThreads(userId, limit = 50) {
 
     // Hydrate names/avatars from profiles
     const otherIds = threads.map((t) => t.otherUserId).filter(Boolean);
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profileErr } = await supabase
       .from('profiles')
       .select('user_id,display_name,avatar_url')
       .in('user_id', otherIds);
 
+    if (profileErr) {
+      console.warn('[MESSAGES] Failed to fetch profile data:', profileErr.message);
+    }
+
     const byId = (profiles || []).reduce((acc, p) => {
-      acc[p.user_id] = p;
+      if (p?.user_id) acc[p.user_id] = p;
       return acc;
     }, {});
 

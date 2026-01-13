@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -96,6 +96,7 @@ export default function AlertsScreen({ navigation }) {
   const [upcomingReminders, setUpcomingReminders] = useState([]);
   const [overdueReminders, setOverdueReminders] = useState([]);
   const [upcomingDates, setUpcomingDates] = useState([]);
+  const isMountedRef = useRef(true);
 
   // Load alerts
   const loadAlerts = useCallback(async (showRefresh = false) => {
@@ -104,6 +105,8 @@ export default function AlertsScreen({ navigation }) {
       else setLoading(true);
 
       const { success: userSuccess, user } = await getCurrentUser();
+      if (!isMountedRef.current) return;
+
       if (!userSuccess || !user) {
         setAlerts([]);
         return;
@@ -111,14 +114,26 @@ export default function AlertsScreen({ navigation }) {
 
       setUserId(user.id);
 
-      // Load alerts, messages, and reminders in parallel
-      const [alertsRes, messagesRes, upcomingRes, overdueRes, datesRes] = await Promise.all([
-        getAlerts(user.id),
-        getUnreadMessageCount(user.id),
-        getUpcomingReminders(user.id, 7), // Next 7 days
-        getOverdueReminders(user.id),
-        getUpcomingDates(user.id, 14), // Next 14 days
+      // Load alerts, messages, and reminders in parallel with timeout protection
+      const loadTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Loading alerts timed out')), 15000)
+      );
+      const [alertsRes, messagesRes, upcomingRes, overdueRes, datesRes] = await Promise.race([
+        Promise.all([
+          getAlerts(user.id),
+          getUnreadMessageCount(user.id),
+          getUpcomingReminders(user.id, 7), // Next 7 days
+          getOverdueReminders(user.id),
+          getUpcomingDates(user.id, 14), // Next 14 days
+        ]),
+        loadTimeout.then(() => {
+          // Return empty results on timeout so screen shows something
+          throw new Error('Load timeout');
+        }),
       ]);
+
+      // Check mounted before setting state
+      if (!isMountedRef.current) return;
 
       if (alertsRes.success) {
         setAlerts(alertsRes.alerts);
@@ -142,9 +157,19 @@ export default function AlertsScreen({ navigation }) {
     } catch (error) {
       console.error('[AlertsScreen] Error loading alerts:', error);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
+  }, []);
+
+  // Track mounted state
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   // Initial load and focus listener
@@ -601,7 +626,7 @@ export default function AlertsScreen({ navigation }) {
         ) : (
           <FlatList
             data={alerts}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => item?.id || `alert-${index}`}
             renderItem={renderAlert}
             ListHeaderComponent={renderRemindersSection}
             ListEmptyComponent={!hasReminders ? renderEmpty : null}

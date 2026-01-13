@@ -14,6 +14,15 @@ import Confetti, { ConfettiBurst, Sparkles } from '../common/Confetti';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// Streak milestone thresholds
+const STREAK_MILESTONES = {
+  LEGENDARY: 100,
+  INCREDIBLE: 50,
+  AMAZING: 30,
+  FANTASTIC: 14,
+  GREAT: 7,
+};
+
 /**
  * Achievement unlocked celebration modal
  */
@@ -152,15 +161,15 @@ export function StreakCelebration({ visible, streakCount, onDismiss }) {
   }, [visible, streakCount]);
 
   const getMilestoneContent = () => {
-    if (streakCount >= 100) {
+    if (streakCount >= STREAK_MILESTONES.LEGENDARY) {
       return { title: 'LEGENDARY!', subtitle: '100 Day Streak', color: '#FFD700' };
-    } else if (streakCount >= 50) {
+    } else if (streakCount >= STREAK_MILESTONES.INCREDIBLE) {
       return { title: 'INCREDIBLE!', subtitle: '50 Day Streak', color: '#A855F7' };
-    } else if (streakCount >= 30) {
+    } else if (streakCount >= STREAK_MILESTONES.AMAZING) {
       return { title: 'AMAZING!', subtitle: '30 Day Streak', color: '#FF6B6B' };
-    } else if (streakCount >= 14) {
+    } else if (streakCount >= STREAK_MILESTONES.FANTASTIC) {
       return { title: 'FANTASTIC!', subtitle: '2 Week Streak', color: '#FF8C42' };
-    } else if (streakCount >= 7) {
+    } else if (streakCount >= STREAK_MILESTONES.GREAT) {
       return { title: 'GREAT JOB!', subtitle: '1 Week Streak', color: '#4FFFB0' };
     }
     return { title: 'NICE!', subtitle: 'Streak Milestone', color: '#4FFFB0' };

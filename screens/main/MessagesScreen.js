@@ -26,17 +26,23 @@ export default function MessagesScreen({ navigation, route }) {
 
   const loadThreads = async () => {
     setLoading(true);
-    const { success, user } = await getCurrentUser();
-    const uid = success ? user?.id : null;
-    setCurrentUserId(uid);
-    if (!uid) {
+    try {
+      const { success, user } = await getCurrentUser();
+      const uid = success ? user?.id : null;
+      setCurrentUserId(uid);
+      if (!uid) {
+        setThreads([]);
+        return;
+      }
+      const res = await fetchRecentThreads(uid);
+      setThreads(res.threads || []);
+    } catch (error) {
+      console.error('[MESSAGES] Error loading threads:', error?.message || error);
       setThreads([]);
+    } finally {
+      // ALWAYS reset loading state to prevent stuck loading screen
       setLoading(false);
-      return;
     }
-    const res = await fetchRecentThreads(uid);
-    setThreads(res.threads || []);
-    setLoading(false);
   };
 
   React.useEffect(() => {

@@ -455,9 +455,10 @@ export async function getHealthStats(userId) {
       return { success: false, stats: {}, error: 'Missing userId' };
     }
 
+    // Single query for both status counts and average (optimized from double-fetch)
     const { data, error } = await supabase
       .from('relationship_health')
-      .select('status')
+      .select('status, health_score')
       .eq('user_id', userId);
 
     if (error) throw error;
@@ -469,8 +470,10 @@ export async function getHealthStats(userId) {
       at_risk: 0,
       cold: 0,
       needsAttention: 0,
+      averageHealth: 0,
     };
 
+    let healthSum = 0;
     for (const row of data || []) {
       if (stats[row.status] !== undefined) {
         stats[row.status]++;
@@ -478,19 +481,12 @@ export async function getHealthStats(userId) {
       if (row.status !== 'healthy') {
         stats.needsAttention++;
       }
+      healthSum += row.health_score || 0;
     }
 
-    // Calculate average health
+    // Calculate average health from same query data
     if (stats.total > 0) {
-      const avgQuery = await supabase
-        .from('relationship_health')
-        .select('health_score')
-        .eq('user_id', userId);
-
-      if (avgQuery.data && avgQuery.data.length > 0) {
-        const sum = avgQuery.data.reduce((acc, row) => acc + row.health_score, 0);
-        stats.averageHealth = Math.round(sum / avgQuery.data.length);
-      }
+      stats.averageHealth = Math.round(healthSum / stats.total);
     }
 
     return { success: true, stats };

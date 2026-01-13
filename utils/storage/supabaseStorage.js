@@ -5,6 +5,8 @@ import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { normalizeEmail, normalizePhone, sha256 } from '../contactsImport';
 import { upsertUserIdentities } from './identitiesStorage';
+import { clearProfile } from './profileStorage';
+import { clearImportedContacts } from './contactsStorage';
 
 // Tell the browser to dismiss when auth is complete
 // Wrapped in try-catch for Expo Go compatibility
@@ -327,6 +329,13 @@ export const signInWithGoogle = async () => {
 // Sign out
 export const signOut = async () => {
   try {
+    // Clear cached data BEFORE signing out (security: prevent next user seeing old data)
+    await Promise.all([
+      clearProfile(),
+      clearImportedContacts(),
+    ]);
+    console.log('[Auth] Cleared cached profile and contacts');
+
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     return { success: true };
@@ -352,7 +361,22 @@ export const getCurrentSession = async () => {
 export const getCurrentUser = async () => {
   try {
     const { data: { user }, error } = await supabase.auth.getUser();
-    if (error) throw error;
+    if (error) {
+      // Check for refresh token errors - force logout to clear corrupted session
+      const errorMsg = error.message || '';
+      if (errorMsg.includes('Refresh Token') || errorMsg.includes('refresh_token') ||
+          errorMsg.includes('Invalid token') || errorMsg.includes('JWT expired')) {
+        console.error('[AUTH] Invalid/expired refresh token detected - forcing logout');
+        try {
+          await supabase.auth.signOut();
+          // Clear local storage too
+          await Promise.all([clearProfile(), clearImportedContacts()]).catch(() => {});
+        } catch (signOutErr) {
+          console.warn('[AUTH] Error during forced logout:', signOutErr?.message);
+        }
+      }
+      throw error;
+    }
     return { success: true, user };
   } catch (error) {
     console.error('Error getting user:', error);

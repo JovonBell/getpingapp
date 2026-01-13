@@ -52,13 +52,13 @@ export default function ProfileScreen({ navigation, route }) {
       }
 
       // Fallback to local storage if Supabase fails or user not authenticated
-      const savedProfile = await getProfile();
-      setProfile(savedProfile || DEFAULT_PROFILE);
+      const localResult = await getProfile();
+      setProfile(localResult.profile || DEFAULT_PROFILE);
     } catch (error) {
       console.error('Error loading profile:', error);
       // Fallback to local storage
-      const savedProfile = await getProfile();
-      setProfile(savedProfile || DEFAULT_PROFILE);
+      const localResult = await getProfile();
+      setProfile(localResult.profile || DEFAULT_PROFILE);
     }
 
     setLoading(false);

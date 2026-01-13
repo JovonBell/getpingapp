@@ -166,6 +166,18 @@ export function createContactGlow(radius, color) {
 }
 
 /**
+ * Remove a specific texture from cache (call when contact is deleted)
+ * @param {string} uri - The texture URI to remove
+ */
+export function removeFromCache(uri) {
+  if (textureCache.has(uri)) {
+    const texture = textureCache.get(uri);
+    texture.dispose();
+    textureCache.delete(uri);
+  }
+}
+
+/**
  * Clear the texture cache (call on unmount)
  */
 export function clearTextureCache() {
@@ -189,6 +201,7 @@ export default {
   loadContactTexture,
   createContactMaterial,
   createContactGlow,
+  removeFromCache,
   clearTextureCache,
   getCacheStats,
 };

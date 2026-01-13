@@ -110,12 +110,20 @@ export default function EditContactModal({
 
     setSaving(true);
     try {
-      const result = await updateContactDetails(contact.importedContactId, {
-        notes,
-        tags,
-        howWeMet,
-        interests,
-      });
+      // Add timeout to prevent hanging
+      const saveTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Save timeout')), 15000)
+      );
+
+      const result = await Promise.race([
+        updateContactDetails(contact.importedContactId, {
+          notes,
+          tags,
+          howWeMet,
+          interests,
+        }),
+        saveTimeout,
+      ]);
 
       if (result.success) {
         onSave?.({
@@ -131,7 +139,12 @@ export default function EditContactModal({
       }
     } catch (err) {
       console.error('[EditContactModal] Error saving:', err);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      Alert.alert(
+        'Error',
+        err.message === 'Save timeout'
+          ? 'Operation timed out. Please try again.'
+          : 'An unexpected error occurred. Please try again.'
+      );
     } finally {
       setSaving(false);
     }

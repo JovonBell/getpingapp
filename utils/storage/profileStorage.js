@@ -15,22 +15,26 @@ export const saveProfile = async (profileData) => {
 };
 
 // Get profile from local storage
+// Returns { success: true, profile } or { success: false, error }
 export const getProfile = async () => {
   try {
     const jsonValue = await AsyncStorage.getItem(PROFILE_KEY);
-    return jsonValue != null ? JSON.parse(jsonValue) : null;
+    return { success: true, profile: jsonValue != null ? JSON.parse(jsonValue) : null };
   } catch (error) {
     console.error('Error loading profile:', error);
-    return null;
+    return { success: false, error: error?.message || String(error), profile: null };
   }
 };
 
 // Update specific fields in profile
 export const updateProfile = async (updates) => {
   try {
-    const currentProfile = await getProfile();
+    const result = await getProfile();
+    if (!result.success) {
+      return { success: false, error: result.error || 'Failed to load current profile' };
+    }
     const updatedProfile = {
-      ...currentProfile,
+      ...(result.profile || {}),
       ...updates,
       updatedAt: new Date().toISOString(),
     };

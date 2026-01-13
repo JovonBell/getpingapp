@@ -189,6 +189,13 @@ export default function SolarSystemView({
 
   const onContextCreate = async (gl) => {
     console.log('[SolarSystemView] GL Context created');
+
+    // Cancel any existing animation loop before starting new one (handles device rotation)
+    if (stateRef.current.raf) {
+      cancelAnimationFrame(stateRef.current.raf);
+      stateRef.current.raf = null;
+    }
+
     glRef.current = gl;
     
     const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;

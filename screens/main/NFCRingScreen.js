@@ -60,6 +60,8 @@ export default function NFCRingScreen({ navigation }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const pulseLoopRef = useRef(null);
+  const rotateLoopRef = useRef(null);
 
   // Check NFC availability on mount
   useEffect(() => {
@@ -77,11 +79,32 @@ export default function NFCRingScreen({ navigation }) {
       startPulseAnimation();
       startRotateAnimation();
     } else {
+      // Stop and clean up animation loops
+      if (pulseLoopRef.current) {
+        pulseLoopRef.current.stop();
+        pulseLoopRef.current = null;
+      }
+      if (rotateLoopRef.current) {
+        rotateLoopRef.current.stop();
+        rotateLoopRef.current = null;
+      }
       pulseAnim.stopAnimation();
       rotateAnim.stopAnimation();
       pulseAnim.setValue(1);
       rotateAnim.setValue(0);
     }
+
+    // Cleanup on unmount
+    return () => {
+      if (pulseLoopRef.current) {
+        pulseLoopRef.current.stop();
+        pulseLoopRef.current = null;
+      }
+      if (rotateLoopRef.current) {
+        rotateLoopRef.current.stop();
+        rotateLoopRef.current = null;
+      }
+    };
   }, [status]);
 
   // Fade in animation on mount
@@ -94,7 +117,7 @@ export default function NFCRingScreen({ navigation }) {
   }, []);
 
   const startPulseAnimation = () => {
-    Animated.loop(
+    pulseLoopRef.current = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.2,
@@ -109,18 +132,20 @@ export default function NFCRingScreen({ navigation }) {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    pulseLoopRef.current.start();
   };
 
   const startRotateAnimation = () => {
-    Animated.loop(
+    rotateLoopRef.current = Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
         duration: 3000,
         easing: Easing.linear,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    rotateLoopRef.current.start();
   };
 
   const checkNfc = async () => {

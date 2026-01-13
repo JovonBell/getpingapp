@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -17,12 +17,14 @@ import { saveImportedContacts, getImportedContacts } from '../../utils/storage/c
 import { buildIdentifierHashes, expoContactsToAppContacts, hashContactsForMatching } from '../../utils/contactsImport';
 import { findIdentityMapByHashes, findUsersByHashes } from '../../utils/storage/identitiesStorage';
 import { upsertConnections } from '../../utils/storage/connectionsStorage';
+import { addContactsToCircle } from '../../utils/storage/circlesStorage';
 
 export default function SelectContactsScreen({ navigation, route }) {
   const selectAll = route?.params?.selectAll || false;
   const mode = route?.params?.mode || '';
   const isInitialImport = mode === 'initialImport' || route?.params?.isInitialImport || false;
   const isAddContacts = mode === 'addContacts';
+  const circleId = route?.params?.circleId || null; // Circle to add contacts to (when isAddContacts)
   const isFirstCircle = route?.params?.isFirstCircle ?? true;
   const existingCircles = route?.params?.existingCircles || [];
   const [contacts, setContacts] = useState([]);
@@ -31,6 +33,15 @@ export default function SelectContactsScreen({ navigation, route }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [loadError, setLoadError] = useState(null);
+  const isMountedRef = useRef(true);
+
+  // Track mounted state for async operations
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const loadContacts = async (mounted) => {
     setLoadingContacts(true);
@@ -87,7 +98,7 @@ export default function SelectContactsScreen({ navigation, route }) {
     return () => {
       mounted.current = false;
     };
-  }, [isInitialImport, navigation]);
+  }, [isInitialImport, isAddContacts, navigation]);
 
   useEffect(() => {
     // Initialize selection once contacts are loaded
@@ -369,7 +380,31 @@ export default function SelectContactsScreen({ navigation, route }) {
                   await Promise.race([saveImportedContacts(merged), saveTimeout]);
 
                   if (isAddContacts) {
-                    // Adding contacts - go back to contacts list
+                    // If circleId provided, also add contacts to that circle
+                    if (circleId && newContacts.length > 0) {
+                      try {
+                        // Add 15-second timeout to prevent hanging on auth/network issues
+                        const addTimeout = new Promise((_, reject) =>
+                          setTimeout(() => reject(new Error('Adding to circle timed out')), 15000)
+                        );
+                        const { success: userOk, user } = await getCurrentUser();
+                        if (userOk && user) {
+                          const addResult = await Promise.race([
+                            addContactsToCircle(user.id, circleId, newContacts),
+                            addTimeout
+                          ]);
+                          if (!addResult.success) {
+                            console.warn('[SELECT CONTACTS] Failed to add to circle:', addResult.error);
+                          }
+                        } else {
+                          console.warn('[SELECT CONTACTS] User not authenticated, skipping circle add');
+                        }
+                      } catch (circleErr) {
+                        console.warn('[SELECT CONTACTS] Error adding to circle:', circleErr?.message);
+                        // Don't block - contacts were still saved locally
+                      }
+                    }
+                    // Adding contacts - go back to contacts list (ALWAYS runs even if circle add fails)
                     Alert.alert('Success', `Added ${newContacts.length} new contacts!`);
                     navigation.goBack();
                   } else {
@@ -382,10 +417,14 @@ export default function SelectContactsScreen({ navigation, route }) {
                 }
               } catch (err) {
                 console.error('Error in import flow:', err);
-                Alert.alert('Error', 'Failed to process contacts. Please try again.');
+                if (isMountedRef.current) {
+                  Alert.alert('Error', 'Failed to process contacts. Please try again.');
+                }
               } finally {
-                // ALWAYS reset loading state
-                setIsImporting(false);
+                // ALWAYS reset loading state (only if still mounted)
+                if (isMountedRef.current) {
+                  setIsImporting(false);
+                }
               }
             }}
           >

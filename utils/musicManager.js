@@ -209,12 +209,13 @@ class MusicManager {
   }
 
   // Settings
-  setEnabled(enabled) {
+  async setEnabled(enabled) {
     this.enabled = enabled;
-    this.saveSettings();
+    await this.saveSettings();
 
     if (!enabled && this.currentSound) {
-      this.fadeOut(500).then(() => this.stop());
+      await this.fadeOut(500);
+      await this.stop();
     }
   }
 
@@ -224,7 +225,7 @@ class MusicManager {
 
   async setVolume(volume) {
     this.volume = Math.max(0, Math.min(1, volume));
-    this.saveSettings();
+    await this.saveSettings();
 
     if (this.currentSound) {
       try {

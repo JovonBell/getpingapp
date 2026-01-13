@@ -37,7 +37,11 @@ export default function ChatScreen({ navigation, route }) {
 
   useEffect(() => {
     if (!receiverId) {
-      Alert.alert('Not on ping yet', 'This contact is not on ping yet, so you can’t message them yet.');
+      Alert.alert(
+        'Not on ping yet',
+        'This contact is not on ping yet, so you can\'t message them yet.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
       return;
     }
     load();
@@ -51,24 +55,32 @@ export default function ChatScreen({ navigation, route }) {
       if (!text) return;
       if (!currentUserId || !receiverId) return;
 
-      setMessage('');
-      const res = await sendMessage(currentUserId, receiverId, text);
-      if (!res.success) {
-        Alert.alert('Send failed', res.error || 'Please try again.');
-        return;
-      }
-      await load();
-
-      // Push notify recipient (best-effort)
       try {
-        const tokensRes = await fetchRecipientPushTokens(receiverId);
-        await sendExpoPush(tokensRes.tokens, {
-          title: 'ping!',
-          body: `${contact?.name || 'Someone'}: ${text}`,
-          data: { type: 'message', senderId: currentUserId },
-        });
-      } catch (e) {
-        // ignore
+        const res = await sendMessage(currentUserId, receiverId, text);
+        if (!res.success) {
+          Alert.alert('Send failed', res.error || 'Please try again.');
+          return; // Keep message in input so user can retry
+        }
+
+        // Only clear message AFTER successful send
+        setMessage('');
+        await load();
+
+        // Push notify recipient (best-effort)
+        try {
+          const tokensRes = await fetchRecipientPushTokens(receiverId);
+          await sendExpoPush(tokensRes.tokens, {
+            title: 'ping!',
+            body: `${contact?.name || 'Someone'}: ${text}`,
+            data: { type: 'message', senderId: currentUserId },
+          });
+        } catch (e) {
+          // ignore push notification errors
+        }
+      } catch (error) {
+        console.error('[ChatScreen] Send error:', error);
+        Alert.alert('Error', 'Failed to send message. Please check your connection.');
+        // Keep message in input so user can retry
       }
     })();
   };

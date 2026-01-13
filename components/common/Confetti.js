@@ -3,6 +3,17 @@ import { View, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// Animation timing constants
+const ANIMATION_TIMING = {
+  CONFETTI_MIN_DURATION: 3000,
+  CONFETTI_MAX_EXTRA_DURATION: 2000,
+  CONFETTI_DELAY_MAX: 500,
+  CONFETTI_COMPLETION_TIMEOUT: 5000,
+  BURST_PARTICLE_DURATION: 2000,
+  SPARKLE_DURATION: 300,
+  SPARKLE_CYCLE: 400,
+};
+
 const CONFETTI_COLORS = [
   '#4FFFB0', // Brand green
   '#FFD93D', // Gold
@@ -26,7 +37,7 @@ function ConfettiPiece({ delay, color, startX }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const duration = 3000 + Math.random() * 2000;
+    const duration = ANIMATION_TIMING.CONFETTI_MIN_DURATION + Math.random() * ANIMATION_TIMING.CONFETTI_MAX_EXTRA_DURATION;
     const horizontalMovement = (Math.random() - 0.5) * 200;
 
     Animated.sequence([

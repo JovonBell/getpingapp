@@ -55,6 +55,7 @@ export default function HomeScreen({ navigation, route }) {
   const [circlesLoading, setCirclesLoading] = useState(true);
   const [justDeleted, setJustDeleted] = useState(false); // Prevent reload after delete
   const loadingRef = useRef(false); // Prevent concurrent loadCircles calls
+  const deleteTimeoutRef = useRef(null); // Track delete timeout for cleanup
   const hasCircle = circles.length > 0;
   // Helper to get first name from full name
   const getFirstName = (fullName) => fullName.split(' ')[0];
@@ -178,6 +179,19 @@ export default function HomeScreen({ navigation, route }) {
     };
   }, [route?.params?.importedContacts]);
 
+  // Cleanup: Reset justDeleted and clear timeout on unmount
+  // This prevents the flag from staying true forever if user navigates away mid-delete
+  useEffect(() => {
+    return () => {
+      if (deleteTimeoutRef.current) {
+        clearTimeout(deleteTimeoutRef.current);
+        deleteTimeoutRef.current = null;
+      }
+      // Reset justDeleted on unmount so next mount starts fresh
+      setJustDeleted(false);
+    };
+  }, []);
+
   // Load circles function - moved outside useEffect so it can be called from anywhere
   // Auth state is now handled by onAuthStateChange listener, no retries needed
   const loadCircles = useCallback(async (force = false, passedUser = null) => {
@@ -218,10 +232,26 @@ export default function HomeScreen({ navigation, route }) {
       setUserId(user.id);
 
       // Load circles AND health scores in parallel for faster initial render
-      const [circlesRes, healthRes] = await Promise.all([
-        loadCirclesWithMembers(user.id),
-        getHealthScores(user.id),
+      // Using Promise.allSettled to handle partial failures gracefully
+      // Add timeout to prevent stuck loading screen if Supabase is unresponsive
+      const loadTimeout = new Promise((resolve) =>
+        setTimeout(() => resolve({ status: 'rejected', reason: new Error('Load timeout') }), 20000)
+      );
+      const [circlesResult, healthResult] = await Promise.race([
+        Promise.allSettled([
+          loadCirclesWithMembers(user.id),
+          getHealthScores(user.id),
+        ]),
+        // Timeout returns fake allSettled result
+        loadTimeout.then(() => [
+          { status: 'rejected', reason: new Error('Circles load timed out') },
+          { status: 'rejected', reason: new Error('Health scores load timed out') },
+        ]),
       ]);
+
+      // Extract results, handling potential failures
+      const circlesRes = circlesResult.status === 'fulfilled' ? circlesResult.value : { success: false, circles: [], error: circlesResult.reason?.message };
+      const healthRes = healthResult.status === 'fulfilled' ? healthResult.value : { healthScores: [] };
 
       console.log('[HomeScreen] Circles loaded:', { success: circlesRes.success, count: circlesRes.circles?.length, error: circlesRes.error });
       console.log('[HomeScreen] Health scores loaded:', { count: healthRes.healthScores?.length || 0 });
@@ -959,8 +989,13 @@ export default function HomeScreen({ navigation, route }) {
         console.error('[HOME] Supabase delete error:', e);
       } finally {
         // Allow reloads after Supabase operation completes (success or fail)
-        // Longer delay to ensure any pending focus events don't reload deleted data
-        setTimeout(() => setJustDeleted(false), 1500);
+        // Extended delay (5s) to ensure any pending focus events don't reload deleted data
+        // and to account for network latency in Supabase replication
+        // Store timeout ID so we can cancel it on unmount
+        deleteTimeoutRef.current = setTimeout(() => {
+          setJustDeleted(false);
+          deleteTimeoutRef.current = null;
+        }, 5000);
       }
     })();
   };
@@ -1240,7 +1275,8 @@ export default function HomeScreen({ navigation, route }) {
             onProfile={() => navigation.navigate('Profile')}
             onImportContacts={() => {
               const parent = navigation.getParent();
-              const params = { isAddingToCircle: true, circleId: circles?.[0]?.id };
+              // Use mode: 'addContacts' to match SelectContactsScreen's expected param
+              const params = { mode: 'addContacts', circleId: circles?.[0]?.id };
               if (parent) {
                 parent.navigate('SelectContacts', params);
               } else {

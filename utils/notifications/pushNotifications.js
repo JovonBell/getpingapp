@@ -66,7 +66,7 @@ export async function registerForPushNotificationsAsync(userId) {
     const expoPushToken = tokenRes?.data;
     if (!expoPushToken) return { success: false, error: 'Failed to get Expo push token.' };
 
-    await supabase.from('device_tokens').upsert(
+    const { error: upsertError } = await supabase.from('device_tokens').upsert(
       {
         user_id: userId,
         expo_push_token: expoPushToken,
@@ -75,6 +75,11 @@ export async function registerForPushNotificationsAsync(userId) {
       },
       { onConflict: 'user_id,expo_push_token' }
     );
+
+    if (upsertError) {
+      console.warn('Failed to store device token:', upsertError?.message);
+      // Continue anyway - token registration still succeeded
+    }
 
     return { success: true, expoPushToken };
   } catch (error) {

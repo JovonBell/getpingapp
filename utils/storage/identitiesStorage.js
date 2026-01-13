@@ -15,9 +15,17 @@ export async function upsertUserIdentities(userId, { emailHashes = [], phoneHash
 
     const { error } = await supabase
       .from('user_identities')
-      .upsert(rows, { onConflict: 'type,hash' });
+      .upsert(rows, { onConflict: 'user_id,type,hash', ignoreDuplicates: true });
 
-    if (error) throw error;
+    if (error) {
+      // Handle case where another user already claimed this hash (RLS will block update)
+      // This is expected behavior - hash is already in the system for matching
+      if (error.code === '42501' || error.message?.includes('RLS')) {
+        console.log('[identitiesStorage] Hash already exists for another user (expected)');
+        return { success: true, count: 0, note: 'Hash already claimed' };
+      }
+      throw error;
+    }
     return { success: true, count: rows.length };
   } catch (error) {
     console.warn('upsertUserIdentities failed:', error?.message || error);

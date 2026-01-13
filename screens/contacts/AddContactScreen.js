@@ -9,6 +9,7 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +27,7 @@ export default function AddContactScreen({ navigation, route }) {
       alert('Please enter at least a name and phone number');
       return;
     }
+    Keyboard.dismiss();
     setShowTierPicker(true);
   };
 

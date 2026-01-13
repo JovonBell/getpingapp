@@ -138,18 +138,18 @@ class SoundManager {
   }
 
   // Settings
-  setEnabled(enabled) {
+  async setEnabled(enabled) {
     soundEnabled = enabled;
-    this.saveSettings();
+    await this.saveSettings();
   }
 
   isEnabled() {
     return soundEnabled;
   }
 
-  setVolume(volume) {
+  async setVolume(volume) {
     soundVolume = Math.max(0, Math.min(1, volume));
-    this.saveSettings();
+    await this.saveSettings();
   }
 
   getVolume() {

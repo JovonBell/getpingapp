@@ -258,7 +258,7 @@ async function hasAlreadyAlerted(userId, contactId, threshold) {
  */
 async function recordAlertSent(userId, contactId, threshold) {
   try {
-    await supabase
+    const { error } = await supabase
       .from('alert_history')
       .upsert({
         user_id: userId,
@@ -266,8 +266,15 @@ async function recordAlertSent(userId, contactId, threshold) {
         threshold: threshold,
         alerted_at: new Date().toISOString(),
       }, { onConflict: 'user_id,imported_contact_id,threshold' });
+
+    if (error) {
+      console.error('[ALERTS] Error recording alert history:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
   } catch (error) {
     console.error('[ALERTS] Error recording alert history:', error);
+    return { success: false, error: error?.message || String(error) };
   }
 }
 
