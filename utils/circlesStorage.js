@@ -36,7 +36,7 @@ async function upsertImportedContacts(userId, contacts) {
   return { success: true, rows: data || [] };
 }
 
-export async function createCircleWithMembers(userId, { name, tier, contacts }) {
+export async function createCircleWithMembers(userId, { name, tier, contacts, source }) {
   try {
     console.log('[CREATE CIRCLE] Starting:', { userId, name, tier, contactCount: contacts?.length });
     
@@ -68,8 +68,8 @@ export async function createCircleWithMembers(userId, { name, tier, contacts }) 
     // Create circle with next available tier
     const { data: circle, error: circleErr } = await supabase
       .from('circles')
-      .insert({ user_id: userId, name, tier: nextTier })
-      .select('id,name,tier')
+      .insert({ user_id: userId, name, tier: nextTier, source: source || 'phone' })
+      .select('id,name,tier,source')
       .single();
 
     if (circleErr) {
@@ -122,7 +122,7 @@ export async function loadCirclesWithMembers(userId) {
 
     const { data: circles, error: cErr } = await supabase
       .from('circles')
-      .select('id,name,tier,created_at')
+      .select('id,name,tier,source,created_at')
       .eq('user_id', userId)
       .order('tier', { ascending: true });
 
@@ -180,6 +180,7 @@ export async function loadCirclesWithMembers(userId) {
       id: c.id,
       name: c.name,
       tier: c.tier,
+      source: c.source || 'phone',
       contacts: membersByCircle[c.id] || [],
     }));
 

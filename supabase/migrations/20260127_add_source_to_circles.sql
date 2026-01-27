@@ -1,0 +1,1 @@
+ALTER TABLE circles ADD COLUMN source TEXT NOT NULL DEFAULT 'phone';

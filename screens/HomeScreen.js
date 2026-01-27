@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -38,7 +38,14 @@ export default function HomeScreen({ navigation, route }) {
   const [circles, setCircles] = useState([]);
   const [circlesLoading, setCirclesLoading] = useState(true);
   const [justDeleted, setJustDeleted] = useState(false); // Prevent reload after delete
-  const hasCircle = circles.length > 0;
+  const [activeTab, setActiveTab] = useState('phone'); // 'phone' | 'linkedin' | 'all'
+
+  const filteredCircles = useMemo(() => {
+    if (activeTab === 'all') return circles;
+    return circles.filter(c => (c.source || 'phone') === activeTab);
+  }, [circles, activeTab]);
+
+  const hasCircle = filteredCircles.length > 0;
   // Helper to get first name from full name
   const getFirstName = (fullName) => fullName.split(' ')[0];
 
@@ -190,7 +197,7 @@ export default function HomeScreen({ navigation, route }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const zoomScale = useRef(new Animated.Value(1)).current;
   const networkViewRef = useRef(null);
-  const allCircleContacts = circles.reduce((acc, c) => acc.concat(c?.contacts || []), []);
+  const allCircleContacts = filteredCircles.reduce((acc, c) => acc.concat(c?.contacts || []), []);
   const allSearchContacts = hasCircle ? allCircleContacts : importedContacts;
 
   // Filter contacts based on search
@@ -209,13 +216,13 @@ export default function HomeScreen({ navigation, route }) {
 
   // Keep rings within the 400x400 SVG viewBox even as more circles are added.
   // Increased spacing between rings for better visual separation
-  let ringStep = circles.length <= 1 ? (SINGLE_DOTTED_RADIUS - BASE_RING_RADIUS) : 55;
-  if (circles.length > 0 && BASE_RING_RADIUS + ringStep * circles.length > MAX_DOTTED_RADIUS) {
-    ringStep = (MAX_DOTTED_RADIUS - BASE_RING_RADIUS) / circles.length;
+  let ringStep = filteredCircles.length <= 1 ? (SINGLE_DOTTED_RADIUS - BASE_RING_RADIUS) : 55;
+  if (filteredCircles.length > 0 && BASE_RING_RADIUS + ringStep * filteredCircles.length > MAX_DOTTED_RADIUS) {
+    ringStep = (MAX_DOTTED_RADIUS - BASE_RING_RADIUS) / filteredCircles.length;
   }
 
   const getRingRadius = (ringIndex) => BASE_RING_RADIUS + ringStep * ringIndex;
-  const getDottedRingRadius = () => BASE_RING_RADIUS + ringStep * circles.length;
+  const getDottedRingRadius = () => BASE_RING_RADIUS + ringStep * filteredCircles.length;
 
   // Calculate positions for contacts - evenly distributed on their ring
   // arrayIndex is the index in ringedContacts/planetItems for reliable color mapping
@@ -235,12 +242,12 @@ export default function HomeScreen({ navigation, route }) {
     };
   };
 
-  const primaryCircleName = circles?.[0]?.name || routeCircleName;
+  const primaryCircleName = filteredCircles?.[0]?.name || routeCircleName;
 
   // Flatten circles -> ringed contact entries (stable ordering with useMemo to prevent rebuilding)
   const ringedContacts = React.useMemo(() => {
     const result = [];
-    circles.forEach((circle, ringIndex) => {
+    filteredCircles.forEach((circle, ringIndex) => {
       const contacts = circle?.contacts || [];
       contacts.forEach((contact, indexOnRing) => {
         result.push({
@@ -253,7 +260,7 @@ export default function HomeScreen({ navigation, route }) {
       });
     });
     return result;
-  }, [circles]);
+  }, [filteredCircles]);
 
   // Items used by 3D planet view (index must align with handlePerson3DPress indices)
   // Use array index as the source of truth for mapping
@@ -452,7 +459,7 @@ export default function HomeScreen({ navigation, route }) {
       // Check if tap is on any ring (within tolerance)
       const ringTolerance = 15; // pixels in SVG coords
       
-      for (let ringIndex = 0; ringIndex < circles.length; ringIndex++) {
+      for (let ringIndex = 0; ringIndex < filteredCircles.length; ringIndex++) {
         const ringRadius = getRingRadius(ringIndex);
         if (Math.abs(distFromCenter - ringRadius) < ringTolerance) {
           // Tapped on this ring!
@@ -485,18 +492,21 @@ export default function HomeScreen({ navigation, route }) {
     }
   };
 
+  const [showImportMethod, setShowImportMethod] = useState(false);
+
   const handleCreateNewCircle = () => {
-    console.log('[HOME] ➕➕➕ CREATE NEW CIRCLE BUTTON PRESSED!');
-    console.log('[HOME] Existing circles:', circles.length);
+    console.log('[HOME] CREATE NEW CIRCLE BUTTON PRESSED');
+    setShowImportMethod(true);
+  };
+
+  const navigateToImport = (method) => {
+    setShowImportMethod(false);
     const parent = navigation.getParent();
-    const params = { selectAll: false, isFirstCircle: false, existingCircles: circles };
-    console.log('[HOME] Navigating to SelectContacts with params:', params);
-    if (parent) {
-      console.log('[HOME] Using parent navigation');
-      parent.navigate('SelectContacts', params);
+    const nav = parent || navigation;
+    if (method === 'phone') {
+      nav.navigate('SelectContacts', { selectAll: false, isFirstCircle: false, existingCircles: circles });
     } else {
-      console.log('[HOME] Using direct navigation');
-      navigation.navigate('SelectContacts', params);
+      nav.navigate('LinkedInImport', { existingCircles: circles });
     }
   };
 
@@ -562,7 +572,7 @@ export default function HomeScreen({ navigation, route }) {
     }
     
     const ringIndex = entry.ringIndex;
-    const circle = circles[ringIndex];
+    const circle = filteredCircles[ringIndex];
     
     if (!circle || !circle.contacts) {
       setPlanetStartIndex(0);
@@ -590,7 +600,7 @@ export default function HomeScreen({ navigation, route }) {
 
   // Handler for when a ring (circle) is tapped
   const handleRingPress = (ringIndex) => {
-    const circle = circles[ringIndex];
+    const circle = filteredCircles[ringIndex];
     if (circle) {
       setSelectedCircleForZoom(circle);
       setCircleZoomOpen(true);
@@ -653,6 +663,27 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Tab Bar */}
+        {circles.length > 0 && (
+          <View style={styles.tabBar}>
+            {[
+              { key: 'phone', label: 'My Circle' },
+              { key: 'linkedin', label: 'LinkedIn' },
+              { key: 'all', label: 'All Circles' },
+            ].map((tab) => (
+              <TouchableOpacity
+                key={tab.key}
+                style={[styles.tabPill, activeTab === tab.key && styles.tabPillActive]}
+                onPress={() => setActiveTab(tab.key)}
+              >
+                <Text style={[styles.tabPillText, activeTab === tab.key && styles.tabPillTextActive]}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* Search Bar & circle label only after first circle exists */}
         {hasCircle && (
@@ -759,7 +790,7 @@ export default function HomeScreen({ navigation, route }) {
                   ) : (
                     <>
                       {/* Solid rings (one per circle) - tap detected via touch handlers */}
-                      {circles.map((circle, ringIndex) => (
+                      {filteredCircles.map((circle, ringIndex) => (
                         <Circle
                           key={circle?.id || `ring-${ringIndex}`}
                           cx="200"
@@ -1072,6 +1103,40 @@ export default function HomeScreen({ navigation, route }) {
                   <Text style={styles.confirmDeleteText}>Delete</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Import Method Chooser */}
+        <Modal
+          visible={showImportMethod}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowImportMethod(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.importMethodModal}>
+              <Text style={styles.importMethodTitle}>Add contacts from</Text>
+              <TouchableOpacity
+                style={styles.importMethodOption}
+                onPress={() => navigateToImport('phone')}
+              >
+                <Ionicons name="call-outline" size={28} color="#4FFFB0" />
+                <Text style={styles.importMethodText}>Phone Contacts</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.importMethodOption}
+                onPress={() => navigateToImport('linkedin')}
+              >
+                <Ionicons name="logo-linkedin" size={28} color="#4FFFB0" />
+                <Text style={styles.importMethodText}>LinkedIn</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.importMethodCancel}
+                onPress={() => setShowImportMethod(false)}
+              >
+                <Text style={styles.importMethodCancelText}>Cancel</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -1650,5 +1715,71 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#000000',
+  },
+  importMethodModal: {
+    backgroundColor: '#1a2a1a',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#4FFFB0',
+    padding: 24,
+    marginHorizontal: 30,
+    width: '80%',
+    alignItems: 'center',
+  },
+  importMethodTitle: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 24,
+  },
+  importMethodOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f1f0f',
+    borderRadius: 12,
+    padding: 16,
+    width: '100%',
+    marginBottom: 12,
+    gap: 16,
+  },
+  importMethodText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  importMethodCancel: {
+    marginTop: 8,
+    paddingVertical: 12,
+  },
+  importMethodCancelText: {
+    color: '#aaa',
+    fontSize: 15,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    gap: 8,
+  },
+  tabPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#2a4a3a',
+    backgroundColor: '#0f1f0f',
+  },
+  tabPillActive: {
+    backgroundColor: '#4FFFB0',
+    borderColor: '#4FFFB0',
+  },
+  tabPillText: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  tabPillTextActive: {
+    color: '#000',
+    fontWeight: '700',
   },
 });
