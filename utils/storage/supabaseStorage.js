@@ -230,6 +230,21 @@ export const signInWithApple = async () => {
 
     if (error) throw error;
 
+    // Save Apple-provided name to user metadata (only available on first sign-in)
+    try {
+      const givenName = credential?.fullName?.givenName || '';
+      const familyName = credential?.fullName?.familyName || '';
+      const fullName = `${givenName} ${familyName}`.trim();
+      if (fullName) {
+        await supabase.auth.updateUser({
+          data: { full_name: fullName },
+        });
+        console.log('[AUTH APPLE] Saved full name to user metadata:', fullName);
+      }
+    } catch (e) {
+      console.warn('[AUTH APPLE] Failed to save name to metadata (continuing):', e?.message || e);
+    }
+
     // Best-effort: publish identity hashes so other users can match you by email/phone.
     try {
       const userId = data?.user?.id;
@@ -239,7 +254,7 @@ export const signInWithApple = async () => {
       const phoneHashes = phone ? [await sha256(phone)] : [];
       if (userId) await upsertUserIdentities(userId, { emailHashes, phoneHashes });
     } catch (e) {
-      console.warn('Failed to upsert user identities (continuing):', e?.message || e);
+      console.warn('[AUTH APPLE] Failed to upsert identities (continuing):', e?.message || e);
     }
 
     return {
@@ -264,17 +279,28 @@ export const signInWithGoogle = async () => {
     // Use the app's deep link scheme for redirect
     const redirectUrl = 'getpingapp://';
 
+    console.log('[AUTH GOOGLE] Starting OAuth flow...');
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
         skipBrowserRedirect: true,
+        scopes: 'email profile',
       },
     });
 
     if (error) {
+      console.error('[AUTH GOOGLE] OAuth init error:', error.message);
       return { success: false, error: error.message };
     }
+
+    if (!data?.url) {
+      console.error('[AUTH GOOGLE] No OAuth URL returned from Supabase');
+      return { success: false, error: 'Could not start Google sign in. Please try again.' };
+    }
+
+    console.log('[AUTH GOOGLE] Opening browser for auth...');
 
     // Open the auth URL in browser (this will go to Google, then back to Supabase, then redirect to our app)
     const result = await WebBrowser.openAuthSessionAsync(
@@ -282,47 +308,95 @@ export const signInWithGoogle = async () => {
       redirectUrl
     );
 
-    if (result.type === 'success') {
-      // Extract the session from the URL
-      const url = result.url;
-      const params = new URLSearchParams(url.split('#')[1] || url.split('?')[1]);
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
+    console.log('[AUTH GOOGLE] Browser result type:', result.type);
 
-      if (accessToken) {
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-
-        if (sessionError) {
-          return { success: false, error: sessionError.message };
-        }
-
-        // Best-effort: publish identity hashes for matching
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const email = normalizeEmail(user.email);
-            const emailHashes = email ? [await sha256(email)] : [];
-            await upsertUserIdentities(user.id, { emailHashes, phoneHashes: [] });
-          }
-        } catch (e) {
-          console.warn('Failed to upsert user identities (continuing):', e?.message || e);
-        }
-
-        return { success: true };
-      }
-    }
-
-    if (result.type === 'cancel') {
+    if (result.type === 'cancel' || result.type === 'dismiss') {
       return { success: false, error: 'canceled' };
     }
 
-    return { success: false, error: 'Authentication failed' };
+    if (result.type === 'success') {
+      const url = result.url;
+      console.log('[AUTH GOOGLE] Redirect URL received');
+
+      // Extract tokens from the URL - try both hash fragment and query params
+      let accessToken = null;
+      let refreshToken = null;
+
+      try {
+        // Supabase returns tokens in the hash fragment (#access_token=...)
+        const hashPart = url.split('#')[1];
+        if (hashPart) {
+          const params = new URLSearchParams(hashPart);
+          accessToken = params.get('access_token');
+          refreshToken = params.get('refresh_token');
+        }
+
+        // Fallback: check query params (?access_token=...)
+        if (!accessToken) {
+          const queryPart = url.split('?')[1];
+          if (queryPart) {
+            // Remove any hash from the query part
+            const cleanQuery = queryPart.split('#')[0];
+            const params = new URLSearchParams(cleanQuery);
+            accessToken = params.get('access_token');
+            refreshToken = params.get('refresh_token');
+          }
+        }
+      } catch (parseErr) {
+        console.error('[AUTH GOOGLE] URL parsing error:', parseErr?.message);
+        return { success: false, error: 'Failed to process sign-in response. Please try again.' };
+      }
+
+      if (!accessToken) {
+        // Check if there's an error in the URL (e.g., access_denied)
+        try {
+          const allParams = new URLSearchParams(url.split('#')[1] || url.split('?')[1] || '');
+          const errorParam = allParams.get('error');
+          const errorDesc = allParams.get('error_description');
+          if (errorParam) {
+            console.error('[AUTH GOOGLE] OAuth error:', errorParam, errorDesc);
+            return { success: false, error: errorDesc || `Google sign in failed: ${errorParam}` };
+          }
+        } catch (e) {
+          // Ignore parse errors for error checking
+        }
+        console.error('[AUTH GOOGLE] No access token in redirect URL');
+        return { success: false, error: 'Sign in did not complete. Please try again.' };
+      }
+
+      console.log('[AUTH GOOGLE] Setting session with tokens...');
+
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+
+      if (sessionError) {
+        console.error('[AUTH GOOGLE] Session error:', sessionError.message);
+        return { success: false, error: sessionError.message };
+      }
+
+      // Best-effort: publish identity hashes for matching
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const email = normalizeEmail(user.email);
+          const emailHashes = email ? [await sha256(email)] : [];
+          await upsertUserIdentities(user.id, { emailHashes, phoneHashes: [] });
+        }
+      } catch (e) {
+        console.warn('[AUTH GOOGLE] Failed to upsert identities (continuing):', e?.message || e);
+      }
+
+      console.log('[AUTH GOOGLE] Success');
+      return { success: true };
+    }
+
+    console.warn('[AUTH GOOGLE] Unexpected result type:', result.type);
+    return { success: false, error: 'Authentication was not completed. Please try again.' };
   } catch (err) {
-    console.error('Google sign-in error:', err);
-    return { success: false, error: err.message };
+    console.error('[AUTH GOOGLE] Error:', err?.message || err);
+    return { success: false, error: err?.message || 'Google sign in failed. Please try again.' };
   }
 };
 

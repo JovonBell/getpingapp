@@ -56,18 +56,7 @@ export default function WelcomeScreen({ navigation }) {
         <Text style={styles.title}>ping!</Text>
         <Text style={styles.tagline}>the future of connection is now.</Text>
 
-        {/* Buttons */}
-        <TouchableOpacity
-          style={styles.googleButton}
-          onPress={handleGoogleSignIn}
-        >
-          <View style={styles.googleLogo}>
-            <Text style={styles.googleG}>G</Text>
-          </View>
-          <Text style={styles.googleButtonText}>Sign in with Google</Text>
-        </TouchableOpacity>
-
-        {/* Apple Sign In - Required by App Store when offering other social logins */}
+        {/* Buttons - Apple MUST be first per App Store guideline 4.8 / HIG */}
         {Platform.OS === 'ios' && (
           <AppleAuthentication.AppleAuthenticationButton
             buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
@@ -77,6 +66,16 @@ export default function WelcomeScreen({ navigation }) {
             onPress={handleAppleSignIn}
           />
         )}
+
+        <TouchableOpacity
+          style={styles.googleButton}
+          onPress={handleGoogleSignIn}
+        >
+          <View style={styles.googleLogo}>
+            <Text style={styles.googleG}>G</Text>
+          </View>
+          <Text style={styles.googleButtonText}>Sign in with Google</Text>
+        </TouchableOpacity>
 
         {/* Divider */}
         <View style={styles.divider}>
@@ -220,7 +219,7 @@ const styles = StyleSheet.create({
   },
   appleButton: {
     width: 260,
-    height: 50,
+    height: 52,
     marginBottom: 14,
   },
   divider: {

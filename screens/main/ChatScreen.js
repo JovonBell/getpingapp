@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActionSheetIOS,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,6 +49,88 @@ export default function ChatScreen({ navigation, route }) {
     const unsub = navigation.addListener('focus', load);
     return unsub;
   }, [navigation, receiverId]);
+
+  const handleMoreOptions = () => {
+    const contactName = contact?.name || 'this user';
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Report User', 'Block User'],
+          destructiveButtonIndex: 2,
+          cancelButtonIndex: 0,
+          title: contactName,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) handleReport();
+          if (buttonIndex === 2) handleBlock();
+        }
+      );
+    } else {
+      Alert.alert(contactName, 'Choose an action', [
+        { text: 'Report User', onPress: handleReport },
+        { text: 'Block User', onPress: handleBlock, style: 'destructive' },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
+  };
+
+  const handleReport = () => {
+    Alert.alert(
+      'Report User',
+      `Why are you reporting ${contact?.name || 'this user'}?`,
+      [
+        { text: 'Spam or Scam', onPress: () => submitReport('spam') },
+        { text: 'Harassment or Abuse', onPress: () => submitReport('harassment') },
+        { text: 'Inappropriate Content', onPress: () => submitReport('inappropriate') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const submitReport = async (reason) => {
+    try {
+      if (!currentUserId || !receiverId) return;
+      const { supabase } = require('../../lib/supabase');
+      await supabase.from('reports').insert({
+        reporter_id: currentUserId,
+        reported_user_id: receiverId,
+        reason,
+        status: 'pending',
+      });
+    } catch (e) {
+      console.warn('[ChatScreen] Report submission error (non-fatal):', e?.message);
+    }
+    Alert.alert('Report Submitted', 'Thank you for helping keep ping safe. We will review this report.');
+  };
+
+  const handleBlock = () => {
+    Alert.alert(
+      'Block User',
+      `Are you sure you want to block ${contact?.name || 'this user'}? They won\'t be able to message you.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (!currentUserId || !receiverId) return;
+              const { supabase } = require('../../lib/supabase');
+              await supabase.from('blocked_users').insert({
+                blocker_id: currentUserId,
+                blocked_id: receiverId,
+              });
+            } catch (e) {
+              console.warn('[ChatScreen] Block error (non-fatal):', e?.message);
+            }
+            Alert.alert('User Blocked', `${contact?.name || 'This user'} has been blocked.`, [
+              { text: 'OK', onPress: () => navigation.goBack() },
+            ]);
+          },
+        },
+      ]
+    );
+  };
 
   const handleSend = () => {
     (async () => {
@@ -128,8 +211,8 @@ export default function ChatScreen({ navigation, route }) {
             <TouchableOpacity style={styles.headerIcon}>
               <Ionicons name="call-outline" size={24} color="#ffffff" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerIcon}>
-              <Ionicons name="videocam-outline" size={24} color="#ffffff" />
+            <TouchableOpacity style={styles.headerIcon} onPress={handleMoreOptions}>
+              <Ionicons name="ellipsis-vertical" size={24} color="#ffffff" />
             </TouchableOpacity>
           </View>
         </View>

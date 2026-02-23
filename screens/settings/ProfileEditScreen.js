@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -40,6 +40,28 @@ export default function ProfileEditScreen({ navigation, route }) {
   const [tiktok, setTiktok] = useState(currentProfile.socialLinks?.tiktok || '');
   const [website, setWebsite] = useState(currentProfile.socialLinks?.website || '');
   const [school, setSchool] = useState(currentProfile.school || '');
+
+  // Auto-populate profile fields from auth data for new users
+  // This satisfies Apple's requirement: don't ask for info already provided by SIWA/Google
+  useEffect(() => {
+    if (fromFirstCircle && !currentProfile.name) {
+      getCurrentUser().then(({ success, user }) => {
+        if (success && user) {
+          const meta = user.user_metadata || {};
+          // Pre-fill name from auth provider (SIWA or Google)
+          const authName = meta.full_name || meta.name || '';
+          if (authName && !name) setName(authName);
+          // Pre-fill email from auth
+          if (user.email && !email) setEmail(user.email);
+          // Pre-fill avatar from Google (Google provides avatar_url)
+          if (meta.avatar_url && !avatar) setAvatar(meta.avatar_url);
+          console.log('[ProfileEdit] Pre-filled from auth:', { name: authName, email: user.email, hasAvatar: !!meta.avatar_url });
+        }
+      }).catch((e) => {
+        console.warn('[ProfileEdit] Could not pre-fill from auth:', e?.message);
+      });
+    }
+  }, []);
 
   const [nameFocused, setNameFocused] = useState(false);
   const [jobTitleFocused, setJobTitleFocused] = useState(false);
@@ -343,7 +365,7 @@ export default function ProfileEditScreen({ navigation, route }) {
             <Text style={styles.sectionTitle}>Contact Information</Text>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={styles.label}>Email (optional)</Text>
               <TextInput
                 style={[styles.input, emailFocused && styles.inputFocused]}
                 placeholder="your.email@example.com"
@@ -358,7 +380,7 @@ export default function ProfileEditScreen({ navigation, route }) {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Phone</Text>
+              <Text style={styles.label}>Phone (optional)</Text>
               <TextInput
                 style={[styles.input, phoneFocused && styles.inputFocused]}
                 placeholder="(555) 123-4567"

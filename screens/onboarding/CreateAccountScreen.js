@@ -70,8 +70,18 @@ export default function CreateAccountScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Sign in with Google */}
+          {/* Sign in buttons - Apple MUST be first per App Store guideline 4.8 / HIG */}
           <View style={{ alignItems: 'center', marginTop: 10 }}>
+            {Platform.OS === 'ios' && (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                cornerRadius={12}
+                style={styles.appleButton}
+                onPress={handleAppleSignIn}
+              />
+            )}
+
             <TouchableOpacity
               style={styles.socialButton}
               onPress={handleGoogleSignIn}
@@ -82,17 +92,6 @@ export default function CreateAccountScreen({ navigation }) {
               </View>
               <Text style={styles.socialButtonText}>continue with google</Text>
             </TouchableOpacity>
-
-            {/* Apple Sign In - Required by App Store when offering other social logins */}
-            {Platform.OS === 'ios' && (
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-                cornerRadius={12}
-                style={styles.appleButton}
-                onPress={handleAppleSignIn}
-              />
-            )}
 
             <Text style={styles.helperText}>
               Sign in quickly to access your circles across devices.
