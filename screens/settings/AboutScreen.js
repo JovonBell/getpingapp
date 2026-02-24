@@ -12,8 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function AboutScreen({ navigation }) {
   const openUrl = (url) => Linking.openURL(url).catch(() => {});
-  const TERMS_URL = 'https://getping.app/terms';
-  const PRIVACY_URL = 'https://getping.app/privacy';
+  const TERMS_URL = 'https://getping.today/terms';
+  const PRIVACY_URL = 'https://getping.today/privacy';
 
   return (
     <View style={styles.container}>
@@ -79,7 +79,7 @@ export default function AboutScreen({ navigation }) {
               <Text style={styles.legalText}>Privacy Policy</Text>
               <Ionicons name="chevron-forward" size={20} color="#666" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.legalItem} onPress={() => openUrl('https://getping.app/licenses')}>
+            <TouchableOpacity style={styles.legalItem} onPress={() => openUrl('https://getping.today/licenses')}>
               <Text style={styles.legalText}>Licenses</Text>
               <Ionicons name="chevron-forward" size={20} color="#666" />
             </TouchableOpacity>

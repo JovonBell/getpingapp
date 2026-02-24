@@ -103,8 +103,8 @@ export default function CreateAccountScreen({ navigation }) {
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             by continuing, you agree to our{' '}
-            <Text style={styles.footerLink} onPress={() => Linking.openURL('https://getping.app/terms')}>terms</Text> and{' '}
-            <Text style={styles.footerLink} onPress={() => Linking.openURL('https://getping.app/privacy')}>privacy policy</Text>.
+            <Text style={styles.footerLink} onPress={() => Linking.openURL('https://getping.today/terms')}>terms</Text> and{' '}
+            <Text style={styles.footerLink} onPress={() => Linking.openURL('https://getping.today/privacy')}>privacy policy</Text>.
           </Text>
           <TouchableOpacity style={styles.signInLink}>
             <Text style={styles.signInText}>
