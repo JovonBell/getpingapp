@@ -35,6 +35,22 @@
 
 ---
 
+## App Store Status
+
+**Build 45** submitted Feb 24, 2026. Previous rejections all resolved.
+
+**Auth:**
+- SIWA: Native `expo-apple-authentication`, button MUST be above Google (HIG 4.8)
+- Google: Supabase OAuth, client ID `883735243677-us7b...`, scopes `email profile`
+- Name persistence: SIWA fullName → `user_metadata.full_name`
+- Profile auto-populate from auth data in ProfileEditScreen
+
+**UGC Moderation:**
+- Report/Block: ActionSheet in ChatScreen → `reports` + `blocked_users` tables (RLS enabled)
+- Account deletion: `delete-account` Supabase edge function
+
+**URLs:** All in-app links use `https://getping.today` (Vercel SPA)
+
 ## Known Issues (Priority Fixes)
 
 1. **3D animations** - Not smooth enough, need GSAP with power3.inOut
@@ -228,6 +244,8 @@ TEXT_MUTED: '#666666'
 | `messages` | In-app messaging |
 | `user_streaks` | Gamification |
 | `user_achievements` | Achievement tracking |
+| `reports` | UGC moderation reports (RLS) |
+| `blocked_users` | Blocked user pairs (RLS) |
 
 ---
 

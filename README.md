@@ -1,23 +1,58 @@
 # ping! (iOS / Expo)
 
-A relationship management app that helps you stay connected with the people who matter most. Track your circles, maintain relationship health, and never forget to reach out.
+A relationship management app that helps you stay connected with the people who matter most. Visualize your network as a 3D solar system, track your circles, maintain relationship health, and never forget to reach out.
+
+**Website:** https://getping.today
+**Bundle ID:** `today.getping.app`
+**App Store ID:** `6757105038`
 
 ## Features
 
 - **Circles** - Organize contacts into up to 10 customizable tiers (Inner Circle, Close Friends, etc.)
-- **3D Visualization** - Interactive planet/circle view of your network
+- **3D Visualization** - Interactive planet/circle view of your network (Three.js)
 - **NFC Ring** - Program NFC rings with custom URLs for instant contact sharing
 - **Relationship Health** - Track how well you're maintaining each relationship
 - **Reminders** - Set follow-up reminders for birthdays, check-ins, and more
 - **Gamification** - Earn streaks, achievements, and track your engagement
 - **Analytics Dashboard** - See your weekly activity and network health trends
 - **Push Notifications** - Get reminded to reach out to contacts
-- **Google OAuth** - Simple sign-in with your Google account
-- **Apple Sign In** - Native Apple authentication on iOS (App Store required)
+- **Sign in with Apple** - Native SIWA on iOS (positioned first per App Store guideline 4.8)
+- **Google Sign-In** - OAuth via Supabase with `email profile` scopes
+- **Report/Block** - UGC moderation via ActionSheet in chat (Supabase `reports` + `blocked_users` tables)
+- **Account Deletion** - Settings → Profile → Delete Account
 - **Immersive Audio** - Ambient music and tactile sound effects
 - **Magic Link Auth** - Passwordless email authentication
 
+## App Store Submission Status
+
+**Build 45** submitted February 24, 2026. All previous rejection issues resolved:
+- Google OAuth scopes fixed (`email profile`)
+- SIWA button ordering (Apple above Google on all auth screens)
+- SIWA name persistence to user metadata
+- Profile auto-populate from auth data
+- Optional field labels for Email/Phone
+- Report/Block flow in ChatScreen with Supabase moderation tables
+- Tappable Terms/Privacy links → https://getping.today/terms and /privacy
+- Account deletion via Supabase edge function
+
+**Google OAuth:** Client ID `883735243677-us7b...` (Ping! Auth), consent screen in Production mode.
+**Supabase:** `ahksxziueqkacyaqtgeu` — reports, blocked_users tables with RLS.
+
 ## Changelog
+
+### February 24, 2026
+**App Store Resubmission (Build 45)**
+
+Fixed all 4 previous App Store rejections:
+- Google OAuth: Added scopes, switched to own client ID (was using Supabase default)
+- HIG: Apple Sign-In button above Google on WelcomeScreen + CreateAccountScreen
+- UGC Moderation: Report/Block ActionSheet in ChatScreen with Supabase tables
+- Account Deletion: delete-account edge function
+- Legal: Terms/Privacy pages live at getping.today, tappable in-app links
+- Profile: Auto-populate from SIWA/Google, optional field labels
+- URLs: All in-app links updated to getping.today
+
+---
 
 ### January 6, 2026
 **Button Loading State Fixes**
@@ -354,12 +389,23 @@ The shared Supabase backend is at: `https://ahksxziueqkacyaqtgeu.supabase.co`
 5. Build (TestFlight): `eas build -p ios --profile production`
 6. Submit: `eas submit -p ios --profile production`
 
-## App Store review checklist
-See `APP_STORE_REVIEW_SCRIPT.md`.
+## App Store Review Checklist
 
-**Legal Documents (included):**
-- `PRIVACY_POLICY.md` - Required for App Store
-- `TERMS_OF_SERVICE.md` - Required for App Store
+**Legal (live on getping.today):**
+- Privacy Policy: https://getping.today/privacy
+- Terms of Service: https://getping.today/terms
+- Local copies: `PRIVACY_POLICY.md`, `TERMS_OF_SERVICE.md`
+
+**Auth (tested & working):**
+- Sign in with Apple (native SDK, button first per HIG)
+- Google Sign-In (Supabase OAuth, client ID `883735243677-us7b...`)
+
+**UGC Moderation:**
+- Report User: ChatScreen → ActionSheet → `reports` table
+- Block User: ChatScreen → ActionSheet → `blocked_users` table
+
+**Account Management:**
+- Delete Account: Settings → Profile → Delete Account (edge function)
 
 ## Assets (included)
 - `assets/icon.png` - App icon (1024x1024)
