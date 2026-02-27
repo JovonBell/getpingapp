@@ -37,7 +37,8 @@
 
 ## App Store Status
 
-**Build 45** submitted Feb 24, 2026. Previous rejections all resolved.
+**Build 46** submitted Feb 27, 2026. Fixes Guideline 5.1.2 privacy rejection (contact upload consent).
+**Build 45** rejected Feb 26, 2026 — Guideline 5.1.2 (contacts uploaded without consent).
 
 **Auth:**
 - SIWA: Native `expo-apple-authentication`, button MUST be above Google (HIG 4.8)

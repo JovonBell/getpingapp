@@ -25,6 +25,12 @@ A relationship management app that helps you stay connected with the people who 
 
 ## App Store Submission Status
 
+**Build 46** — February 27, 2026. Fixes Guideline 5.1.2 (Privacy - Data Use and Sharing) rejection from Build 45:
+- Updated `NSContactsUsageDescription` to explicitly state contacts are uploaded to Ping's servers
+- Added in-app consent dialog before any contact data is uploaded to the server
+- Added visible privacy notice on contact selection screen
+- All previous rejection fixes (auth, UGC, HIG) remain in place
+
 **Build 45** submitted February 24, 2026. All previous rejection issues resolved:
 - Google OAuth scopes fixed (`email profile`)
 - SIWA button ordering (Apple above Google on all auth screens)
@@ -39,6 +45,22 @@ A relationship management app that helps you stay connected with the people who 
 **Supabase:** `ahksxziueqkacyaqtgeu` — reports, blocked_users tables with RLS.
 
 ## Changelog
+
+### February 27, 2026
+**App Store Resubmission (Build 46) — Fix Guideline 5.1.2 Privacy Rejection**
+
+Apple rejected Build 45 for Guideline 5.1.2 (Data Use and Sharing): contacts are uploaded to a server without informing the user and obtaining consent first.
+
+**Fixes:**
+- `app.json`: Updated `NSContactsUsageDescription` to explicitly state that selected contact information (names, emails, phone numbers) will be securely uploaded to Ping's servers
+- `SelectContactsScreen.js`: Added consent Alert dialog before any contact data is uploaded — explains what data is uploaded, why, and that it's never shared with third parties
+- `SelectContactsScreen.js`: Added visible privacy notice strip (shield icon + text) above the footer on the contact selection screen
+
+**Files Updated:**
+- `app.json` — NSContactsUsageDescription updated
+- `screens/onboarding/SelectContactsScreen.js` — Consent dialog + privacy notice
+
+---
 
 ### February 24, 2026
 **App Store Resubmission (Build 45)**

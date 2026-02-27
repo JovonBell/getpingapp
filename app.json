@@ -45,7 +45,7 @@
       "deploymentTarget": "15.1",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "NSContactsUsageDescription": "Ping uses your contacts to help you build your circles and find who you already know on ping.",
+        "NSContactsUsageDescription": "Ping uses your contacts to help you build your circles and find who you already know on Ping. Your selected contact information (names, emails, and phone numbers) will be securely uploaded to Ping's servers to match you with other users and build your network.",
         "NSCameraUsageDescription": "Ping uses your camera to let you take and upload a profile photo.",
         "NSPhotoLibraryUsageDescription": "Ping uses your photo library to let you choose and upload a profile photo.",
         "NSPhotoLibraryAddUsageDescription": "Ping saves your selected profile photo.",

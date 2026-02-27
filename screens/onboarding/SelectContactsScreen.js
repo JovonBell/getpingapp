@@ -286,6 +286,16 @@ export default function SelectContactsScreen({ navigation, route }) {
           />
         )}
 
+        {/* Privacy Notice */}
+        {(isInitialImport || isAddContacts) && (
+          <View style={styles.privacyNotice}>
+            <Ionicons name="shield-checkmark-outline" size={14} color="#4FFFB0" />
+            <Text style={styles.privacyNoticeText}>
+              Selected contacts will be securely uploaded to Ping's servers to find people you know.
+            </Text>
+          </View>
+        )}
+
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
@@ -300,6 +310,31 @@ export default function SelectContactsScreen({ navigation, route }) {
               if (selected.length === 0) {
                 Alert.alert('No Contacts Selected', 'Please select at least one contact to continue.');
                 return;
+              }
+
+              // Show consent dialog before uploading contacts to server (Apple Guideline 5.1.2)
+              if (isInitialImport || isAddContacts) {
+                const userConsented = await new Promise((resolve) => {
+                  Alert.alert(
+                    'Upload Contacts to Ping',
+                    `The ${selected.length} contact(s) you selected will be securely uploaded to Ping's servers. This allows us to:\n\n` +
+                    '\u2022 Match you with people you know who are already on Ping\n' +
+                    '\u2022 Build your network visualization\n' +
+                    '\u2022 Enable communication features\n\n' +
+                    'Contact names, emails, and phone numbers are stored securely and are never shared with third parties. ' +
+                    'You can delete your data at any time from Settings.\n\n' +
+                    'By continuing, you consent to this data being uploaded.',
+                    [
+                      { text: 'Cancel', onPress: () => resolve(false), style: 'cancel' },
+                      { text: 'Continue', onPress: () => resolve(true) },
+                    ],
+                    { cancelable: false }
+                  );
+                });
+
+                if (!userConsented) {
+                  return;
+                }
               }
 
               setIsImporting(true);
@@ -590,6 +625,21 @@ const styles = StyleSheet.create({
   checkboxSelected: {
     backgroundColor: '#a8e6cf',
     borderColor: '#a8e6cf',
+  },
+  privacyNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(79, 255, 176, 0.08)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(79, 255, 176, 0.15)',
+  },
+  privacyNoticeText: {
+    color: '#a0a0a0',
+    fontSize: 12,
+    marginLeft: 8,
+    flex: 1,
   },
   footer: {
     flexDirection: 'row',
