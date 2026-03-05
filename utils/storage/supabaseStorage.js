@@ -3,10 +3,23 @@ import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { normalizeEmail, normalizePhone, sha256 } from '../contactsImport';
+import * as Crypto from 'expo-crypto';
 import { upsertUserIdentities } from './identitiesStorage';
 import { clearProfile } from './profileStorage';
-import { clearImportedContacts } from './contactsStorage';
+
+// Inlined utility functions (previously from contactsImport)
+export function normalizeEmail(email) {
+  if (!email) return null;
+  return String(email).trim().toLowerCase() || null;
+}
+export function normalizePhone(phone) {
+  if (!phone) return null;
+  const digits = String(phone).replace(/[^\d]/g, '');
+  return digits.length ? digits : null;
+}
+export async function sha256(value) {
+  return await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, String(value));
+}
 
 // Tell the browser to dismiss when auth is complete
 // Wrapped in try-catch for Expo Go compatibility
@@ -404,11 +417,8 @@ export const signInWithGoogle = async () => {
 export const signOut = async () => {
   try {
     // Clear cached data BEFORE signing out (security: prevent next user seeing old data)
-    await Promise.all([
-      clearProfile(),
-      clearImportedContacts(),
-    ]);
-    console.log('[Auth] Cleared cached profile and contacts');
+    await clearProfile();
+    console.log('[Auth] Cleared cached profile');
 
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
@@ -444,7 +454,7 @@ export const getCurrentUser = async () => {
         try {
           await supabase.auth.signOut();
           // Clear local storage too
-          await Promise.all([clearProfile(), clearImportedContacts()]).catch(() => {});
+          await clearProfile().catch(() => {});
         } catch (signOutErr) {
           console.warn('[AUTH] Error during forced logout:', signOutErr?.message);
         }

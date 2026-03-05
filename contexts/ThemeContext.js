@@ -7,6 +7,9 @@ const THEMES = {
     primary: '#4FFFB0',
     primaryGlow: 'rgba(79, 255, 176, 0.4)',
     primaryLight: 'rgba(79, 255, 176, 0.1)',
+    success: '#4FFFB0',
+    error: '#FF6B6B',
+    warning: '#FFAA00',
   },
   blue: {
     id: 'blue',
@@ -14,6 +17,9 @@ const THEMES = {
     primary: '#4F9FFF',
     primaryGlow: 'rgba(79, 159, 255, 0.4)',
     primaryLight: 'rgba(79, 159, 255, 0.1)',
+    success: '#4FFFB0',
+    error: '#FF6B6B',
+    warning: '#FFAA00',
   },
   purple: {
     id: 'purple',
@@ -21,6 +27,9 @@ const THEMES = {
     primary: '#B04FFF',
     primaryGlow: 'rgba(176, 79, 255, 0.4)',
     primaryLight: 'rgba(176, 79, 255, 0.1)',
+    success: '#4FFFB0',
+    error: '#FF6B6B',
+    warning: '#FFAA00',
   },
   pink: {
     id: 'pink',
@@ -28,6 +37,9 @@ const THEMES = {
     primary: '#FF4F9F',
     primaryGlow: 'rgba(255, 79, 159, 0.4)',
     primaryLight: 'rgba(255, 79, 159, 0.1)',
+    success: '#4FFFB0',
+    error: '#FF6B6B',
+    warning: '#FFAA00',
   },
   orange: {
     id: 'orange',
@@ -35,6 +47,9 @@ const THEMES = {
     primary: '#FF9F4F',
     primaryGlow: 'rgba(255, 159, 79, 0.4)',
     primaryLight: 'rgba(255, 159, 79, 0.1)',
+    success: '#4FFFB0',
+    error: '#FF6B6B',
+    warning: '#FFAA00',
   },
 };
 

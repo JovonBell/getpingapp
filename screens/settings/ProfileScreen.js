@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,10 +7,12 @@ import {
   ScrollView,
   Image,
   Linking,
+  Share,
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { getProfile } from '../../utils/storage/profileStorage';
 import { getProfileFromSupabase, getCurrentUser } from '../../utils/storage/supabaseStorage';
 
@@ -27,9 +29,10 @@ const DEFAULT_PROFILE = {
   socialLinks: {},
 };
 
-export default function ProfileScreen({ navigation, route }) {
+export default function ProfileScreen({ navigation }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState(null);
 
   // Load profile data
   const loadProfile = async () => {
@@ -40,12 +43,11 @@ export default function ProfileScreen({ navigation, route }) {
       const { success: userSuccess, user } = await getCurrentUser();
 
       if (userSuccess && user) {
+        setUserId(user.id);
         const { success: profileSuccess, profile: supabaseProfile } = await getProfileFromSupabase(user.id);
 
         if (profileSuccess && supabaseProfile) {
           setProfile(supabaseProfile);
-          // Also save to local storage for offline access
-          await getProfile(); // This will cache it locally
           setLoading(false);
           return;
         }
@@ -64,20 +66,23 @@ export default function ProfileScreen({ navigation, route }) {
     setLoading(false);
   };
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  // Reload profile every time tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, [])
+  );
 
-  // Reload profile when navigating back from edit
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      if (route.params?.updated) {
-        loadProfile();
-      }
-    });
-
-    return unsubscribe;
-  }, [navigation, route.params?.updated]);
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Check out my ping! profile: https://getping.today/${userId}`,
+        url: `https://getping.today/${userId}`,
+      });
+    } catch (e) {
+      console.warn('[ProfileScreen] Share failed:', e?.message);
+    }
+  };
 
   if (loading) {
     return (
@@ -117,10 +122,7 @@ export default function ProfileScreen({ navigation, route }) {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color="#ffffff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={styles.headerTitle}>Your Card</Text>
           <TouchableOpacity
             onPress={() => navigation.navigate('ProfileEdit', { profile })}
           >
@@ -267,14 +269,9 @@ export default function ProfileScreen({ navigation, route }) {
 
           {/* Actions */}
           <View style={styles.section}>
-            <TouchableOpacity style={styles.actionButton}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
               <Ionicons name="share-outline" size={20} color="#1a1a1a" />
               <Text style={styles.actionButtonText}>Share Profile</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionButtonSecondary}>
-              <Ionicons name="person-add-outline" size={20} color="#00ff88" />
-              <Text style={styles.actionButtonTextSecondary}>Invite Friend</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

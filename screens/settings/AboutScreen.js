@@ -39,33 +39,29 @@ export default function AboutScreen({ navigation }) {
           </View>
 
           <Text style={styles.description}>
-            Ping is a revolutionary networking platform that combines NFC smart ring technology with intuitive relationship management. Visualize your network as a cosmic universe and keep track of your most important connections.
+            Ping is your digital business card powered by NFC smart ring technology. Share your profile instantly with a tap and make every connection count.
           </Text>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Our Mission</Text>
             <Text style={styles.sectionText}>
-              To transform how people build and maintain professional relationships by making networking effortless, intuitive, and meaningful.
+              To make sharing who you are effortless — one tap, one ring, one profile.
             </Text>
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Features</Text>
             <View style={styles.feature}>
+              <Ionicons name="person-circle-outline" size={20} color="#4FFFB0" />
+              <Text style={styles.featureText}>Digital Business Card</Text>
+            </View>
+            <View style={styles.feature}>
               <Ionicons name="radio-outline" size={20} color="#4FFFB0" />
               <Text style={styles.featureText}>NFC Smart Ring Integration</Text>
             </View>
             <View style={styles.feature}>
-              <Ionicons name="planet-outline" size={20} color="#4FFFB0" />
-              <Text style={styles.featureText}>Network Visualization</Text>
-            </View>
-            <View style={styles.feature}>
-              <Ionicons name="layers-outline" size={20} color="#4FFFB0" />
-              <Text style={styles.featureText}>Relationship Ring Tiers</Text>
-            </View>
-            <View style={styles.feature}>
-              <Ionicons name="chatbubbles-outline" size={20} color="#4FFFB0" />
-              <Text style={styles.featureText}>Integrated Messaging</Text>
+              <Ionicons name="share-outline" size={20} color="#4FFFB0" />
+              <Text style={styles.featureText}>Instant Profile Sharing</Text>
             </View>
           </View>
 

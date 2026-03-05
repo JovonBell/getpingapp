@@ -64,7 +64,7 @@ export default function CreateAccountScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>create account</Text>
-          <Text style={styles.subtitle}>sign in to visualize your circle.</Text>
+          <Text style={styles.subtitle}>sign in to create your card.</Text>
         </View>
 
         <ScrollView
@@ -95,7 +95,7 @@ export default function CreateAccountScreen({ navigation }) {
             </TouchableOpacity>
 
             <Text style={styles.helperText}>
-              Sign in quickly to access your circles across devices.
+              Sign in quickly to access your card across devices.
             </Text>
           </View>
 

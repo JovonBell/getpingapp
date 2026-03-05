@@ -54,7 +54,7 @@ export default function WelcomeScreen({ navigation }) {
 
         {/* App title */}
         <Text style={styles.title}>ping!</Text>
-        <Text style={styles.tagline}>the future of connection is now.</Text>
+        <Text style={styles.tagline}>your digital business card.</Text>
 
         {/* Buttons - Apple MUST be first per App Store guideline 4.8 / HIG */}
         {Platform.OS === 'ios' && (

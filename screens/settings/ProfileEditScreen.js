@@ -13,16 +13,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { saveProfile } from '../../utils/storage/profileStorage';
-import { saveProfileToSupabase, uploadAvatar, getCurrentUser } from '../../utils/storage/supabaseStorage';
-import { normalizeEmail, normalizePhone, sha256 } from '../../utils/contactsImport';
+import { saveProfileToSupabase, uploadAvatar, getCurrentUser, normalizeEmail, normalizePhone, sha256 } from '../../utils/storage/supabaseStorage';
 import { upsertUserIdentities } from '../../utils/storage/identitiesStorage';
 
 export default function ProfileEditScreen({ navigation, route }) {
   // Get current profile data from route params or use defaults
   const currentProfile = route?.params?.profile || {};
-  const fromFirstCircle = route?.params?.fromFirstCircle || false;
-  const contacts = route?.params?.contacts || [];
-  const circleName = route?.params?.circleName || '';
 
   const [name, setName] = useState(currentProfile.name || '');
   const [jobTitle, setJobTitle] = useState(currentProfile.jobTitle || '');
@@ -41,10 +37,9 @@ export default function ProfileEditScreen({ navigation, route }) {
   const [website, setWebsite] = useState(currentProfile.socialLinks?.website || '');
   const [school, setSchool] = useState(currentProfile.school || '');
 
-  // Auto-populate profile fields from auth data for new users
-  // This satisfies Apple's requirement: don't ask for info already provided by SIWA/Google
+  // Auto-populate profile fields from auth data when profile name is empty
   useEffect(() => {
-    if (fromFirstCircle && !currentProfile.name) {
+    if (!currentProfile.name) {
       getCurrentUser().then(({ success, user }) => {
         if (success && user) {
           const meta = user.user_metadata || {};
@@ -213,16 +208,7 @@ export default function ProfileEditScreen({ navigation, route }) {
           {
             text: 'OK',
             onPress: () => {
-              if (fromFirstCircle) {
-                // Coming from first circle setup, go to Home with circle data
-                navigation.navigate('Home', {
-                  screen: 'HomeTab',
-                  params: { contacts, circleName },
-                });
-              } else {
-                // Regular profile edit, go back to Profile screen
-                navigation.navigate('Profile', { updated: true });
-              }
+              navigation.goBack();
             },
           },
         ]

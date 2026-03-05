@@ -47,7 +47,7 @@ export default function AccountDeletionScreen({ navigation }) {
           <Ionicons name="warning-outline" size={54} color="#ff6b6b" />
           <Text style={styles.title}>Permanent deletion</Text>
           <Text style={styles.sub}>
-            This will delete your profile, circles, contacts you imported, and messages associated with your account.
+            This will delete your profile and all data associated with your account.
           </Text>
 
           <TouchableOpacity
