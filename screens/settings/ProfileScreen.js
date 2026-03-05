@@ -9,6 +9,7 @@ import {
   Linking,
   Share,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +17,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getProfile } from '../../utils/storage/profileStorage';
 import { getProfileFromSupabase, getCurrentUser } from '../../utils/storage/supabaseStorage';
 
-// Empty profile fallback (avoid shipping fake demo data)
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 const DEFAULT_PROFILE = {
   name: '',
   jobTitle: '',
@@ -34,39 +36,29 @@ export default function ProfileScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState(null);
 
-  // Load profile data
   const loadProfile = async () => {
     setLoading(true);
-
     try {
-      // Try to get user and load from Supabase first
       const { success: userSuccess, user } = await getCurrentUser();
-
       if (userSuccess && user) {
         setUserId(user.id);
         const { success: profileSuccess, profile: supabaseProfile } = await getProfileFromSupabase(user.id);
-
         if (profileSuccess && supabaseProfile) {
           setProfile(supabaseProfile);
           setLoading(false);
           return;
         }
       }
-
-      // Fallback to local storage if Supabase fails or user not authenticated
       const localResult = await getProfile();
       setProfile(localResult.profile || DEFAULT_PROFILE);
     } catch (error) {
       console.error('Error loading profile:', error);
-      // Fallback to local storage
       const localResult = await getProfile();
       setProfile(localResult.profile || DEFAULT_PROFILE);
     }
-
     setLoading(false);
   };
 
-  // Reload profile every time tab is focused
   useFocusEffect(
     useCallback(() => {
       loadProfile();
@@ -87,13 +79,9 @@ export default function ProfileScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.container}>
-        <LinearGradient
-          colors={['#0a2e1a', '#05140a', '#000000']}
-          style={styles.gradient}
-        >
+        <LinearGradient colors={['#0A0A0F', '#0D1117', '#0A0A0F']} style={styles.gradient}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#00ff88" />
-            <Text style={styles.loadingText}>Loading profile...</Text>
+            <ActivityIndicator size="large" color="#4FFFB0" />
           </View>
         </LinearGradient>
       </View>
@@ -101,179 +89,197 @@ export default function ProfileScreen({ navigation }) {
   }
 
   const openLink = (url) => {
-    if (url) {
-      Linking.openURL(url).catch(err => console.error('Error opening link:', err));
-    }
+    if (url) Linking.openURL(url).catch(err => console.error('Error opening link:', err));
   };
+  const openEmail = () => { if (profile.email) Linking.openURL(`mailto:${profile.email}`); };
+  const openPhone = () => { if (profile.phone) Linking.openURL(`tel:${profile.phone}`); };
 
-  const openEmail = () => {
-    if (profile.email) Linking.openURL(`mailto:${profile.email}`);
-  };
+  const hasSocials = profile.socialLinks && (
+    profile.socialLinks.linkedin || profile.socialLinks.twitter ||
+    profile.socialLinks.instagram || profile.socialLinks.tiktok ||
+    profile.socialLinks.website
+  );
 
-  const openPhone = () => {
-    if (profile.phone) Linking.openURL(`tel:${profile.phone}`);
-  };
+  const hasContact = profile.email || profile.phone;
+
+  // Empty state
+  if (!profile?.name) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={['#0A0A0F', '#0D1117', '#0A0A0F']} style={styles.gradient}>
+          <View style={styles.emptyState}>
+            <View style={styles.emptyAvatarRing}>
+              <View style={styles.emptyAvatarInner}>
+                <Ionicons name="person-outline" size={48} color="#4FFFB0" />
+              </View>
+            </View>
+            <Text style={styles.emptyTitle}>Create your card</Text>
+            <Text style={styles.emptySubtitle}>
+              Set up your digital business card so{'\n'}people can find and connect with you.
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyButton}
+              onPress={() => navigation.navigate('ProfileEdit', { profile })}
+            >
+              <LinearGradient
+                colors={['#4FFFB0', '#00D68F']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.emptyButtonGradient}
+              >
+                <Ionicons name="add" size={20} color="#0A0A0F" />
+                <Text style={styles.emptyButtonText}>Set up profile</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#0a2e1a', '#05140a', '#000000']}
-        style={styles.gradient}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Your Card</Text>
+      <LinearGradient colors={['#0A0A0F', '#0D1117', '#0A0A0F']} style={styles.gradient}>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Card */}
+          <View style={styles.card}>
+            <LinearGradient
+              colors={['#141E1A', '#0F1A15', '#0A1210']}
+              style={styles.cardGradient}
+            >
+              {/* Card top accent line */}
+              <LinearGradient
+                colors={['#4FFFB0', '#00D68F', '#4FFFB0']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.cardAccent}
+              />
+
+              {/* Edit button */}
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => navigation.navigate('ProfileEdit', { profile })}
+              >
+                <Ionicons name="create-outline" size={18} color="#4FFFB0" />
+              </TouchableOpacity>
+
+              {/* Avatar + Identity */}
+              <View style={styles.identitySection}>
+                <View style={styles.avatarOuter}>
+                  {profile.avatar ? (
+                    <Image source={{ uri: profile.avatar }} style={styles.avatar} />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <Ionicons name="person" size={44} color="#4FFFB0" />
+                    </View>
+                  )}
+                </View>
+
+                <Text style={styles.name}>{profile.name}</Text>
+                {profile.jobTitle ? (
+                  <Text style={styles.jobTitle}>{profile.jobTitle}</Text>
+                ) : null}
+
+                <View style={styles.metaRow}>
+                  {profile.company ? (
+                    <View style={styles.metaChip}>
+                      <Ionicons name="briefcase-outline" size={13} color="#4FFFB0" />
+                      <Text style={styles.metaChipText}>{profile.company}</Text>
+                    </View>
+                  ) : null}
+                  {profile.location ? (
+                    <View style={styles.metaChip}>
+                      <Ionicons name="location-outline" size={13} color="#4FFFB0" />
+                      <Text style={styles.metaChipText}>{profile.location}</Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                {profile.bio ? (
+                  <Text style={styles.bio}>{profile.bio}</Text>
+                ) : null}
+              </View>
+
+              {/* Divider */}
+              {(hasContact || hasSocials) ? (
+                <View style={styles.divider} />
+              ) : null}
+
+              {/* Contact row */}
+              {hasContact ? (
+                <View style={styles.contactRow}>
+                  {profile.email ? (
+                    <TouchableOpacity style={styles.contactPill} onPress={openEmail}>
+                      <Ionicons name="mail-outline" size={16} color="#4FFFB0" />
+                      <Text style={styles.contactPillText} numberOfLines={1}>{profile.email}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {profile.phone ? (
+                    <TouchableOpacity style={styles.contactPill} onPress={openPhone}>
+                      <Ionicons name="call-outline" size={16} color="#4FFFB0" />
+                      <Text style={styles.contactPillText}>{profile.phone}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* Social icons row */}
+              {hasSocials ? (
+                <View style={styles.socialRow}>
+                  {profile.socialLinks.linkedin ? (
+                    <TouchableOpacity style={styles.socialIcon} onPress={() => openLink(profile.socialLinks.linkedin)}>
+                      <Ionicons name="logo-linkedin" size={22} color="#fff" />
+                    </TouchableOpacity>
+                  ) : null}
+                  {profile.socialLinks.twitter ? (
+                    <TouchableOpacity style={styles.socialIcon} onPress={() => openLink(profile.socialLinks.twitter)}>
+                      <Ionicons name="logo-twitter" size={22} color="#fff" />
+                    </TouchableOpacity>
+                  ) : null}
+                  {profile.socialLinks.instagram ? (
+                    <TouchableOpacity style={styles.socialIcon} onPress={() => openLink(profile.socialLinks.instagram)}>
+                      <Ionicons name="logo-instagram" size={22} color="#fff" />
+                    </TouchableOpacity>
+                  ) : null}
+                  {profile.socialLinks.tiktok ? (
+                    <TouchableOpacity style={styles.socialIcon} onPress={() => openLink(profile.socialLinks.tiktok)}>
+                      <Ionicons name="logo-tiktok" size={22} color="#fff" />
+                    </TouchableOpacity>
+                  ) : null}
+                  {profile.socialLinks.website ? (
+                    <TouchableOpacity style={styles.socialIcon} onPress={() => openLink(profile.socialLinks.website)}>
+                      <Ionicons name="globe-outline" size={22} color="#fff" />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* ping! watermark */}
+              <Text style={styles.watermark}>ping!</Text>
+            </LinearGradient>
+          </View>
+
+          {/* Share button */}
+          <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+            <LinearGradient
+              colors={['#4FFFB0', '#00D68F']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.shareGradient}
+            >
+              <Ionicons name="share-outline" size={20} color="#0A0A0F" />
+              <Text style={styles.shareText}>Share your card</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Edit link */}
           <TouchableOpacity
+            style={styles.editLink}
             onPress={() => navigation.navigate('ProfileEdit', { profile })}
           >
-            <Ionicons name="create-outline" size={24} color="#00ff88" />
+            <Ionicons name="create-outline" size={18} color="#4FFFB0" />
+            <Text style={styles.editLinkText}>Edit profile</Text>
           </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Profile Header */}
-          <View style={styles.profileHeader}>
-            <View style={styles.avatarContainer}>
-              {profile.avatar ? (
-                <Image source={{ uri: profile.avatar }} style={styles.avatar} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Ionicons name="person" size={60} color="#ffffff" />
-                </View>
-              )}
-            </View>
-            {!profile?.name ? (
-              <>
-                <Text style={styles.name}>Your profile</Text>
-                <Text style={styles.jobTitle}>Set this up so people recognize you.</Text>
-                <TouchableOpacity
-                  style={{ marginTop: 14, backgroundColor: '#4FFFB0', paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12 }}
-                  onPress={() => navigation.navigate('ProfileEdit', { profile })}
-                >
-                  <Text style={{ color: '#1a1a1a', fontWeight: '700' }}>Set up profile</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <Text style={styles.name}>{profile.name}</Text>
-                <Text style={styles.jobTitle}>{profile.jobTitle}</Text>
-              </>
-            )}
-
-            <View style={styles.metaInfo}>
-              {profile.company && (
-                <View style={styles.metaItem}>
-                  <Ionicons name="briefcase-outline" size={16} color="#00ff88" />
-                  <Text style={styles.metaText}>{profile.company}</Text>
-                </View>
-              )}
-              {profile.location && (
-                <View style={styles.metaItem}>
-                  <Ionicons name="location-outline" size={16} color="#00ff88" />
-                  <Text style={styles.metaText}>{profile.location}</Text>
-                </View>
-              )}
-            </View>
-
-            {profile.bio && (
-              <Text style={styles.bio}>{profile.bio}</Text>
-            )}
-          </View>
-
-          {/* Contact Information */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Contact</Text>
-
-            {profile.email && (
-              <TouchableOpacity style={styles.contactItem} onPress={openEmail}>
-                <View style={styles.contactLeft}>
-                  <View style={styles.contactIcon}>
-                    <Ionicons name="mail-outline" size={20} color="#00ff88" />
-                  </View>
-                  <View>
-                    <Text style={styles.contactLabel}>Email</Text>
-                    <Text style={styles.contactValue}>{profile.email}</Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#666" />
-              </TouchableOpacity>
-            )}
-
-            {profile.phone && (
-              <TouchableOpacity style={styles.contactItem} onPress={openPhone}>
-                <View style={styles.contactLeft}>
-                  <View style={styles.contactIcon}>
-                    <Ionicons name="call-outline" size={20} color="#00ff88" />
-                  </View>
-                  <View>
-                    <Text style={styles.contactLabel}>Phone</Text>
-                    <Text style={styles.contactValue}>{profile.phone}</Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#666" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Social Links */}
-          {profile.socialLinks && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Social</Text>
-
-              {profile.socialLinks.linkedin && (
-                <TouchableOpacity
-                  style={styles.contactItem}
-                  onPress={() => openLink(profile.socialLinks.linkedin)}
-                >
-                  <View style={styles.contactLeft}>
-                    <View style={styles.contactIcon}>
-                      <Ionicons name="logo-linkedin" size={20} color="#00ff88" />
-                    </View>
-                    <Text style={styles.contactLabel}>LinkedIn</Text>
-                  </View>
-                  <Ionicons name="open-outline" size={20} color="#666" />
-                </TouchableOpacity>
-              )}
-
-              {profile.socialLinks.twitter && (
-                <TouchableOpacity
-                  style={styles.contactItem}
-                  onPress={() => openLink(profile.socialLinks.twitter)}
-                >
-                  <View style={styles.contactLeft}>
-                    <View style={styles.contactIcon}>
-                      <Ionicons name="logo-twitter" size={20} color="#00ff88" />
-                    </View>
-                    <Text style={styles.contactLabel}>Twitter</Text>
-                  </View>
-                  <Ionicons name="open-outline" size={20} color="#666" />
-                </TouchableOpacity>
-              )}
-
-              {profile.socialLinks.instagram && (
-                <TouchableOpacity
-                  style={styles.contactItem}
-                  onPress={() => openLink(profile.socialLinks.instagram)}
-                >
-                  <View style={styles.contactLeft}>
-                    <View style={styles.contactIcon}>
-                      <Ionicons name="logo-instagram" size={20} color="#00ff88" />
-                    </View>
-                    <Text style={styles.contactLabel}>Instagram</Text>
-                  </View>
-                  <Ionicons name="open-outline" size={20} color="#666" />
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-
-          {/* Actions */}
-          <View style={styles.section}>
-            <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-              <Ionicons name="share-outline" size={20} color="#1a1a1a" />
-              <Text style={styles.actionButtonText}>Share Profile</Text>
-            </TouchableOpacity>
-          </View>
         </ScrollView>
       </LinearGradient>
     </View>
@@ -288,158 +294,275 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 60,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
   content: {
     flex: 1,
-  },
-  profileHeader: {
-    alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 32,
-  },
-  avatarContainer: {
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 4,
-    borderColor: '#00ff88',
-  },
-  avatarPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#2a4a3a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: '#00ff88',
-  },
-  name: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  jobTitle: {
-    fontSize: 18,
-    color: '#999',
-    marginBottom: 12,
-  },
-  metaInfo: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    color: '#999',
-    fontSize: 14,
-  },
-  bio: {
-    color: '#cccccc',
-    fontSize: 15,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    color: '#999',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
-  contactItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a3a2a',
-  },
-  contactLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  contactIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2a4a3a',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  contactLabel: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  contactValue: {
-    color: '#999',
-    fontSize: 14,
-    marginTop: 2,
-  },
-  actionButton: {
-    backgroundColor: '#a8e6cf',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
-    marginBottom: 12,
-  },
-  actionButtonText: {
-    color: '#1a1a1a',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  actionButtonSecondary: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#00ff88',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  actionButtonTextSecondary: {
-    color: '#00ff88',
-    fontSize: 16,
-    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    color: '#ffffff',
-    marginTop: 16,
+
+  // Empty state
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyAvatarRing: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2,
+    borderColor: 'rgba(79, 255, 176, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 28,
+  },
+  emptyAvatarInner: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(79, 255, 176, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 10,
+  },
+  emptySubtitle: {
     fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  emptyButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  emptyButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    gap: 8,
+  },
+  emptyButtonText: {
+    color: '#0A0A0F',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+
+  // Card
+  card: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginTop: 10,
+    // Shadow
+    shadowColor: '#4FFFB0',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  cardGradient: {
+    paddingTop: 0,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.1)',
+  },
+  cardAccent: {
+    height: 3,
+    marginHorizontal: -24,
+    marginBottom: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  editButton: {
+    position: 'absolute',
+    top: 18,
+    right: 18,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(79, 255, 176, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+
+  // Identity
+  identitySection: {
+    alignItems: 'center',
+    paddingTop: 8,
+  },
+  avatarOuter: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    padding: 3,
+    backgroundColor: 'rgba(79, 255, 176, 0.15)',
+    marginBottom: 16,
+  },
+  avatar: {
+    width: 94,
+    height: 94,
+    borderRadius: 47,
+  },
+  avatarPlaceholder: {
+    width: 94,
+    height: 94,
+    borderRadius: 47,
+    backgroundColor: 'rgba(79, 255, 176, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  name: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  jobTitle: {
+    fontSize: 16,
+    color: '#8B9DA0',
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(79, 255, 176, 0.06)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.08)',
+  },
+  metaChipText: {
+    color: '#8B9DA0',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  bio: {
+    color: '#A0A8B0',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 21,
+    marginTop: 4,
+    paddingHorizontal: 8,
+  },
+
+  // Divider
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(79, 255, 176, 0.08)',
+    marginVertical: 18,
+    marginHorizontal: -4,
+  },
+
+  // Contact pills
+  contactRow: {
+    gap: 8,
+    marginBottom: 14,
+  },
+  contactPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(79, 255, 176, 0.04)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.06)',
+  },
+  contactPillText: {
+    color: '#C0C8D0',
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+
+  // Social icons
+  socialRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  socialIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+
+  // Watermark
+  watermark: {
+    textAlign: 'center',
+    color: 'rgba(79, 255, 176, 0.15)',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginTop: 16,
+  },
+
+  // Share button
+  shareButton: {
+    marginTop: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  shareGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 10,
+  },
+  shareText: {
+    color: '#0A0A0F',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+
+  // Edit link
+  editLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 16,
+    marginBottom: 40,
+    paddingVertical: 12,
+  },
+  editLinkText: {
+    color: '#4FFFB0',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
