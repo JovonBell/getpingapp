@@ -8,6 +8,8 @@ import {
   TextInput,
   Image,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +19,6 @@ import { saveProfileToSupabase, uploadAvatar, getCurrentUser, normalizeEmail, no
 import { upsertUserIdentities } from '../../utils/storage/identitiesStorage';
 
 export default function ProfileEditScreen({ navigation, route }) {
-  // Get current profile data from route params or use defaults
   const currentProfile = route?.params?.profile || {};
 
   const [name, setName] = useState(currentProfile.name || '');
@@ -29,26 +30,24 @@ export default function ProfileEditScreen({ navigation, route }) {
   const [phone, setPhone] = useState(currentProfile.phone || '');
   const [avatar, setAvatar] = useState(currentProfile.avatar || null);
 
-  // Social links
-  const [linkedin, setLinkedin] = useState(currentProfile.socialLinks?.linkedin || '');
-  const [twitter, setTwitter] = useState(currentProfile.socialLinks?.twitter || '');
-  const [instagram, setInstagram] = useState(currentProfile.socialLinks?.instagram || '');
-  const [tiktok, setTiktok] = useState(currentProfile.socialLinks?.tiktok || '');
-  const [website, setWebsite] = useState(currentProfile.socialLinks?.website || '');
+  const toStr = (v) => (typeof v === 'string' ? v : typeof v === 'object' && v?.url ? v.url : '');
+  const [linkedin, setLinkedin] = useState(toStr(currentProfile.socialLinks?.linkedin));
+  const [twitter, setTwitter] = useState(toStr(currentProfile.socialLinks?.twitter));
+  const [instagram, setInstagram] = useState(toStr(currentProfile.socialLinks?.instagram));
+  const [tiktok, setTiktok] = useState(toStr(currentProfile.socialLinks?.tiktok));
+  const [website, setWebsite] = useState(toStr(currentProfile.socialLinks?.website));
   const [school, setSchool] = useState(currentProfile.school || '');
 
-  // Auto-populate profile fields from auth data when profile name is empty
+  const [focusedField, setFocusedField] = useState(null);
+
   useEffect(() => {
     if (!currentProfile.name) {
       getCurrentUser().then(({ success, user }) => {
         if (success && user) {
           const meta = user.user_metadata || {};
-          // Pre-fill name from auth provider (SIWA or Google)
           const authName = meta.full_name || meta.name || '';
           if (authName && !name) setName(authName);
-          // Pre-fill email from auth
           if (user.email && !email) setEmail(user.email);
-          // Pre-fill avatar from Google (Google provides avatar_url)
           if (meta.avatar_url && !avatar) setAvatar(meta.avatar_url);
           console.log('[ProfileEdit] Pre-filled from auth:', { name: authName, email: user.email, hasAvatar: !!meta.avatar_url });
         }
@@ -58,105 +57,58 @@ export default function ProfileEditScreen({ navigation, route }) {
     }
   }, []);
 
-  const [nameFocused, setNameFocused] = useState(false);
-  const [jobTitleFocused, setJobTitleFocused] = useState(false);
-  const [companyFocused, setCompanyFocused] = useState(false);
-  const [locationFocused, setLocationFocused] = useState(false);
-  const [bioFocused, setBioFocused] = useState(false);
-  const [emailFocused, setEmailFocused] = useState(false);
-  const [phoneFocused, setPhoneFocused] = useState(false);
-  const [linkedinFocused, setLinkedinFocused] = useState(false);
-  const [twitterFocused, setTwitterFocused] = useState(false);
-  const [instagramFocused, setInstagramFocused] = useState(false);
-  const [websiteFocused, setWebsiteFocused] = useState(false);
-
   const pickImage = async () => {
-    // Request permission
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
     if (status !== 'granted') {
       Alert.alert('Permission Denied', 'We need camera roll permissions to change your profile picture.');
       return;
     }
-
-    // Launch image picker
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
     });
-
-    if (!result.canceled) {
-      setAvatar(result.assets[0].uri);
-    }
+    if (!result.canceled) setAvatar(result.assets[0].uri);
   };
 
   const takePhoto = async () => {
-    // Request permission
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
-
     if (status !== 'granted') {
       Alert.alert('Permission Denied', 'We need camera permissions to take a photo.');
       return;
     }
-
-    // Launch camera
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
     });
-
-    if (!result.canceled) {
-      setAvatar(result.assets[0].uri);
-    }
+    if (!result.canceled) setAvatar(result.assets[0].uri);
   };
 
   const showImageOptions = () => {
-    Alert.alert(
-      'Profile Picture',
-      'Choose an option',
-      [
-        {
-          text: 'Take Photo',
-          onPress: takePhoto,
-        },
-        {
-          text: 'Choose from Library',
-          onPress: pickImage,
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ],
-      { cancelable: true }
-    );
+    Alert.alert('Profile Picture', 'Choose an option', [
+      { text: 'Take Photo', onPress: takePhoto },
+      { text: 'Choose from Library', onPress: pickImage },
+      { text: 'Cancel', style: 'cancel' },
+    ], { cancelable: true });
   };
 
   const handleSave = async () => {
-    // Validate required fields
     if (!name.trim()) {
       Alert.alert('Required Field', 'Please enter your name.');
       return;
     }
 
     try {
-      // Get current user
       const { success: userSuccess, user } = await getCurrentUser();
-
       let avatarUrl = avatar;
 
-      // Upload avatar if it's a local file (not a URL)
       if (avatar && !avatar.startsWith('http') && userSuccess && user) {
         const uploadResult = await uploadAvatar(avatar, user.id);
-        if (uploadResult.success) {
-          avatarUrl = uploadResult.url;
-        }
+        if (uploadResult.success) avatarUrl = uploadResult.url;
       }
 
-      // Prepare profile data
       const updatedProfile = {
         name: name.trim(),
         jobTitle: jobTitle.trim(),
@@ -177,19 +129,12 @@ export default function ProfileEditScreen({ navigation, route }) {
         updatedAt: new Date().toISOString(),
       };
 
-      // Save to local storage first (for offline support)
       await saveProfile(updatedProfile);
 
-      // Save to Supabase if user is authenticated
       if (userSuccess && user) {
         const supabaseResult = await saveProfileToSupabase(updatedProfile, user.id);
+        if (!supabaseResult.success) console.warn('Failed to sync to Supabase:', supabaseResult.error);
 
-        if (!supabaseResult.success) {
-          console.warn('Failed to sync to Supabase:', supabaseResult.error);
-          // Still show success since local save worked
-        }
-
-        // Keep identity hashes up to date for contact matching
         try {
           const email = normalizeEmail(updatedProfile.email);
           const phone = normalizePhone(updatedProfile.phone);
@@ -201,278 +146,163 @@ export default function ProfileEditScreen({ navigation, route }) {
         }
       }
 
-      Alert.alert(
-        'Success',
-        'Your profile has been updated!',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              navigation.goBack();
-            },
-          },
-        ]
-      );
+      Alert.alert('Success', 'Your profile has been updated!', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert(
-        'Error',
-        'Failed to save profile. Please try again.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Error', 'Failed to save profile. Please try again.', [{ text: 'OK' }]);
     }
+  };
+
+  const renderInput = (label, value, onChangeText, options = {}) => {
+    const { placeholder, icon, iconColor, keyboardType, autoCapitalize, multiline, numberOfLines } = options;
+    const isFocused = focusedField === label;
+
+    return (
+      <View style={styles.inputContainer}>
+        {icon ? (
+          <View style={styles.socialLabel}>
+            <View style={styles.socialIconWrap}>
+              <Ionicons name={icon} size={16} color={iconColor || '#4FFFB0'} />
+            </View>
+            <Text style={styles.label}>{label}</Text>
+          </View>
+        ) : (
+          <Text style={styles.label}>{label}</Text>
+        )}
+        <TextInput
+          style={[
+            styles.input,
+            multiline && styles.textArea,
+            isFocused && styles.inputFocused,
+          ]}
+          placeholder={placeholder || ''}
+          placeholderTextColor="rgba(255,255,255,0.2)"
+          value={value}
+          onChangeText={onChangeText}
+          onFocus={() => setFocusedField(label)}
+          onBlur={() => setFocusedField(null)}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          multiline={multiline}
+          numberOfLines={numberOfLines}
+          textAlignVertical={multiline ? 'top' : 'center'}
+        />
+      </View>
+    );
   };
 
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#0a2e1a', '#05140a', '#000000']}
+        colors={['#0A1A12', '#060E09', '#020804', '#000000']}
+        locations={[0, 0.3, 0.6, 1]}
         style={styles.gradient}
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="close" size={24} color="#ffffff" />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
+            <View style={styles.headerButtonInner}>
+              <Ionicons name="close" size={20} color="#ffffff" />
+            </View>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Edit Profile</Text>
-          <TouchableOpacity onPress={handleSave}>
-            <Text style={styles.saveButton}>Save</Text>
+          <TouchableOpacity onPress={handleSave} style={styles.headerButton}>
+            <Text style={styles.saveButtonText}>Save</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Profile Picture */}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {/* Avatar */}
           <View style={styles.avatarSection}>
-            <TouchableOpacity onPress={showImageOptions} style={styles.avatarContainer}>
-              {avatar ? (
-                <Image source={{ uri: avatar }} style={styles.avatar} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Ionicons name="person" size={60} color="#ffffff" />
-                </View>
-              )}
+            <TouchableOpacity onPress={showImageOptions} style={styles.avatarContainer} activeOpacity={0.8}>
+              <View style={styles.avatarRing}>
+                {avatar ? (
+                  <Image source={{ uri: avatar }} style={styles.avatar} />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Ionicons name="person" size={48} color="rgba(255,255,255,0.3)" />
+                  </View>
+                )}
+              </View>
               <View style={styles.editIconContainer}>
-                <Ionicons name="camera" size={20} color="#ffffff" />
+                <Ionicons name="camera" size={16} color="#0A0A0F" />
               </View>
             </TouchableOpacity>
             <Text style={styles.changePhotoText}>Tap to change photo</Text>
           </View>
 
-          {/* Basic Info Section */}
+          {/* Basic Info */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Basic Information</Text>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Full Name *</Text>
-              <TextInput
-                style={[styles.input, nameFocused && styles.inputFocused]}
-                placeholder="Enter your name"
-                placeholderTextColor="#666"
-                value={name}
-                onChangeText={setName}
-                onFocus={() => setNameFocused(true)}
-                onBlur={() => setNameFocused(false)}
-              />
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionAccent} />
+              <Text style={styles.sectionTitle}>Basic Information</Text>
             </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Job Title</Text>
-              <TextInput
-                style={[styles.input, jobTitleFocused && styles.inputFocused]}
-                placeholder="e.g., Software Engineer"
-                placeholderTextColor="#666"
-                value={jobTitle}
-                onChangeText={setJobTitle}
-                onFocus={() => setJobTitleFocused(true)}
-                onBlur={() => setJobTitleFocused(false)}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Company</Text>
-              <TextInput
-                style={[styles.input, companyFocused && styles.inputFocused]}
-                placeholder="Enter your company"
-                placeholderTextColor="#666"
-                value={company}
-                onChangeText={setCompany}
-                onFocus={() => setCompanyFocused(true)}
-                onBlur={() => setCompanyFocused(false)}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Location</Text>
-              <TextInput
-                style={[styles.input, locationFocused && styles.inputFocused]}
-                placeholder="City, Country"
-                placeholderTextColor="#666"
-                value={location}
-                onChangeText={setLocation}
-                onFocus={() => setLocationFocused(true)}
-                onBlur={() => setLocationFocused(false)}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.socialLabel}>
-                <Ionicons name="school-outline" size={20} color="#00ff88" />
-                <Text style={styles.label}>School or Program</Text>
-              </View>
-              <TextInput
-                style={[styles.input]}
-                placeholder="Add your school or program"
-                placeholderTextColor="#666"
-                value={school}
-                onChangeText={setSchool}
-                autoCapitalize="words"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Bio</Text>
-              <TextInput
-                style={[styles.input, styles.textArea, bioFocused && styles.inputFocused]}
-                placeholder="Tell us about yourself"
-                placeholderTextColor="#666"
-                value={bio}
-                onChangeText={setBio}
-                onFocus={() => setBioFocused(true)}
-                onBlur={() => setBioFocused(false)}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
+            {renderInput('Full Name *', name, setName, { placeholder: 'Enter your name' })}
+            {renderInput('Job Title', jobTitle, setJobTitle, { placeholder: 'e.g., Software Engineer' })}
+            {renderInput('Company', company, setCompany, { placeholder: 'Enter your company' })}
+            {renderInput('Location', location, setLocation, { placeholder: 'City, Country' })}
+            {renderInput('School or Program', school, setSchool, {
+              placeholder: 'Add your school or program',
+              icon: 'school-outline',
+              autoCapitalize: 'words',
+            })}
+            {renderInput('Bio', bio, setBio, {
+              placeholder: 'Tell us about yourself',
+              multiline: true,
+              numberOfLines: 4,
+            })}
           </View>
 
-          {/* Contact Information */}
+          {/* Contact Info */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Contact Information</Text>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email (optional)</Text>
-              <TextInput
-                style={[styles.input, emailFocused && styles.inputFocused]}
-                placeholder="your.email@example.com"
-                placeholderTextColor="#666"
-                value={email}
-                onChangeText={setEmail}
-                onFocus={() => setEmailFocused(true)}
-                onBlur={() => setEmailFocused(false)}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionAccent} />
+              <Text style={styles.sectionTitle}>Contact Information</Text>
             </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Phone (optional)</Text>
-              <TextInput
-                style={[styles.input, phoneFocused && styles.inputFocused]}
-                placeholder="(555) 123-4567"
-                placeholderTextColor="#666"
-                value={phone}
-                onChangeText={setPhone}
-                onFocus={() => setPhoneFocused(true)}
-                onBlur={() => setPhoneFocused(false)}
-                keyboardType="phone-pad"
-              />
-            </View>
+            {renderInput('Email (optional)', email, setEmail, {
+              placeholder: 'your.email@example.com',
+              keyboardType: 'email-address',
+              autoCapitalize: 'none',
+            })}
+            {renderInput('Phone (optional)', phone, setPhone, {
+              placeholder: '(555) 123-4567',
+              keyboardType: 'phone-pad',
+            })}
           </View>
 
           {/* Social Links */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Social Links</Text>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.socialLabel}>
-                <Ionicons name="logo-linkedin" size={20} color="#00ff88" />
-                <Text style={styles.label}>LinkedIn</Text>
-              </View>
-              <TextInput
-                style={[styles.input, linkedinFocused && styles.inputFocused]}
-                placeholder="linkedin.com/in/yourprofile"
-                placeholderTextColor="#666"
-                value={linkedin}
-                onChangeText={setLinkedin}
-                onFocus={() => setLinkedinFocused(true)}
-                onBlur={() => setLinkedinFocused(false)}
-                autoCapitalize="none"
-              />
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionAccent} />
+              <Text style={styles.sectionTitle}>Social Links</Text>
             </View>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.socialLabel}>
-                <Ionicons name="logo-twitter" size={20} color="#00ff88" />
-                <Text style={styles.label}>Twitter</Text>
-              </View>
-              <TextInput
-                style={[styles.input, twitterFocused && styles.inputFocused]}
-                placeholder="twitter.com/yourhandle"
-                placeholderTextColor="#666"
-                value={twitter}
-                onChangeText={setTwitter}
-                onFocus={() => setTwitterFocused(true)}
-                onBlur={() => setTwitterFocused(false)}
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.socialLabel}>
-                <Ionicons name="logo-instagram" size={20} color="#00ff88" />
-                <Text style={styles.label}>Instagram</Text>
-              </View>
-              <TextInput
-                style={[styles.input, instagramFocused && styles.inputFocused]}
-                placeholder="instagram.com/yourhandle"
-                placeholderTextColor="#666"
-                value={instagram}
-                onChangeText={setInstagram}
-                onFocus={() => setInstagramFocused(true)}
-                onBlur={() => setInstagramFocused(false)}
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.socialLabel}>
-                <Ionicons name="logo-tiktok" size={20} color="#00ff88" />
-                <Text style={styles.label}>TikTok</Text>
-              </View>
-              <TextInput
-                style={[styles.input]}
-                placeholder="@yourtiktok"
-                placeholderTextColor="#666"
-                value={tiktok}
-                onChangeText={setTiktok}
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.socialLabel}>
-                <Ionicons name="globe-outline" size={20} color="#00ff88" />
-                <Text style={styles.label}>Website (optional)</Text>
-              </View>
-              <TextInput
-                style={[styles.input, websiteFocused && styles.inputFocused]}
-                placeholder="yourwebsite.com"
-                placeholderTextColor="#666"
-                value={website}
-                onChangeText={setWebsite}
-                onFocus={() => setWebsiteFocused(true)}
-                onBlur={() => setWebsiteFocused(false)}
-                autoCapitalize="none"
-              />
-            </View>
+            {renderInput('LinkedIn', linkedin, setLinkedin, { placeholder: 'linkedin.com/in/yourprofile', icon: 'logo-linkedin', autoCapitalize: 'none' })}
+            {renderInput('Twitter', twitter, setTwitter, { placeholder: 'twitter.com/yourhandle', icon: 'logo-twitter', autoCapitalize: 'none' })}
+            {renderInput('Instagram', instagram, setInstagram, { placeholder: 'instagram.com/yourhandle', icon: 'logo-instagram', autoCapitalize: 'none' })}
+            {renderInput('TikTok', tiktok, setTiktok, { placeholder: '@yourtiktok', icon: 'logo-tiktok', autoCapitalize: 'none' })}
+            {renderInput('Website', website, setWebsite, { placeholder: 'yourwebsite.com', icon: 'globe-outline', autoCapitalize: 'none' })}
           </View>
 
-          {/* Save Button at bottom */}
-          <TouchableOpacity style={styles.saveButtonBottom} onPress={handleSave}>
-            <Text style={styles.saveButtonBottomText}>Save Changes</Text>
+          {/* Save Button */}
+          <TouchableOpacity style={styles.saveButtonBottom} onPress={handleSave} activeOpacity={0.85}>
+            <LinearGradient
+              colors={['#4FFFB0', '#00D68F']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.saveButtonGradient}
+            >
+              <Text style={styles.saveButtonBottomText}>Save Changes</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </ScrollView>
+        </KeyboardAvoidingView>
       </LinearGradient>
     </View>
   );
@@ -493,15 +323,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 20,
   },
+  headerButton: {
+    width: 50,
+  },
+  headerButtonInner: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#ffffff',
+    letterSpacing: -0.3,
   },
-  saveButton: {
+  saveButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#00ff88',
+    color: '#4FFFB0',
+    textAlign: 'right',
   },
   content: {
     flex: 1,
@@ -509,62 +354,80 @@ const styles = StyleSheet.create({
   },
   avatarSection: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 36,
   },
   avatarContainer: {
     position: 'relative',
     marginBottom: 8,
   },
+  avatarRing: {
+    padding: 3,
+    borderRadius: 64,
+    borderWidth: 2,
+    borderColor: 'rgba(79, 255, 176, 0.3)',
+  },
   avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 4,
-    borderColor: '#00ff88',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
   },
   avatarPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#2a4a3a',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(79, 255, 176, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: '#00ff88',
   },
   editIconContainer: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#00ff88',
+    bottom: 2,
+    right: 2,
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: '#4FFFB0',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: '#000000',
+    borderColor: '#060E09',
+    shadowColor: '#4FFFB0',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   changePhotoText: {
-    color: '#999',
-    fontSize: 14,
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 13,
   },
   section: {
-    marginBottom: 32,
+    marginBottom: 28,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 18,
+  },
+  sectionAccent: {
+    width: 3,
+    height: 16,
+    borderRadius: 2,
+    backgroundColor: '#4FFFB0',
   },
   sectionTitle: {
-    color: '#00ff88',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 16,
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 1.2,
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
-    color: '#cccccc',
-    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
     marginBottom: 8,
     fontWeight: '500',
   },
@@ -574,35 +437,50 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
+  socialIconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: 'rgba(79, 255, 176, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   input: {
-    backgroundColor: '#2a3a2a',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
-    borderColor: '#2a3a2a',
-    borderRadius: 12,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
     color: '#ffffff',
   },
   inputFocused: {
-    borderColor: '#00ff88',
-    borderWidth: 2,
+    borderColor: 'rgba(79, 255, 176, 0.3)',
+    backgroundColor: 'rgba(79, 255, 176, 0.04)',
   },
   textArea: {
     minHeight: 100,
     paddingTop: 14,
   },
   saveButtonBottom: {
-    backgroundColor: '#a8e6cf',
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: 8,
+    marginBottom: 50,
+    shadowColor: '#4FFFB0',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+  },
+  saveButtonGradient: {
     paddingVertical: 16,
-    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 40,
+    borderRadius: 14,
   },
   saveButtonBottomText: {
-    color: '#1a1a1a',
-    fontSize: 18,
-    fontWeight: '600',
+    color: '#0A0A0F',
+    fontSize: 17,
+    fontWeight: '700',
   },
 });

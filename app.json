@@ -69,9 +69,7 @@
       }
     },
     "owner": "ping-organization",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/f15c8ce6-81d5-41c9-ab51-a397fefa7c4c"
     }

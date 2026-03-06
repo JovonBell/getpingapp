@@ -21,6 +21,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
@@ -55,82 +56,62 @@ export default function NFCRingScreen({ navigation }) {
   const [storedRingInfo, setStoredRingInfo] = useState(null);
   const [readResult, setReadResult] = useState(null);
   const [customUrl, setCustomUrl] = useState('');
+  const [inputFocused, setInputFocused] = useState(false);
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0.3)).current;
   const pulseLoopRef = useRef(null);
   const rotateLoopRef = useRef(null);
+  const glowLoopRef = useRef(null);
 
-  // Check NFC availability on mount
   useEffect(() => {
     checkNfc();
     loadUserAndRingInfo();
-
-    return () => {
-      cancelNfcOperation();
-    };
+    return () => { cancelNfcOperation(); };
   }, []);
 
-  // Start pulse animation when scanning or reading
+  // Ambient glow animation
+  useEffect(() => {
+    glowLoopRef.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 0.6, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0.3, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    glowLoopRef.current.start();
+    return () => { if (glowLoopRef.current) glowLoopRef.current.stop(); };
+  }, []);
+
   useEffect(() => {
     if (status === STATUS.SCANNING || status === STATUS.READING) {
       startPulseAnimation();
       startRotateAnimation();
     } else {
-      // Stop and clean up animation loops
-      if (pulseLoopRef.current) {
-        pulseLoopRef.current.stop();
-        pulseLoopRef.current = null;
-      }
-      if (rotateLoopRef.current) {
-        rotateLoopRef.current.stop();
-        rotateLoopRef.current = null;
-      }
+      if (pulseLoopRef.current) { pulseLoopRef.current.stop(); pulseLoopRef.current = null; }
+      if (rotateLoopRef.current) { rotateLoopRef.current.stop(); rotateLoopRef.current = null; }
       pulseAnim.stopAnimation();
       rotateAnim.stopAnimation();
       pulseAnim.setValue(1);
       rotateAnim.setValue(0);
     }
-
-    // Cleanup on unmount
     return () => {
-      if (pulseLoopRef.current) {
-        pulseLoopRef.current.stop();
-        pulseLoopRef.current = null;
-      }
-      if (rotateLoopRef.current) {
-        rotateLoopRef.current.stop();
-        rotateLoopRef.current = null;
-      }
+      if (pulseLoopRef.current) { pulseLoopRef.current.stop(); pulseLoopRef.current = null; }
+      if (rotateLoopRef.current) { rotateLoopRef.current.stop(); rotateLoopRef.current = null; }
     };
   }, [status]);
 
-  // Fade in animation on mount
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
+    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
   }, []);
 
   const startPulseAnimation = () => {
     pulseLoopRef.current = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.2,
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
+        Animated.timing(pulseAnim, { toValue: 1.15, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
     );
     pulseLoopRef.current.start();
@@ -138,12 +119,7 @@ export default function NFCRingScreen({ navigation }) {
 
   const startRotateAnimation = () => {
     rotateLoopRef.current = Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 3000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
+      Animated.timing(rotateAnim, { toValue: 1, duration: 3000, easing: Easing.linear, useNativeDriver: true })
     );
     rotateLoopRef.current.start();
   };
@@ -151,23 +127,15 @@ export default function NFCRingScreen({ navigation }) {
   const checkNfc = async () => {
     setStatus(STATUS.CHECKING);
     const result = await checkNfcAvailability();
-
-    if (!result.supported) {
-      setStatus(STATUS.NOT_SUPPORTED);
-    } else if (!result.enabled) {
-      setStatus(STATUS.DISABLED);
-    } else {
-      setStatus(STATUS.READY);
-    }
+    if (!result.supported) setStatus(STATUS.NOT_SUPPORTED);
+    else if (!result.enabled) setStatus(STATUS.DISABLED);
+    else setStatus(STATUS.READY);
   };
 
   const loadUserAndRingInfo = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUserId(session.user.id);
-      }
-
+      if (session?.user) setUserId(session.user.id);
       const ringInfo = await getStoredRingInfo();
       setStoredRingInfo(ringInfo);
     } catch (error) {
@@ -176,43 +144,30 @@ export default function NFCRingScreen({ navigation }) {
   };
 
   const handleProgramRing = async () => {
-    // Validate URL
     const urlToWrite = customUrl.trim();
     if (!urlToWrite) {
       Alert.alert('No URL', 'Please enter a URL to write to your ring.');
       return;
     }
-
-    // Add https:// if no protocol specified
     let finalUrl = urlToWrite;
     if (!urlToWrite.startsWith('http://') && !urlToWrite.startsWith('https://')) {
       finalUrl = 'https://' + urlToWrite;
     }
-
     setStatus(STATUS.SCANNING);
     setErrorMessage(null);
     Haptic.mediumImpact();
 
     const result = await programRing(finalUrl);
-
     if (result.success) {
       setStatus(STATUS.SUCCESS);
       Haptic.success();
       setStoredRingInfo({ url: result.url, date: new Date().toISOString() });
-
-      // Reset to ready after 3 seconds
-      setTimeout(() => {
-        setStatus(STATUS.READY);
-      }, 3000);
+      setTimeout(() => setStatus(STATUS.READY), 3000);
     } else {
       setStatus(STATUS.ERROR);
       setErrorMessage(result.message);
       Haptic.error();
-
-      // Reset to ready after 5 seconds
-      setTimeout(() => {
-        setStatus(STATUS.READY);
-      }, 5000);
+      setTimeout(() => setStatus(STATUS.READY), 5000);
     }
   };
 
@@ -223,35 +178,22 @@ export default function NFCRingScreen({ navigation }) {
     Haptic.mediumImpact();
 
     const result = await readRing();
-
     if (result.success) {
       setStatus(STATUS.READ_SUCCESS);
       setReadResult(result.data);
       Haptic.success();
-
-      // Reset to ready after 5 seconds
-      setTimeout(() => {
-        setStatus(STATUS.READY);
-      }, 5000);
+      setTimeout(() => setStatus(STATUS.READY), 5000);
     } else {
       setStatus(STATUS.ERROR);
       setErrorMessage(result.error || 'Failed to read ring');
       Haptic.error();
-
-      // Reset to ready after 5 seconds
-      setTimeout(() => {
-        setStatus(STATUS.READY);
-      }, 5000);
+      setTimeout(() => setStatus(STATUS.READY), 5000);
     }
   };
 
   const handleCancel = () => {
     cancelNfcOperation();
     setStatus(STATUS.READY);
-  };
-
-  const handleOpenSettings = () => {
-    openNfcSettings();
   };
 
   const rotateInterpolate = rotateAnim.interpolate({
@@ -264,60 +206,69 @@ export default function NFCRingScreen({ navigation }) {
     const isSuccess = status === STATUS.SUCCESS || status === STATUS.READ_SUCCESS;
     const isError = status === STATUS.ERROR;
 
+    const ringColor = isSuccess ? theme.success : isError ? theme.error : isScanning ? theme.primary : 'rgba(255,255,255,0.12)';
+    const glowColor = isSuccess ? theme.success : isError ? theme.error : isScanning ? theme.primary : 'transparent';
+
     return (
-      <Animated.View
-        style={[
-          styles.ringContainer,
-          {
-            transform: [
-              { scale: isScanning ? pulseAnim : 1 },
-              { rotate: isScanning ? rotateInterpolate : '0deg' },
-            ],
-          },
-        ]}
-      >
-        {/* Outer ring glow */}
-        <View style={[styles.ringOuter, {
-          borderColor: isSuccess ? theme.success :
-                       isError ? theme.error :
-                       isScanning ? theme.primary : '#333',
-          shadowColor: isSuccess ? theme.success :
-                      isError ? theme.error :
-                      isScanning ? theme.primary : 'transparent',
+      <View style={styles.ringWrapper}>
+        {/* Ambient ring glow */}
+        <Animated.View style={[styles.ringAmbientGlow, {
+          backgroundColor: isScanning || isSuccess ? `${ringColor}10` : 'rgba(79, 255, 176, 0.02)',
+          opacity: glowAnim,
         }]} />
 
-        {/* Inner ring */}
-        <View style={[styles.ringInner, {
-          borderColor: isSuccess ? theme.success :
-                       isError ? theme.error :
-                       isScanning ? theme.primary : '#444',
-        }]}>
-          {isSuccess ? (
-            <Ionicons name="checkmark" size={48} color={theme.success} />
-          ) : isError ? (
-            <Ionicons name="close" size={48} color={theme.error} />
-          ) : isScanning ? (
-            <Ionicons name="radio" size={48} color={theme.primary} />
-          ) : (
-            <Ionicons name="radio-outline" size={48} color="#666" />
-          )}
-        </View>
-      </Animated.View>
+        <Animated.View
+          style={[
+            styles.ringContainer,
+            {
+              transform: [
+                { scale: isScanning ? pulseAnim : 1 },
+                { rotate: isScanning ? rotateInterpolate : '0deg' },
+              ],
+            },
+          ]}
+        >
+          {/* Outer ring */}
+          <View style={[styles.ringOuter, {
+            borderColor: ringColor,
+            shadowColor: glowColor,
+            shadowOpacity: isScanning || isSuccess ? 0.6 : 0,
+          }]} />
+
+          {/* Middle decorative ring */}
+          <View style={[styles.ringMiddle, {
+            borderColor: isScanning || isSuccess ? `${ringColor}40` : 'rgba(255,255,255,0.05)',
+          }]} />
+
+          {/* Inner ring */}
+          <View style={[styles.ringInner, { borderColor: ringColor }]}>
+            {isSuccess ? (
+              <Ionicons name="checkmark" size={40} color={theme.success} />
+            ) : isError ? (
+              <Ionicons name="close" size={40} color={theme.error} />
+            ) : isScanning ? (
+              <Ionicons name="radio" size={40} color={theme.primary} />
+            ) : (
+              <Ionicons name="radio-outline" size={40} color="rgba(255,255,255,0.3)" />
+            )}
+          </View>
+        </Animated.View>
+      </View>
     );
   };
 
   const renderStatus = () => {
     switch (status) {
       case STATUS.CHECKING:
-        return (
-          <Text style={styles.statusText}>Checking NFC availability...</Text>
-        );
+        return <Text style={styles.statusText}>Checking NFC availability...</Text>;
 
       case STATUS.NOT_SUPPORTED:
         return (
           <View style={styles.statusContainer}>
-            <Ionicons name="warning" size={32} color={theme.warning} />
-            <Text style={styles.statusTitle}>NFC Not Available</Text>
+            <View style={styles.statusBadge}>
+              <Ionicons name="warning" size={20} color={theme.warning} />
+              <Text style={[styles.statusBadgeText, { color: theme.warning }]}>Not Available</Text>
+            </View>
             <Text style={styles.statusText}>
               Your device doesn't support NFC.{'\n'}
               You'll need an NFC-enabled phone to program your ring.
@@ -328,53 +279,32 @@ export default function NFCRingScreen({ navigation }) {
       case STATUS.DISABLED:
         return (
           <View style={styles.statusContainer}>
-            <Ionicons name="settings" size={32} color={theme.warning} />
-            <Text style={styles.statusTitle}>NFC is Disabled</Text>
-            <Text style={styles.statusText}>
-              Please enable NFC in your device settings.
-            </Text>
+            <View style={styles.statusBadge}>
+              <Ionicons name="settings" size={20} color={theme.warning} />
+              <Text style={[styles.statusBadgeText, { color: theme.warning }]}>NFC Disabled</Text>
+            </View>
+            <Text style={styles.statusText}>Please enable NFC in your device settings.</Text>
             <TouchableOpacity
-              style={[styles.secondaryButton, { borderColor: theme.primary }]}
-              onPress={handleOpenSettings}
+              style={styles.glassButton}
+              onPress={() => openNfcSettings()}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.secondaryButtonText, { color: theme.primary }]}>
-                Open Settings
-              </Text>
+              <Text style={[styles.glassButtonText, { color: theme.primary }]}>Open Settings</Text>
             </TouchableOpacity>
           </View>
         );
 
       case STATUS.SCANNING:
-        return (
-          <View style={styles.statusContainer}>
-            <Text style={[styles.statusTitle, { color: theme.primary }]}>
-              Programming...
-            </Text>
-            <Text style={styles.statusText}>
-              Hold your ring near the {Platform.OS === 'ios' ? 'top of your iPhone' : 'back of your phone'}
-            </Text>
-            <TouchableOpacity
-              style={[styles.cancelButton]}
-              onPress={handleCancel}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
       case STATUS.READING:
         return (
           <View style={styles.statusContainer}>
             <Text style={[styles.statusTitle, { color: theme.primary }]}>
-              Reading...
+              {status === STATUS.SCANNING ? 'Programming...' : 'Reading...'}
             </Text>
             <Text style={styles.statusText}>
               Hold your ring near the {Platform.OS === 'ios' ? 'top of your iPhone' : 'back of your phone'}
             </Text>
-            <TouchableOpacity
-              style={[styles.cancelButton]}
-              onPress={handleCancel}
-            >
+            <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -383,29 +313,22 @@ export default function NFCRingScreen({ navigation }) {
       case STATUS.SUCCESS:
         return (
           <View style={styles.statusContainer}>
-            <Text style={[styles.statusTitle, { color: theme.success }]}>
-              Ring Programmed!
-            </Text>
-            <Text style={styles.statusText}>
-              Your ring is ready to share your contact info.
-            </Text>
+            <Text style={[styles.statusTitle, { color: theme.success }]}>Ring Programmed!</Text>
+            <Text style={styles.statusText}>Your ring is ready to share your contact info.</Text>
           </View>
         );
 
       case STATUS.READ_SUCCESS:
         return (
           <View style={styles.statusContainer}>
-            <Text style={[styles.statusTitle, { color: theme.success }]}>
-              Ring Read!
-            </Text>
+            <Text style={[styles.statusTitle, { color: theme.success }]}>Ring Read!</Text>
             {readResult?.url ? (
-              <Text style={styles.statusText}>
-                URL on ring:{'\n'}{readResult.url}
-              </Text>
+              <View style={styles.readResultCard}>
+                <Text style={styles.readResultLabel}>URL on ring</Text>
+                <Text style={styles.readResultUrl}>{readResult.url}</Text>
+              </View>
             ) : (
-              <Text style={styles.statusText}>
-                Ring is empty or has no URL.
-              </Text>
+              <Text style={styles.statusText}>Ring is empty or has no URL.</Text>
             )}
           </View>
         );
@@ -413,17 +336,14 @@ export default function NFCRingScreen({ navigation }) {
       case STATUS.ERROR:
         return (
           <View style={styles.statusContainer}>
-            <Text style={[styles.statusTitle, { color: theme.error }]}>
-              Operation Failed
-            </Text>
+            <Text style={[styles.statusTitle, { color: theme.error }]}>Operation Failed</Text>
             <Text style={styles.statusText}>{errorMessage}</Text>
             <TouchableOpacity
-              style={[styles.secondaryButton, { borderColor: theme.primary }]}
+              style={styles.glassButton}
               onPress={() => setStatus(STATUS.READY)}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.secondaryButtonText, { color: theme.primary }]}>
-                Try Again
-              </Text>
+              <Text style={[styles.glassButtonText, { color: theme.primary }]}>Try Again</Text>
             </TouchableOpacity>
           </View>
         );
@@ -441,121 +361,122 @@ export default function NFCRingScreen({ navigation }) {
     }
   };
 
-  const canProgram = status === STATUS.READY;
-  const canRead = status === STATUS.READY;
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView
+      <LinearGradient
+        colors={['#0A0A0F', '#080D0A', '#050805', '#000000']}
+        locations={[0, 0.3, 0.6, 1]}
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView
+        <KeyboardAvoidingView
           style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.title}>NFC Ring</Text>
-              {storedRingInfo?.date && status === STATUS.READY && (
-                <Text style={styles.subtitle}>
-                  Last programmed: {new Date(storedRingInfo.date).toLocaleDateString()}
-                </Text>
-              )}
-            </View>
-
-            {/* Ring Animation */}
-            <View style={styles.ringWrapper}>
-              {renderRingIcon()}
-            </View>
-
-            {/* Status */}
-            {renderStatus()}
-
-            {/* URL Input */}
-            {status === STATUS.READY && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Enter URL to write:</Text>
-                <TextInput
-                  style={[styles.urlInput, { borderColor: theme.primary }]}
-                  placeholder="instagram.com/yourusername"
-                  placeholderTextColor="#666"
-                  value={customUrl}
-                  onChangeText={setCustomUrl}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                />
-                <Text style={styles.inputHint}>
-                  e.g. your Instagram, YouTube, website, or any link
-                </Text>
-              </View>
-            )}
-
-            {/* Action Buttons */}
-            {status === STATUS.READY && (
-              <View style={styles.buttonRow}>
-                {/* Program Button */}
-                {canProgram && (
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: theme.primary }]}
-                    onPress={handleProgramRing}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="create-outline" size={24} color="#000" />
-                    <Text style={styles.actionButtonText}>Write</Text>
-                  </TouchableOpacity>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ flexGrow: 1 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+              {/* Header */}
+              <View style={styles.header}>
+                <Text style={styles.title}>NFC Ring</Text>
+                {storedRingInfo?.date && status === STATUS.READY && (
+                  <View style={styles.lastProgrammedBadge}>
+                    <Ionicons name="checkmark-circle" size={12} color="#4FFFB0" />
+                    <Text style={styles.lastProgrammedText}>
+                      Last programmed {new Date(storedRingInfo.date).toLocaleDateString()}
+                    </Text>
+                  </View>
                 )}
+              </View>
 
-                {/* Read Button */}
-                {canRead && (
+              {/* Ring Animation */}
+              {renderRingIcon()}
+
+              {/* Status */}
+              {renderStatus()}
+
+              {/* URL Input */}
+              {status === STATUS.READY && (
+                <View style={styles.inputSection}>
+                  <Text style={styles.inputLabel}>Enter URL to write</Text>
+                  <View style={[
+                    styles.inputWrapper,
+                    inputFocused && styles.inputWrapperFocused,
+                  ]}>
+                    <Ionicons name="link-outline" size={18} color={inputFocused ? '#4FFFB0' : 'rgba(255,255,255,0.25)'} style={{ marginRight: 10 }} />
+                    <TextInput
+                      style={styles.urlInput}
+                      placeholder="instagram.com/yourusername"
+                      placeholderTextColor="rgba(255,255,255,0.2)"
+                      value={customUrl}
+                      onChangeText={setCustomUrl}
+                      onFocus={() => setInputFocused(true)}
+                      onBlur={() => setInputFocused(false)}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                    />
+                  </View>
+                  <Text style={styles.inputHint}>
+                    Instagram, YouTube, website, or any link
+                  </Text>
+                </View>
+              )}
+
+              {/* Action Buttons */}
+              {status === STATUS.READY && (
+                <View style={styles.buttonRow}>
                   <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: '#333', borderWidth: 1, borderColor: theme.primary }]}
+                    style={styles.writeButton}
+                    onPress={handleProgramRing}
+                    activeOpacity={0.85}
+                  >
+                    <LinearGradient
+                      colors={['#4FFFB0', '#00D68F']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.writeButtonGradient}
+                    >
+                      <Ionicons name="create-outline" size={20} color="#0A0A0F" />
+                      <Text style={styles.writeButtonText}>Write</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.readButton}
                     onPress={handleReadRing}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="scan-outline" size={24} color={theme.primary} />
-                    <Text style={[styles.actionButtonText, { color: theme.primary }]}>Read</Text>
+                    <Ionicons name="scan-outline" size={20} color="#4FFFB0" />
+                    <Text style={styles.readButtonText}>Read</Text>
                   </TouchableOpacity>
-                )}
-              </View>
-            )}
+                </View>
+              )}
 
-        {/* Info Section */}
-            {status === STATUS.READY && (
-              <View style={styles.infoSection}>
-                <Text style={styles.infoTitle}>How it works</Text>
-                <View style={styles.infoItem}>
-                  <View style={[styles.infoNumber, { backgroundColor: theme.primary }]}>
-                    <Text style={styles.infoNumberText}>1</Text>
-                  </View>
-                  <Text style={styles.infoText}>
-                    Enter any URL - Instagram, YouTube, your website, etc.
-                  </Text>
+              {/* How it Works */}
+              {status === STATUS.READY && (
+                <View style={styles.infoSection}>
+                  <Text style={styles.infoTitle}>How it works</Text>
+                  {[
+                    { num: '1', text: 'Enter any URL \u2014 Instagram, YouTube, your website, etc.' },
+                    { num: '2', text: 'Tap "Write" and hold your ring to your phone' },
+                    { num: '3', text: 'Anyone who taps your ring will open your link!' },
+                  ].map((item) => (
+                    <View style={styles.infoItem} key={item.num}>
+                      <View style={styles.infoNumber}>
+                        <Text style={styles.infoNumberText}>{item.num}</Text>
+                      </View>
+                      <Text style={styles.infoText}>{item.text}</Text>
+                    </View>
+                  ))}
                 </View>
-                <View style={styles.infoItem}>
-                  <View style={[styles.infoNumber, { backgroundColor: theme.primary }]}>
-                    <Text style={styles.infoNumberText}>2</Text>
-                  </View>
-                  <Text style={styles.infoText}>
-                    Tap "Write" and hold your ring to your phone
-                  </Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <View style={[styles.infoNumber, { backgroundColor: theme.primary }]}>
-                    <Text style={styles.infoNumberText}>3</Text>
-                  </View>
-                  <Text style={styles.infoText}>
-                    Anyone who taps your ring will open your link!
-                  </Text>
-                </View>
-              </View>
-            )}
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+              )}
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </LinearGradient>
     </SafeAreaView>
   );
 }
@@ -563,7 +484,7 @@ export default function NFCRingScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#0A0A0F',
   },
   content: {
     flex: 1,
@@ -571,24 +492,40 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 20,
+    marginTop: 16,
+    marginBottom: 8,
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#fff',
+    letterSpacing: -0.5,
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+  lastProgrammedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(79, 255, 176, 0.06)',
+  },
+  lastProgrammedText: {
+    fontSize: 12,
+    color: 'rgba(79, 255, 176, 0.6)',
   },
   ringWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
     height: 200,
-    marginVertical: 20,
+    marginVertical: 12,
+  },
+  ringAmbientGlow: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
   },
   ringContainer: {
     width: 160,
@@ -601,110 +538,72 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: 80,
-    borderWidth: 3,
+    borderWidth: 2,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
+    shadowRadius: 24,
+  },
+  ringMiddle: {
+    position: 'absolute',
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    borderWidth: 1,
   },
   ringInner: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 4,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
   statusContainer: {
     alignItems: 'center',
     paddingHorizontal: 20,
-    minHeight: 120,
+    minHeight: 100,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 170, 0, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 170, 0, 0.15)',
+    marginBottom: 12,
+  },
+  statusBadgeText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   statusTitle: {
     fontSize: 22,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#fff',
-    marginTop: 12,
     marginBottom: 8,
     textAlign: 'center',
   },
   statusText: {
     fontSize: 15,
-    color: '#888',
+    color: 'rgba(255,255,255,0.45)',
     textAlign: 'center',
     lineHeight: 22,
   },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 30,
-    marginTop: 24,
-    gap: 10,
-  },
-  primaryButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    marginTop: 16,
-    paddingHorizontal: 20,
-  },
-  inputContainer: {
-    marginTop: 20,
-    paddingHorizontal: 10,
-  },
-  inputLabel: {
-    fontSize: 14,
-    color: '#888',
-    marginBottom: 8,
-  },
-  urlInput: {
-    backgroundColor: '#1a1a1a',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#fff',
-  },
-  inputHint: {
-    fontSize: 12,
-    color: '#555',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 25,
-    gap: 8,
-    minWidth: 130,
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-  },
-  secondaryButton: {
+  glassButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 20,
+    borderRadius: 14,
     borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.2)',
+    backgroundColor: 'rgba(79, 255, 176, 0.06)',
     marginTop: 16,
   },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
+  glassButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   cancelButton: {
     paddingVertical: 12,
@@ -712,44 +611,158 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   cancelButtonText: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  readResultCard: {
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(79, 255, 176, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.12)',
+    alignItems: 'center',
+  },
+  readResultLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.35)',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  readResultUrl: {
+    fontSize: 14,
+    color: '#4FFFB0',
+    fontWeight: '500',
+  },
+  inputSection: {
+    marginTop: 20,
+    paddingHorizontal: 4,
+  },
+  inputLabel: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    fontWeight: '600',
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 2,
+  },
+  inputWrapperFocused: {
+    borderColor: 'rgba(79, 255, 176, 0.3)',
+    backgroundColor: 'rgba(79, 255, 176, 0.04)',
+  },
+  urlInput: {
+    flex: 1,
     fontSize: 16,
-    color: '#888',
+    color: '#fff',
+    paddingVertical: 14,
   },
-  infoSection: {
-    marginTop: 40,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#222',
+  inputHint: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.2)',
+    marginTop: 8,
+    textAlign: 'center',
   },
-  infoTitle: {
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 20,
+  },
+  writeButton: {
+    flex: 1,
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#4FFFB0',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+  },
+  writeButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    gap: 8,
+    borderRadius: 14,
+  },
+  writeButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0A0A0F',
+  },
+  readButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    borderRadius: 14,
+    gap: 8,
+    backgroundColor: 'rgba(79, 255, 176, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.2)',
+  },
+  readButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#666',
-    marginBottom: 16,
+    color: '#4FFFB0',
+  },
+  infoSection: {
+    marginTop: 32,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+    marginBottom: 40,
+  },
+  infoTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.3)',
+    marginBottom: 20,
     textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: 16,
-    gap: 12,
+    gap: 14,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
   },
   infoNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(79, 255, 176, 0.12)',
   },
   infoNumberText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#000',
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4FFFB0',
   },
   infoText: {
     flex: 1,
     fontSize: 14,
-    color: '#888',
+    color: 'rgba(255,255,255,0.5)',
     lineHeight: 20,
   },
 });

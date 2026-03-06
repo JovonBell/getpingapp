@@ -25,7 +25,6 @@ export default function MagicLinkSentScreen({ navigation, route }) {
 
   const handleResend = async () => {
     if (resendCooldown > 0) return;
-
     setLoading(true);
     try {
       const res = await signInWithMagicLink(email);
@@ -45,21 +44,21 @@ export default function MagicLinkSentScreen({ navigation, route }) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#0a2e1a', '#05140a', '#000000']}
+        colors={['#0A1A12', '#060E09', '#020804', '#000000']}
+        locations={[0, 0.3, 0.6, 1]}
         style={styles.gradient}
       >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <View style={styles.backButtonInner}>
+            <Ionicons name="arrow-back" size={20} color="#fff" />
+          </View>
         </TouchableOpacity>
 
         <View style={styles.content}>
-          {/* Email icon with animated ring */}
-          <View style={styles.iconContainer}>
-            <View style={styles.iconRing}>
-              <Ionicons name="mail" size={48} color="#a8e6cf" />
+          {/* Email icon */}
+          <View style={styles.iconGlow}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="mail" size={36} color="#4FFFB0" />
             </View>
           </View>
 
@@ -75,40 +74,42 @@ export default function MagicLinkSentScreen({ navigation, route }) {
             The link will expire in 1 hour.
           </Text>
 
-          <View style={styles.tipsContainer}>
+          {/* Tips card */}
+          <View style={styles.tipsCard}>
             <View style={styles.tip}>
-              <Ionicons name="checkmark-circle" size={20} color="#a8e6cf" />
+              <Ionicons name="checkmark-circle" size={18} color="#4FFFB0" />
               <Text style={styles.tipText}>Check your spam folder</Text>
             </View>
-            <View style={styles.tip}>
-              <Ionicons name="checkmark-circle" size={20} color="#a8e6cf" />
+            <View style={[styles.tip, { borderBottomWidth: 0 }]}>
+              <Ionicons name="checkmark-circle" size={18} color="#4FFFB0" />
               <Text style={styles.tipText}>Allow emails from ping</Text>
             </View>
           </View>
 
+          {/* Resend Button */}
           <TouchableOpacity
-            style={[
-              styles.resendButton,
-              resendCooldown > 0 && styles.resendButtonDisabled,
-            ]}
+            style={styles.resendButton}
             onPress={handleResend}
             disabled={resendCooldown > 0 || loading}
+            activeOpacity={0.85}
           >
-            {loading ? (
-              <ActivityIndicator color="#1a1a1a" />
-            ) : resendCooldown > 0 ? (
-              <Text style={styles.resendButtonTextDisabled}>
-                Resend in {resendCooldown}s
-              </Text>
+            {resendCooldown > 0 ? (
+              <View style={styles.resendDisabledInner}>
+                <Text style={styles.resendDisabledText}>Resend in {resendCooldown}s</Text>
+              </View>
             ) : (
-              <Text style={styles.resendButtonText}>Resend Email</Text>
+              <LinearGradient
+                colors={['#4FFFB0', '#00D68F']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.resendGradient}
+              >
+                {loading ? <ActivityIndicator color="#0A0A0F" /> : <Text style={styles.resendText}>Resend Email</Text>}
+              </LinearGradient>
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.tryAnotherButton}
-            onPress={() => navigation.goBack()}
-          >
+          <TouchableOpacity style={styles.tryAnotherButton} onPress={() => navigation.goBack()}>
             <Text style={styles.tryAnotherText}>Try another email</Text>
           </TouchableOpacity>
         </View>
@@ -129,7 +130,16 @@ const styles = StyleSheet.create({
     top: 60,
     left: 20,
     zIndex: 10,
-    padding: 8,
+  },
+  backButtonInner: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,
@@ -137,85 +147,105 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 30,
   },
-  iconContainer: {
-    marginBottom: 30,
+  iconGlow: {
+    marginBottom: 24,
+    shadowColor: '#4FFFB0',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
   },
-  iconRing: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(168, 230, 207, 0.1)',
-    borderWidth: 2,
-    borderColor: 'rgba(168, 230, 207, 0.3)',
+  iconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(79, 255, 176, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 255, 176, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#ffffff',
-    marginBottom: 16,
+    marginBottom: 14,
+    letterSpacing: -0.5,
   },
   description: {
     fontSize: 16,
-    color: '#aaa',
+    color: 'rgba(255,255,255,0.45)',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
     lineHeight: 24,
   },
   emailText: {
-    color: '#a8e6cf',
+    color: '#4FFFB0',
     fontWeight: '600',
   },
   instructions: {
     fontSize: 14,
-    color: '#888',
+    color: 'rgba(255,255,255,0.3)',
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: 28,
     paddingHorizontal: 20,
     lineHeight: 20,
   },
-  tipsContainer: {
-    marginBottom: 30,
+  tipsCard: {
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 16,
+    marginBottom: 28,
+    overflow: 'hidden',
   },
   tip: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
   },
   tipText: {
-    color: '#ccc',
+    color: 'rgba(255,255,255,0.6)',
     fontSize: 14,
-    marginLeft: 10,
   },
   resendButton: {
-    backgroundColor: '#a8e6cf',
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    borderRadius: 30,
     width: '100%',
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  resendGradient: {
+    paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 16,
+    borderRadius: 14,
   },
-  resendButtonDisabled: {
-    backgroundColor: 'rgba(168, 230, 207, 0.3)',
-  },
-  resendButtonText: {
-    color: '#1a1a1a',
+  resendText: {
+    color: '#0A0A0F',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  resendButtonTextDisabled: {
-    color: '#888',
+  resendDisabledInner: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  resendDisabledText: {
+    color: 'rgba(255,255,255,0.3)',
     fontSize: 16,
     fontWeight: '600',
   },
   tryAnotherButton: {
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   tryAnotherText: {
-    color: '#a8e6cf',
+    color: '#4FFFB0',
     fontSize: 14,
-    textDecorationLine: 'underline',
   },
 });

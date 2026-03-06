@@ -21,7 +21,7 @@ export default function SettingsScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0A0A0F', '#0D1117', '#0A0A0F']} style={styles.gradient}>
+      <LinearGradient colors={['#0A0A0F', '#080D0A', '#050805', '#000000']} locations={[0, 0.3, 0.6, 1]} style={styles.gradient}>
         <Text style={styles.headerTitle}>Settings</Text>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -37,7 +37,7 @@ export default function SettingsScreen({ navigation }) {
                 </View>
                 <Text style={styles.rowLabel}>About</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#444" />
+              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.15)" />
             </TouchableOpacity>
           </View>
 
@@ -53,7 +53,7 @@ export default function SettingsScreen({ navigation }) {
                 </View>
                 <Text style={[styles.rowLabel, { color: '#FF6B6B' }]}>Delete Account</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#444" />
+              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.15)" />
             </TouchableOpacity>
           </View>
 
@@ -81,12 +81,12 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 20 },
   section: { marginBottom: 28 },
   sectionTitle: {
-    color: '#555',
-    fontSize: 13,
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 12,
     fontWeight: '700',
     marginBottom: 10,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
   },
   row: {
     flexDirection: 'row',

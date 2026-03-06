@@ -43,10 +43,9 @@ export const saveProfileToSupabase = async (profileData, userId) => {
         bio: profileData.bio,
         avatar_url: profileData.avatar,
         phone_number: profileData.phone,
-        email: profileData.email,
         social_links: profileData.socialLinks,
         updated_at: new Date().toISOString(),
-      })
+      }, { onConflict: 'user_id' })
       .select()
       .single();
 

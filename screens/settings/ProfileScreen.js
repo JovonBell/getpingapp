@@ -79,7 +79,7 @@ export default function ProfileScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={['#0A0A0F', '#0D1117', '#0A0A0F']} style={styles.gradient}>
+        <LinearGradient colors={['#0A0A0F', '#080D0A', '#050805', '#000000']} locations={[0, 0.3, 0.6, 1]} style={styles.gradient}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#4FFFB0" />
           </View>
@@ -89,7 +89,10 @@ export default function ProfileScreen({ navigation }) {
   }
 
   const openLink = (url) => {
-    if (url) Linking.openURL(url).catch(err => console.error('Error opening link:', err));
+    const str = typeof url === 'string' ? url : typeof url === 'object' && url?.url ? url.url : '';
+    if (!str) return;
+    const full = str.startsWith('http') ? str : `https://${str}`;
+    Linking.openURL(full).catch(err => console.error('Error opening link:', err));
   };
   const openEmail = () => { if (profile.email) Linking.openURL(`mailto:${profile.email}`); };
   const openPhone = () => { if (profile.phone) Linking.openURL(`tel:${profile.phone}`); };
@@ -106,7 +109,7 @@ export default function ProfileScreen({ navigation }) {
   if (!profile?.name) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={['#0A0A0F', '#0D1117', '#0A0A0F']} style={styles.gradient}>
+        <LinearGradient colors={['#0A0A0F', '#080D0A', '#050805', '#000000']} locations={[0, 0.3, 0.6, 1]} style={styles.gradient}>
           <View style={styles.emptyState}>
             <View style={styles.emptyAvatarRing}>
               <View style={styles.emptyAvatarInner}>
@@ -139,7 +142,7 @@ export default function ProfileScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0A0A0F', '#0D1117', '#0A0A0F']} style={styles.gradient}>
+      <LinearGradient colors={['#0A0A0F', '#080D0A', '#050805', '#000000']} locations={[0, 0.3, 0.6, 1]} style={styles.gradient}>
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Card */}
           <View style={styles.card}>

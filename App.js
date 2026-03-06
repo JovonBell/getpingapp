@@ -15,8 +15,13 @@ import CreateAccountScreen from './screens/onboarding/CreateAccountScreen';
 import EmailAuthScreen from './screens/onboarding/EmailAuthScreen';
 import MagicLinkSentScreen from './screens/onboarding/MagicLinkSentScreen';
 
-// Lazy load NFCRingScreen to avoid loading react-native-nfc-manager in Expo Go
-const NFCRingScreen = React.lazy(() => import('./screens/main/NFCRingScreen'));
+// Lazy load NFCRingScreen — native NFC module crashes in Expo Go at import time
+const NFCRingScreen = React.lazy(() =>
+  import('./screens/main/NFCRingScreen').then(
+    (mod) => mod,
+    () => ({ default: () => { throw new Error('NFC not available'); } })
+  )
+);
 
 // Error boundary for NFC tab — native module not available in Expo Go
 class NFCErrorBoundary extends React.Component {
@@ -26,11 +31,25 @@ class NFCErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <View style={{ flex: 1, backgroundColor: '#0A0A0F', alignItems: 'center', justifyContent: 'center', padding: 30 }}>
-          <Ionicons name="radio-outline" size={64} color="#4FFFB0" />
-          <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700', marginTop: 20 }}>NFC Ring</Text>
-          <Text style={{ color: '#999', fontSize: 15, textAlign: 'center', marginTop: 12, lineHeight: 22 }}>
+          <View style={{
+            width: 80, height: 80, borderRadius: 40,
+            backgroundColor: 'rgba(79, 255, 176, 0.06)',
+            borderWidth: 1, borderColor: 'rgba(79, 255, 176, 0.12)',
+            alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+          }}>
+            <Ionicons name="radio-outline" size={36} color="#4FFFB0" />
+          </View>
+          <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700' }}>NFC Ring</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, textAlign: 'center', marginTop: 10, lineHeight: 22 }}>
             NFC requires a development build.{'\n'}Use "eas build" to create one, or test on a physical device.
           </Text>
+          <View style={{
+            marginTop: 24, paddingHorizontal: 20, paddingVertical: 10,
+            borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.04)',
+            borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+          }}>
+            <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>Running in Expo Go</Text>
+          </View>
         </View>
       );
     }
@@ -57,17 +76,19 @@ function MainTabs() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#000000',
+          backgroundColor: 'rgba(10, 10, 15, 0.95)',
           borderTopWidth: 1,
-          borderTopColor: '#2a3a2a',
+          borderTopColor: 'rgba(255, 255, 255, 0.04)',
           paddingBottom: 30,
-          paddingTop: 12,
-          height: 90,
+          paddingTop: 10,
+          height: 88,
         },
         tabBarActiveTintColor: theme.primary,
-        tabBarInactiveTintColor: '#666',
+        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.25)',
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
+          fontWeight: '600',
+          letterSpacing: 0.3,
         },
       }}
     >
@@ -92,7 +113,7 @@ function MainTabs() {
       >
         {(props) => (
           <NFCErrorBoundary>
-            <React.Suspense fallback={<View style={{flex:1,justifyContent:'center',alignItems:'center',backgroundColor:'#000'}}><ActivityIndicator size="large" color="#4FFFB0" /></View>}>
+            <React.Suspense fallback={<View style={{flex:1,justifyContent:'center',alignItems:'center',backgroundColor:'#0A0A0F'}}><ActivityIndicator size="large" color="#4FFFB0" /></View>}>
               <NFCRingScreen {...props} />
             </React.Suspense>
           </NFCErrorBoundary>
@@ -216,8 +237,9 @@ export default function App() {
     <ThemeProvider>
       <NavigationContainer ref={navigationRef}>
         {authLoading ? (
-          <View style={{ flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ flex: 1, backgroundColor: '#0A0A0F', alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator size="large" color="#4FFFB0" />
+            <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, marginTop: 16, letterSpacing: 1 }}>ping!</Text>
           </View>
         ) : (
           <Stack.Navigator
