@@ -41,20 +41,20 @@ export default function ProfileEditScreen({ navigation, route }) {
   const [focusedField, setFocusedField] = useState(null);
 
   useEffect(() => {
-    if (!currentProfile.name) {
-      getCurrentUser().then(({ success, user }) => {
-        if (success && user) {
-          const meta = user.user_metadata || {};
-          const authName = meta.full_name || meta.name || '';
-          if (authName && !name) setName(authName);
-          if (user.email && !email) setEmail(user.email);
-          if (meta.avatar_url && !avatar) setAvatar(meta.avatar_url);
-          console.log('[ProfileEdit] Pre-filled from auth:', { name: authName, email: user.email, hasAvatar: !!meta.avatar_url });
-        }
-      }).catch((e) => {
-        console.warn('[ProfileEdit] Could not pre-fill from auth:', e?.message);
-      });
-    }
+    // Always try to auto-populate from auth data (Google/Apple)
+    getCurrentUser().then(({ success, user }) => {
+      if (success && user) {
+        const meta = user.user_metadata || {};
+        const authName = meta.full_name || meta.name || '';
+        if (authName && !name) setName(authName);
+        // Always fill email from auth if empty — Google sign-in provides this
+        if (user.email && !email) setEmail(user.email);
+        if (meta.avatar_url && !avatar) setAvatar(meta.avatar_url);
+        console.log('[ProfileEdit] Pre-filled from auth:', { name: authName, email: user.email, hasAvatar: !!meta.avatar_url });
+      }
+    }).catch((e) => {
+      console.warn('[ProfileEdit] Could not pre-fill from auth:', e?.message);
+    });
   }, []);
 
   const pickImage = async () => {

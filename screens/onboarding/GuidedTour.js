@@ -110,19 +110,12 @@ export default function GuidedTour({ onComplete, onSwitchTab }) {
   }, []);
 
   const checkTourState = async () => {
-    try {
-      const complete = await AsyncStorage.getItem(TOUR_KEY);
-      if (complete === 'true') {
-        setVisible(false);
-        return;
-      }
-      const savedStep = await AsyncStorage.getItem(TOUR_STEP_KEY);
-      const s = savedStep ? parseInt(savedStep, 10) : 0;
-      setStep(s);
-      setVisible(true);
-    } catch {
-      setVisible(false);
-    }
+    // TODO: restore gate after confirming onboarding flow
+    // For now, always show tour so we can preview it
+    await AsyncStorage.removeItem(TOUR_KEY);
+    await AsyncStorage.removeItem(TOUR_STEP_KEY);
+    setStep(0);
+    setVisible(true);
   };
 
   // Welcome splash animations

@@ -43,6 +43,8 @@ export const saveProfileToSupabase = async (profileData, userId) => {
         bio: profileData.bio,
         avatar_url: profileData.avatar,
         phone_number: profileData.phone,
+        email: profileData.email,
+        school: profileData.school,
         social_links: profileData.socialLinks,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' })
@@ -79,6 +81,7 @@ export const getProfileFromSupabase = async (userId) => {
       avatar: data.avatar_url,
       phone: data.phone_number,
       email: data.email,
+      school: data.school,
       socialLinks: data.social_links || {},
     };
 

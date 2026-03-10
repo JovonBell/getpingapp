@@ -48,7 +48,11 @@
         "NSPhotoLibraryUsageDescription": "Ping uses your photo library to let you choose and upload a profile photo.",
         "NSPhotoLibraryAddUsageDescription": "Ping saves your selected profile photo.",
         "NFCReaderUsageDescription": "Ping needs NFC access to program your ring for contact sharing.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        }
       },
       "entitlements": {
         "com.apple.developer.nfc.readersession.formats": [
