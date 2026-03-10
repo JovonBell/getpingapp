@@ -17,10 +17,24 @@ import MagicLinkSentScreen from './screens/onboarding/MagicLinkSentScreen';
 
 // Lazy load NFCRingScreen — native NFC module crashes in Expo Go at import time
 const NFCRingScreen = React.lazy(() =>
-  import('./screens/main/NFCRingScreen').then(
-    (mod) => mod,
-    () => ({ default: () => { throw new Error('NFC not available'); } })
-  )
+  import('./screens/main/NFCRingScreen').catch(() => ({
+    default: () => (
+      <View style={{ flex: 1, backgroundColor: '#0A0A0F', alignItems: 'center', justifyContent: 'center', padding: 30 }}>
+        <View style={{
+          width: 80, height: 80, borderRadius: 40,
+          backgroundColor: 'rgba(79, 255, 176, 0.06)',
+          borderWidth: 1, borderColor: 'rgba(79, 255, 176, 0.12)',
+          alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+        }}>
+          <Ionicons name="radio-outline" size={36} color="#4FFFB0" />
+        </View>
+        <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700' }}>NFC Ring</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, textAlign: 'center', marginTop: 10, lineHeight: 22 }}>
+          NFC requires a development build.{'\n'}Use "eas build" to create one.
+        </Text>
+      </View>
+    ),
+  }))
 );
 
 // Error boundary for NFC tab — native module not available in Expo Go
