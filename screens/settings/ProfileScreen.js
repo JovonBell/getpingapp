@@ -68,8 +68,8 @@ export default function ProfileScreen({ navigation }) {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Check out my ping! profile: https://getping.today/${userId}`,
-        url: `https://getping.today/${userId}`,
+        message: `Check out my ping! profile: https://www.getping.today/ping/${userId}`,
+        url: `https://www.getping.today/ping/${userId}`,
       });
     } catch (e) {
       console.warn('[ProfileScreen] Share failed:', e?.message);

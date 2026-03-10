@@ -135,7 +135,13 @@ export default function NFCRingScreen({ navigation }) {
   const loadUserAndRingInfo = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) setUserId(session.user.id);
+      if (session?.user) {
+        setUserId(session.user.id);
+        // Pre-populate URL with user's profile link if empty
+        if (!customUrl) {
+          setCustomUrl(`https://www.getping.today/ping/${session.user.id}`);
+        }
+      }
       const ringInfo = await getStoredRingInfo();
       setStoredRingInfo(ringInfo);
     } catch (error) {
@@ -354,7 +360,7 @@ export default function NFCRingScreen({ navigation }) {
           <View style={styles.statusContainer}>
             <Text style={styles.statusTitle}>Program Your Ring</Text>
             <Text style={styles.statusText}>
-              Write any link to your NFC ring and share it with a tap.
+              Tap here, then tap your ring to the top of your phone.
             </Text>
           </View>
         );
@@ -400,7 +406,7 @@ export default function NFCRingScreen({ navigation }) {
               {/* URL Input */}
               {status === STATUS.READY && (
                 <View style={styles.inputSection}>
-                  <Text style={styles.inputLabel}>Enter URL to write</Text>
+                  <Text style={styles.inputLabel}>Your ping link</Text>
                   <View style={[
                     styles.inputWrapper,
                     inputFocused && styles.inputWrapperFocused,
@@ -420,7 +426,7 @@ export default function NFCRingScreen({ navigation }) {
                     />
                   </View>
                   <Text style={styles.inputHint}>
-                    Instagram, YouTube, website, or any link
+                    your profile link is pre-loaded
                   </Text>
                 </View>
               )}
@@ -460,9 +466,9 @@ export default function NFCRingScreen({ navigation }) {
                 <View style={styles.infoSection}>
                   <Text style={styles.infoTitle}>How it works</Text>
                   {[
-                    { num: '1', text: 'Enter any URL \u2014 Instagram, YouTube, your website, etc.' },
-                    { num: '2', text: 'Tap "Write" and hold your ring to your phone' },
-                    { num: '3', text: 'Anyone who taps your ring will open your link!' },
+                    { num: '1', text: 'Your profile link is already loaded' },
+                    { num: '2', text: 'Tap "Write" then hold your ring to the top of your phone' },
+                    { num: '3', text: 'Anyone who taps your ring opens your ping!' },
                   ].map((item) => (
                     <View style={styles.infoItem} key={item.num}>
                       <View style={styles.infoNumber}>

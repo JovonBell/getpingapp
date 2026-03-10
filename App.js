@@ -57,6 +57,9 @@ class NFCErrorBoundary extends React.Component {
   }
 }
 
+// Guided onboarding tour
+import GuidedTour from './screens/onboarding/GuidedTour';
+
 // Screens - Main
 import ProfileScreen from './screens/settings/ProfileScreen';
 import ProfileEditScreen from './screens/settings/ProfileEditScreen';
@@ -68,10 +71,15 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // Bottom Tab Navigator — 3 tabs: Card, Ring, Settings
-function MainTabs() {
+function MainTabs({ navigation }) {
   const { theme } = useTheme();
 
+  const handleSwitchTab = (tabName) => {
+    navigation.navigate('Home', { screen: tabName });
+  };
+
   return (
+    <View style={{ flex: 1 }}>
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
@@ -130,6 +138,8 @@ function MainTabs() {
         }}
       />
     </Tab.Navigator>
+    <GuidedTour onSwitchTab={handleSwitchTab} />
+    </View>
   );
 }
 

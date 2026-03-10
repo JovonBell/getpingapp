@@ -133,7 +133,7 @@ export default function CreateAccountScreen({ navigation }) {
                 <Text style={styles.footerLink} onPress={() => Linking.openURL('https://getping.today/terms')}>terms</Text> and{' '}
                 <Text style={styles.footerLink} onPress={() => Linking.openURL('https://getping.today/privacy')}>privacy policy</Text>.
               </Text>
-              <TouchableOpacity style={styles.signInLink}>
+              <TouchableOpacity style={styles.signInLink} onPress={() => navigation.goBack()}>
                 <Text style={styles.signInText}>
                   already have an account? <Text style={styles.signInLinkText}>sign in</Text>
                 </Text>
