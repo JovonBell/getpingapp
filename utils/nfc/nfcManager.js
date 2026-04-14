@@ -2,36 +2,55 @@
  * NFC Manager Utilities for Ping Ring
  *
  * Handles all NFC operations for programming the user's ring
- * with their contact sharing URL.
+ * with their contact sharing URL. Falls back to mock mode
+ * when native NFC module isn't available (simulator / Expo Go).
  */
 
 import { Platform, Alert } from 'react-native';
-import NfcManager, { NfcTech, Ndef } from 'react-native-nfc-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Storage key for remembering programmed ring
+// Try to import native NFC — will fail in Expo Go / simulator
+let NfcManager = null;
+let NfcTech = null;
+let Ndef = null;
+let MOCK_MODE = false;
+
+try {
+  const nfc = require('react-native-nfc-manager');
+  NfcManager = nfc.default;
+  NfcTech = nfc.NfcTech;
+  Ndef = nfc.Ndef;
+} catch (e) {
+  console.log('[NFC] Native module not available — running in mock mode');
+  MOCK_MODE = true;
+}
+
+// Storage keys
 const NFC_RING_URL_KEY = '@ping_nfc_ring_url';
 const NFC_RING_DATE_KEY = '@ping_nfc_ring_date';
 
 /**
+ * Whether we're running in mock mode (no real NFC hardware)
+ */
+export function isMockMode() {
+  return MOCK_MODE;
+}
+
+/**
  * Check if NFC is available and enabled on this device
- * @returns {Promise<{supported: boolean, enabled: boolean, error?: string}>}
  */
 export async function checkNfcAvailability() {
+  if (MOCK_MODE) {
+    return { supported: true, enabled: true, mock: true };
+  }
+
   try {
     const supported = await NfcManager.isSupported();
-
     if (!supported) {
-      return {
-        supported: false,
-        enabled: false,
-        error: 'NFC_NOT_SUPPORTED'
-      };
+      return { supported: false, enabled: false, error: 'NFC_NOT_SUPPORTED' };
     }
 
-    // Start NFC manager
     await NfcManager.start();
-
     const enabled = await NfcManager.isEnabled();
 
     return {
@@ -41,11 +60,7 @@ export async function checkNfcAvailability() {
     };
   } catch (error) {
     console.error('[NFC] Error checking availability:', error);
-    return {
-      supported: false,
-      enabled: false,
-      error: error.message
-    };
+    return { supported: false, enabled: false, error: error.message };
   }
 }
 
@@ -53,81 +68,73 @@ export async function checkNfcAvailability() {
  * Open device NFC settings
  */
 export async function openNfcSettings() {
+  if (MOCK_MODE) return;
+
   try {
     await NfcManager.goToNfcSetting();
   } catch (error) {
     console.error('[NFC] Error opening settings:', error);
-    Alert.alert(
-      'Cannot Open Settings',
-      'Please manually enable NFC in your device settings.'
-    );
+    Alert.alert('Cannot Open Settings', 'Please manually enable NFC in your device settings.');
   }
 }
 
 /**
  * Program the NFC ring with a custom URL
- * @param {string} url - The URL to write to the ring
- * @returns {Promise<{success: boolean, url?: string, error?: string, message?: string}>}
  */
 export async function programRing(url) {
+  // Mock mode — simulate a 2s write
+  if (MOCK_MODE) {
+    console.log('[NFC MOCK] Simulating write:', url);
+    await new Promise(r => setTimeout(r, 2000));
+    await AsyncStorage.setItem(NFC_RING_URL_KEY, url);
+    await AsyncStorage.setItem(NFC_RING_DATE_KEY, new Date().toISOString());
+    return { success: true, url };
+  }
+
   let timeoutId = null;
 
   try {
     console.log('[NFC] Starting ring programming for:', url);
 
-    // Check if already programmed with same URL
     const existingUrl = await AsyncStorage.getItem(NFC_RING_URL_KEY);
     if (existingUrl === url) {
       const existingDate = await AsyncStorage.getItem(NFC_RING_DATE_KEY);
       console.log('[NFC] Ring already programmed on:', existingDate);
     }
 
-    // Start NFC manager if not started
     await NfcManager.start();
 
-    // Set a 60-second timeout
     const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = setTimeout(() => {
-        reject(new Error('TIMEOUT'));
-      }, 60000);
+      timeoutId = setTimeout(() => reject(new Error('TIMEOUT')), 60000);
     });
 
-    // Request NDEF technology with platform-specific options
     const techRequestOptions = Platform.OS === 'ios'
       ? { alertMessage: 'Hold your ring near the top of your iPhone' }
       : {};
 
     const techPromise = NfcManager.requestTechnology(NfcTech.Ndef, techRequestOptions);
-
-    // Wait for either tech request or timeout
     await Promise.race([techPromise, timeoutPromise]);
     clearTimeout(timeoutId);
 
-    // Get tag info
     const tag = await NfcManager.getTag();
     console.log('[NFC] Tag detected:', tag?.id);
 
-    // Encode the URL
     const bytes = Ndef.encodeMessage([Ndef.uriRecord(url)]);
 
-    // Check tag capacity
     if (tag?.maxSize && bytes.length > tag.maxSize) {
       throw new Error('TAG_TOO_SMALL');
     }
 
-    // Write to the tag
     await NfcManager.ndefHandler.writeNdefMessage(bytes);
     console.log('[NFC] Write successful!');
 
-    // Verify the write by reading back
     const verifyTag = await NfcManager.getTag();
     console.log('[NFC] Verified tag:', verifyTag?.id);
 
-    // Store that we programmed this ring
     await AsyncStorage.setItem(NFC_RING_URL_KEY, url);
     await AsyncStorage.setItem(NFC_RING_DATE_KEY, new Date().toISOString());
 
-    return { success: true, url: url };
+    return { success: true, url };
 
   } catch (error) {
     console.error('[NFC] Programming error:', error);
@@ -149,11 +156,7 @@ export async function programRing(url) {
       errorMessage = 'This ring is read-only and cannot be programmed.';
     }
 
-    return {
-      success: false,
-      error: errorType,
-      message: errorMessage
-    };
+    return { success: false, error: errorType, message: errorMessage };
 
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
@@ -167,21 +170,32 @@ export async function programRing(url) {
 
 /**
  * Read what's currently on an NFC tag
- * @returns {Promise<{success: boolean, data?: any, error?: string}>}
  */
 export async function readRing() {
+  // Mock mode — simulate a 2s read, return stored URL
+  if (MOCK_MODE) {
+    console.log('[NFC MOCK] Simulating read...');
+    await new Promise(r => setTimeout(r, 2000));
+    const storedUrl = await AsyncStorage.getItem(NFC_RING_URL_KEY);
+    return {
+      success: true,
+      data: {
+        id: 'MOCK-RING-001',
+        techTypes: ['Ndef'],
+        maxSize: 868,
+        url: storedUrl || null,
+      }
+    };
+  }
+
   let timeoutId = null;
 
   try {
     console.log('[NFC] Starting ring read...');
-
     await NfcManager.start();
 
-    // Set a 30-second timeout for reading
     const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = setTimeout(() => {
-        reject(new Error('TIMEOUT'));
-      }, 30000);
+      timeoutId = setTimeout(() => reject(new Error('TIMEOUT')), 30000);
     });
 
     const techRequestOptions = Platform.OS === 'ios'
@@ -195,32 +209,22 @@ export async function readRing() {
     const tag = await NfcManager.getTag();
     console.log('[NFC] Tag read:', tag);
 
-    // Parse NDEF message if present
     let url = null;
     if (tag?.ndefMessage && tag.ndefMessage.length > 0) {
       const record = tag.ndefMessage[0];
       if (record.tnf === Ndef.TNF_WELL_KNOWN && record.type[0] === 0x55) {
-        // URI record
         url = Ndef.uri.decodePayload(record.payload);
       }
     }
 
     return {
       success: true,
-      data: {
-        id: tag?.id,
-        techTypes: tag?.techTypes,
-        maxSize: tag?.maxSize,
-        url
-      }
+      data: { id: tag?.id, techTypes: tag?.techTypes, maxSize: tag?.maxSize, url }
     };
 
   } catch (error) {
     console.error('[NFC] Read error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
+    return { success: false, error: error.message };
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
     try {
@@ -233,7 +237,6 @@ export async function readRing() {
 
 /**
  * Get the stored ring URL (if user has programmed a ring before)
- * @returns {Promise<{url: string|null, date: string|null}>}
  */
 export async function getStoredRingInfo() {
   try {
@@ -262,6 +265,7 @@ export async function clearStoredRingInfo() {
  * Cancel any ongoing NFC operation
  */
 export async function cancelNfcOperation() {
+  if (MOCK_MODE) return;
   try {
     await NfcManager.cancelTechnologyRequest();
   } catch (error) {
@@ -277,4 +281,5 @@ export default {
   getStoredRingInfo,
   clearStoredRingInfo,
   cancelNfcOperation,
+  isMockMode,
 };

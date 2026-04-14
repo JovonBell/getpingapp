@@ -16,7 +16,6 @@ import {
   Easing,
   Alert,
   Platform,
-  Linking,
   KeyboardAvoidingView,
   ScrollView,
 } from 'react-native';
@@ -24,7 +23,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
-import { supabase } from '../../lib/supabase';
 import {
   checkNfcAvailability,
   openNfcSettings,
@@ -32,6 +30,7 @@ import {
   readRing,
   getStoredRingInfo,
   cancelNfcOperation,
+  isMockMode,
 } from '../../utils/nfc/nfcManager';
 import Haptic from '../../utils/haptics';
 
@@ -48,11 +47,10 @@ const STATUS = {
   ERROR: 'error',
 };
 
-export default function NFCRingScreen({ navigation }) {
+export default function NFCRingScreen() {
   const { theme } = useTheme();
   const [status, setStatus] = useState(STATUS.CHECKING);
   const [errorMessage, setErrorMessage] = useState(null);
-  const [userId, setUserId] = useState(null);
   const [storedRingInfo, setStoredRingInfo] = useState(null);
   const [readResult, setReadResult] = useState(null);
   const [customUrl, setCustomUrl] = useState('');
@@ -134,16 +132,12 @@ export default function NFCRingScreen({ navigation }) {
 
   const loadUserAndRingInfo = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUserId(session.user.id);
-        // Pre-populate URL with user's profile link if empty
-        if (!customUrl) {
-          setCustomUrl(`https://www.getping.today/ping/${session.user.id}`);
-        }
-      }
       const ringInfo = await getStoredRingInfo();
       setStoredRingInfo(ringInfo);
+      // Pre-fill with last programmed URL if available
+      if (ringInfo?.url && !customUrl) {
+        setCustomUrl(ringInfo.url);
+      }
     } catch (error) {
       console.error('[NFCRing] Error loading info:', error);
     }
@@ -320,7 +314,7 @@ export default function NFCRingScreen({ navigation }) {
         return (
           <View style={styles.statusContainer}>
             <Text style={[styles.statusTitle, { color: theme.success }]}>Ring Programmed!</Text>
-            <Text style={styles.statusText}>Your ring is ready to share your contact info.</Text>
+            <Text style={styles.statusText}>Your ring is ready. Anyone who taps it will open your link.</Text>
           </View>
         );
 
@@ -358,9 +352,9 @@ export default function NFCRingScreen({ navigation }) {
       default:
         return (
           <View style={styles.statusContainer}>
-            <Text style={styles.statusTitle}>Program Your Ring</Text>
+            <Text style={styles.statusTitle}>Ready to Program</Text>
             <Text style={styles.statusText}>
-              Tap here, then tap your ring to the top of your phone.
+              Enter a link below, then tap Write to program your ring.
             </Text>
           </View>
         );
@@ -387,6 +381,12 @@ export default function NFCRingScreen({ navigation }) {
               {/* Header */}
               <View style={styles.header}>
                 <Text style={styles.title}>NFC Ring</Text>
+                {isMockMode() && (
+                  <View style={styles.mockBadge}>
+                    <Ionicons name="flask-outline" size={12} color="rgba(255,255,255,0.4)" />
+                    <Text style={styles.mockBadgeText}>Simulator Mode</Text>
+                  </View>
+                )}
                 {storedRingInfo?.date && status === STATUS.READY && (
                   <View style={styles.lastProgrammedBadge}>
                     <Ionicons name="checkmark-circle" size={12} color="#4FFFB0" />
@@ -406,7 +406,7 @@ export default function NFCRingScreen({ navigation }) {
               {/* URL Input */}
               {status === STATUS.READY && (
                 <View style={styles.inputSection}>
-                  <Text style={styles.inputLabel}>Your ping link</Text>
+                  <Text style={styles.inputLabel}>Link to write</Text>
                   <View style={[
                     styles.inputWrapper,
                     inputFocused && styles.inputWrapperFocused,
@@ -426,7 +426,7 @@ export default function NFCRingScreen({ navigation }) {
                     />
                   </View>
                   <Text style={styles.inputHint}>
-                    your profile link is pre-loaded
+                    enter any link to write to your ring
                   </Text>
                 </View>
               )}
@@ -466,9 +466,9 @@ export default function NFCRingScreen({ navigation }) {
                 <View style={styles.infoSection}>
                   <Text style={styles.infoTitle}>How it works</Text>
                   {[
-                    { num: '1', text: 'Your profile link is already loaded' },
-                    { num: '2', text: 'Tap "Write" then hold your ring to the top of your phone' },
-                    { num: '3', text: 'Anyone who taps your ring opens your ping!' },
+                    { num: '1', text: 'Enter any link you want to share' },
+                    { num: '2', text: 'Tap "Write" and hold your ring to the top of your phone' },
+                    { num: '3', text: 'Anyone who taps your ring opens your link instantly' },
                   ].map((item) => (
                     <View style={styles.infoItem} key={item.num}>
                       <View style={styles.infoNumber}>
@@ -506,6 +506,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
     letterSpacing: -0.5,
+  },
+  mockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  mockBadgeText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.3)',
+    letterSpacing: 0.5,
   },
   lastProgrammedBadge: {
     flexDirection: 'row',
